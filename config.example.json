@@ -1,0 +1,18 @@
+{
+  "app_name": "WireWall",
+  "mode": "real",
+  "scan_interval_seconds": 2,
+  "history_retention_days": 30,
+  "log_level": "INFO",
+  "ollama_base_url": "http://127.0.0.1:11434",
+  "ollama_model": "llama3.2:3b",
+  "ollama_timeout_seconds": 30,
+  "security_profile": "Normal",
+  "theme": "dark",
+  "export_directory": "",
+  "alert_threshold": 50,
+  "dedup_window_seconds": 60,
+  "dashboard_refresh_ms": 1500,
+  "author_name": "Equipe Ydays",
+  "organization_name": "Ynov Campus"
+}

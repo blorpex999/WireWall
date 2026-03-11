@@ -1,0 +1,15 @@
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.wirewall-runtime/
+.wirewall-pytest-tmp/
+wirewall_pytest_tmp/
+wirewall_test_artifacts/
+pytest-cache-files-*/
+build/
+dist/
+.coverage
+*.log

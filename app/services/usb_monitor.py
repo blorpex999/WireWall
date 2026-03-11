@@ -1,0 +1,234 @@
+from __future__ import annotations
+
+import logging
+import threading
+
+from app.models.entities import Alert, DeviceEvent, USBDevice
+from app.utils.datetime import minutes_ago, seconds_ago, utc_now
+
+LOGGER = logging.getLogger(__name__)
+
+GENERIC_VENDOR_NAMES = {"", "INCONNU", "UNKNOWN"}
+GENERIC_PRODUCT_NAMES = {"", "PÉRIPHÉRIQUE USB", "PERIPHERIQUE USB", "USB DEVICE", "UNKNOWN"}
+
+
+class UsbMonitorService:
+    def __init__(
+        self,
+        enumerator,
+        device_repo,
+        event_repo,
+        assessment_repo,
+        alert_repo,
+        policy_service,
+        risk_engine,
+        event_bus,
+        settings,
+    ) -> None:
+        self.enumerator = enumerator
+        self.device_repo = device_repo
+        self.event_repo = event_repo
+        self.assessment_repo = assessment_repo
+        self.alert_repo = alert_repo
+        self.policy_service = policy_service
+        self.risk_engine = risk_engine
+        self.event_bus = event_bus
+        self.settings = settings
+        self._current_snapshot: dict[str, USBDevice] = {}
+        self._stop_event = threading.Event()
+        self._refresh_event = threading.Event()
+        self._thread: threading.Thread | None = None
+
+    @property
+    def demo_mode(self) -> bool:
+        return self.settings.mode == "demo"
+
+    def start(self) -> None:
+        if self._thread and self._thread.is_alive():
+            return
+        self._stop_event.clear()
+        self._thread = threading.Thread(target=self._run, name="wirewall-usb-monitor", daemon=True)
+        self._thread.start()
+
+    def stop(self) -> None:
+        self._stop_event.set()
+        self._refresh_event.set()
+        if self._thread and self._thread.is_alive():
+            self._thread.join(timeout=2)
+
+    def refresh_now(self) -> None:
+        self._refresh_event.set()
+
+    def update_settings(self, settings) -> None:
+        self.settings = settings
+        self.refresh_now()
+
+    def _run(self) -> None:
+        while not self._stop_event.is_set():
+            try:
+                self.scan_once()
+            except Exception as exc:
+                LOGGER.exception("Erreur non gérée dans la boucle de monitoring USB.")
+                self.event_bus.publish("monitor_error", {"message": f"Erreur de monitoring USB: {exc}"})
+            self._refresh_event.wait(timeout=max(1, self.settings.scan_interval_seconds))
+            self._refresh_event.clear()
+
+    def scan_once(self) -> bool:
+        enumeration = self.enumerator.enumerate()
+        if not enumeration.success:
+            LOGGER.warning("Scan USB ignoré: %s", enumeration.message)
+            self._create_system_event(
+                event_type="scan_error",
+                summary=enumeration.message,
+                severity="WARNING",
+                reasons=[enumeration.message],
+            )
+            self.event_bus.publish("monitor_warning", {"message": enumeration.message, "details": enumeration.details})
+            return False
+
+        devices = enumeration.devices
+        now = utc_now()
+        new_snapshot: dict[str, USBDevice] = {}
+        for device in devices:
+            canonical = self._canonicalize_device(device, set(new_snapshot))
+            new_snapshot[canonical.device_key] = canonical
+        previous_snapshot = self._current_snapshot
+
+        for device in new_snapshot.values():
+            existing = self.device_repo.get(device.device_key)
+            device.first_seen = existing.first_seen if existing and existing.first_seen else now
+            device.last_seen = now
+            device.status = "connected"
+            self._device_assessment(device, existing, now)
+
+        for key, previous_device in previous_snapshot.items():
+            if key not in new_snapshot:
+                disconnected = previous_device
+                disconnected.last_seen = now
+                disconnected.status = "disconnected"
+                self.device_repo.upsert(disconnected)
+                self._create_event(
+                    event_type="disconnected",
+                    device=disconnected,
+                    summary=f"{disconnected.display_name} déconnecté.",
+                    level=disconnected.risk_level,
+                    score=disconnected.risk_score,
+                    reasons=["Le périphérique n'est plus détecté dans le snapshot courant."],
+                )
+
+        self._current_snapshot = new_snapshot
+        self.event_bus.publish("snapshot_updated", {"device_count": len(new_snapshot)})
+        return True
+
+    def _canonicalize_device(self, device: USBDevice, reserved_keys: set[str]) -> USBDevice:
+        candidate = self.device_repo.find_reconnect_candidate(device, self.demo_mode)
+        if candidate is None or candidate.device_key in reserved_keys:
+            return device
+
+        device.device_key = candidate.device_key
+        if candidate.first_seen:
+            device.first_seen = candidate.first_seen
+        if self._is_generic_vendor(device.vendor_name) and not self._is_generic_vendor(candidate.vendor_name):
+            device.vendor_name = candidate.vendor_name
+        if self._is_generic_product(device.product_name) and not self._is_generic_product(candidate.product_name):
+            device.product_name = candidate.product_name
+        if not device.serial_number and candidate.serial_number:
+            device.serial_number = candidate.serial_number
+        if device.confidence < candidate.confidence and (
+            self._is_generic_vendor(device.vendor_name) or self._is_generic_product(device.product_name)
+        ):
+            device.confidence = candidate.confidence
+            device.identification_source = candidate.identification_source
+        self.device_repo.delete_disconnected_duplicates(device.device_key, device, self.demo_mode)
+        return device
+
+    def _is_generic_vendor(self, value: str | None) -> bool:
+        return (value or "").strip().upper() in GENERIC_VENDOR_NAMES
+
+    def _is_generic_product(self, value: str | None) -> bool:
+        return (value or "").strip().upper() in GENERIC_PRODUCT_NAMES
+
+    def _device_assessment(self, device: USBDevice, existing: USBDevice | None, now: str) -> None:
+        policies = self.policy_service.evaluate_device(device)
+        recent_events = self.event_repo.list_device_events_since(device.device_key, minutes_ago(10), self.demo_mode)
+        assessment = self.risk_engine.assess(device, recent_events, policies, self.settings.security_profile, now)
+        device.risk_score = assessment.score
+        device.risk_level = assessment.level
+        self.device_repo.upsert(device)
+        self.assessment_repo.add(assessment)
+
+        if existing is None or existing.status != "connected":
+            event_id = self._create_event(
+                event_type="connected",
+                device=device,
+                summary=f"{device.display_name} connecté.",
+                level=assessment.level,
+                score=assessment.score,
+                reasons=assessment.reasons,
+            )
+            if assessment.score >= self.settings.alert_threshold:
+                self.alert_repo.add(
+                    Alert(
+                        created_at=now,
+                        severity=assessment.level,
+                        title=f"Alerte USB {assessment.level}",
+                        message=f"{device.display_name} présente un score de risque de {assessment.score}.",
+                        device_key=device.device_key,
+                        event_id=event_id,
+                        score=assessment.score,
+                        recommendations=assessment.recommendations,
+                        demo_mode=self.demo_mode,
+                    )
+                )
+
+    def _create_event(
+        self,
+        *,
+        event_type: str,
+        device: USBDevice,
+        summary: str,
+        level: str,
+        score: int,
+        reasons: list[str],
+    ) -> int | None:
+        since = seconds_ago(self.settings.dedup_window_seconds)
+        if self.event_repo.has_recent_duplicate(device.device_key, event_type, self.demo_mode, since):
+            return None
+        event = DeviceEvent(
+            occurred_at=utc_now(),
+            event_type=event_type,
+            device_key=device.device_key,
+            summary=summary,
+            severity=level,
+            score=score,
+            level=level,
+            reasons=reasons,
+            source="monitor",
+            payload={"vid_pid": device.vid_pid, "category": device.category},
+            demo_mode=self.demo_mode,
+        )
+        event_id = self.event_repo.add(event)
+        self.event_bus.publish("device_event", {"event_id": event_id, "device_key": device.device_key})
+        return event_id
+
+    def _create_system_event(self, *, event_type: str, summary: str, severity: str, reasons: list[str]) -> int | None:
+        since = seconds_ago(self.settings.dedup_window_seconds)
+        if self.event_repo.has_recent_duplicate(None, event_type, self.demo_mode, since):
+            return None
+        event_id = self.event_repo.add(
+            DeviceEvent(
+                occurred_at=utc_now(),
+                event_type=event_type,
+                device_key=None,
+                summary=summary,
+                severity=severity,
+                score=0,
+                level="LOW",
+                reasons=reasons,
+                source="monitor",
+                payload={},
+                demo_mode=self.demo_mode,
+            )
+        )
+        self.event_bus.publish("device_event", {"event_id": event_id, "device_key": None})
+        return event_id

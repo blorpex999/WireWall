@@ -1,0 +1,1 @@
+"""WireWall application package."""
