@@ -123,10 +123,28 @@ SCHEMA_STATEMENTS = [
         context_json TEXT NOT NULL DEFAULT '{}'
     )
     """,
+    """
+    CREATE TABLE IF NOT EXISTS brain_snapshots (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        created_at TEXT NOT NULL,
+        global_score INTEGER NOT NULL DEFAULT 0,
+        global_level TEXT NOT NULL DEFAULT 'LOW',
+        progress_status TEXT NOT NULL DEFAULT 'LEARNING',
+        summary TEXT NOT NULL DEFAULT '',
+        incident_count INTEGER NOT NULL DEFAULT 0,
+        open_alert_count INTEGER NOT NULL DEFAULT 0,
+        monitored_device_count INTEGER NOT NULL DEFAULT 0,
+        recommendations_json TEXT NOT NULL DEFAULT '[]',
+        focus_areas_json TEXT NOT NULL DEFAULT '[]',
+        metadata_json TEXT NOT NULL DEFAULT '{}',
+        demo_mode INTEGER NOT NULL DEFAULT 0
+    )
+    """,
     "CREATE INDEX IF NOT EXISTS idx_device_events_occurred_at ON device_events(occurred_at DESC)",
     "CREATE INDEX IF NOT EXISTS idx_device_events_device_key ON device_events(device_key)",
     "CREATE INDEX IF NOT EXISTS idx_alerts_created_at ON alerts(created_at DESC)",
     "CREATE INDEX IF NOT EXISTS idx_assessments_device_key ON risk_assessments(device_key)",
+    "CREATE INDEX IF NOT EXISTS idx_brain_snapshots_created_at ON brain_snapshots(created_at DESC)",
 ]
 
 

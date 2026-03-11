@@ -29,6 +29,7 @@ class HistoryView(BaseView):
         self.columnconfigure(1, weight=2)
         self.rowconfigure(2, weight=1)
         self._rows: dict[str, object] = {}
+        self._selected_event_key: str | None = None
 
         self.header = SectionHeader(
             self,
@@ -43,21 +44,26 @@ class HistoryView(BaseView):
         toolbar.columnconfigure(3, weight=1)
         ttk.Label(toolbar, text="Recherche").grid(row=0, column=0, sticky="w", padx=(0, 8))
         self.search_var = tk.StringVar()
-        ttk.Entry(toolbar, textvariable=self.search_var).grid(row=0, column=1, sticky="ew", padx=(0, 12))
+        self.search_entry = ttk.Entry(toolbar, textvariable=self.search_var)
+        self.search_entry.grid(row=0, column=1, sticky="ew", padx=(0, 12))
         ttk.Label(toolbar, text="Gravite").grid(row=0, column=2, sticky="w", padx=(0, 8))
         self.severity_var = tk.StringVar(value="Toutes")
-        ttk.Combobox(
+        self.severity_combo = ttk.Combobox(
             toolbar,
             textvariable=self.severity_var,
             values=list(self.SEVERITY_OPTIONS.keys()),
             state="readonly",
-        ).grid(row=0, column=3, sticky="ew")
+        )
+        self.severity_combo.grid(row=0, column=3, sticky="ew")
         ttk.Button(toolbar, text="Appliquer", command=self.refresh_data).grid(row=1, column=2, sticky="e", pady=(12, 0))
         actions = ttk.Frame(toolbar)
         actions.grid(row=1, column=3, sticky="e", pady=(12, 0))
         ttk.Button(actions, text="CSV", command=lambda: self._export("csv")).pack(side="left")
         ttk.Button(actions, text="JSON", command=lambda: self._export("json")).pack(side="left", padx=8)
         ttk.Button(actions, text="Rapport HTML", style="Accent.TButton", command=lambda: self._export("html")).pack(side="left")
+        self.search_var.trace_add("write", lambda *_args: self.schedule_refresh(250))
+        self.search_entry.bind("<Return>", lambda _event: self.refresh_data())
+        self.severity_combo.bind("<<ComboboxSelected>>", lambda _event: self.refresh_data())
 
         list_frame = ttk.LabelFrame(self, text="Evenements", style="Section.TLabelframe", padding=12)
         list_frame.grid(row=2, column=0, sticky="nsew", padx=(0, 8))
@@ -117,9 +123,11 @@ class HistoryView(BaseView):
 
     def refresh_data(self) -> None:
         severity = self.SEVERITY_OPTIONS[self.severity_var.get()]
+        selected_key = self._get_selected_event_key() or self._selected_event_key
         events = self.controller.list_events(self.search_var.get().strip(), severity)
         self._rows.clear()
         self.table.clear()
+        item_to_restore: str | None = None
         for event in events:
             item_id = self.table.tree.insert(
                 "",
@@ -134,8 +142,16 @@ class HistoryView(BaseView):
                 tags=(event.severity,),
             )
             self._rows[item_id] = event
+            if self._event_key(event) == selected_key:
+                item_to_restore = item_id
         self.table.set_empty(bool(events), "Aucun evenement a afficher avec les filtres actuels.")
-        self._clear_selection_state()
+        if item_to_restore is not None:
+            self.table.tree.selection_set(item_to_restore)
+            self.table.tree.focus(item_to_restore)
+            self.table.tree.see(item_to_restore)
+            self._show_selected()
+        else:
+            self._clear_selection_state()
 
     def _show_selected(self) -> None:
         selection = self.table.tree.selection()
@@ -146,6 +162,7 @@ class HistoryView(BaseView):
         if event is None:
             self._clear_selection_state()
             return
+        self._selected_event_key = self._event_key(event)
         self.severity_badge.set(event.severity, event.severity)
         self.values["date"].set(format_for_ui(event.occurred_at))
         self.values["type"].set(event.event_type)
@@ -164,10 +181,25 @@ class HistoryView(BaseView):
         )
 
     def _clear_selection_state(self) -> None:
+        self._selected_event_key = None
         self.severity_badge.set("INFO", "INFO")
         for value in self.values.values():
             value.set("-")
         self.detail_text.set_text("Selectionnez un evenement pour afficher son contexte d'audit detaille.")
+
+    def _get_selected_event_key(self) -> str | None:
+        selection = self.table.tree.selection()
+        if not selection:
+            return None
+        event = self._rows.get(selection[0])
+        if event is None:
+            return None
+        return self._event_key(event)
+
+    def _event_key(self, event) -> str:
+        if event.id is not None:
+            return f"id:{event.id}"
+        return f"{event.occurred_at}|{event.event_type}|{event.device_key or ''}"
 
     def _export(self, fmt: str) -> None:
         self.run_action(

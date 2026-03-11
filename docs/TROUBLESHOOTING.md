@@ -19,14 +19,43 @@ Si cette commande echoue, changez de poste ou reinstallez Python 3.11 avec Tcl/T
 
 Cause probable :
 
-- Build realise sur un host non supporte
-- Runtime Tk incomplet
+- build realise sur un host non supporte
+- runtime Tk incomplet
 
 Action :
 
 - refaire le build sur un poste `Python 3.11 + Tcl/Tk` valide
 - verifier `dist\WireWall\WireWall.exe`
 - verifier la presence de `libusb-1.0.dll` dans `dist\WireWall`
+
+## `build_installer.bat` echoue
+
+Cause probable :
+
+- Inno Setup 6 absent
+- `ISCC.exe` introuvable
+
+Action :
+
+- installer Inno Setup 6
+- verifier l'un de ces chemins :
+  - `%ProgramFiles(x86)%\Inno Setup 6\ISCC.exe`
+  - `%ProgramFiles%\Inno Setup 6\ISCC.exe`
+- ou definir `ISCC_EXE`
+
+## `check_release_consistency.py` echoue
+
+Cause probable :
+
+- `VERSION` invalide
+- documentation ou scripts manquants
+- packaging `wirewall.spec` desynchronise
+- script installateur desynchronise
+
+Action :
+
+- corriger les fichiers signales
+- relancer le controle avant de produire un package ou une release
 
 ## Aucun peripherique USB n'apparait
 
@@ -49,12 +78,15 @@ Cause probable :
 - service local non lance
 - modele absent
 - URL de base incorrecte
+- `winget` absent ou installeur offline non fourni
 
 Action :
 
 - lancer Ollama localement
 - verifier `http://127.0.0.1:11434`
 - tester depuis l'ecran `Analyse IA`
+- lancer `tools\setup_ai.bat` ou `tools\setup_ai.ps1`
+- si `winget` est absent, utiliser un installeur Ollama officiel offline avec `-OfflineInstallerPath`
 - en soutenance, expliquer que l'analyse est strictement locale et facultative
 
 ## `USBSTOR` ne change pas d'effet
@@ -81,3 +113,15 @@ Action :
 
 - verifier si WireWall a bascule sur `.wirewall-runtime\WireWall\`
 - verifier les permissions OneDrive ou poste de demo
+
+## L'installateur a fonctionne mais l'IA locale ne marche pas
+
+Cause probable :
+
+- Ollama n'est pas installe
+- le modele `qwen2.5:3b` n'est pas encore telecharge
+
+Action :
+
+- ouvrir `Assistant IA locale` depuis le menu demarrer
+- ou lancer `tools\check_target_prereqs.bat` pour diagnostiquer l'etat du poste

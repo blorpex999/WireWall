@@ -153,6 +153,26 @@ class AIAnalysis:
 
 
 @dataclass(slots=True)
+class BrainSnapshot:
+    created_at: str
+    global_score: int
+    global_level: str
+    progress_status: str
+    summary: str
+    incident_count: int = 0
+    open_alert_count: int = 0
+    monitored_device_count: int = 0
+    recommendations: list[str] = field(default_factory=list)
+    focus_areas: list[str] = field(default_factory=list)
+    metadata: dict[str, Any] = field(default_factory=dict)
+    demo_mode: bool = False
+    id: int | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(slots=True)
 class HealthStatus:
     component: str
     status: str

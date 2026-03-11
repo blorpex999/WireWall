@@ -4,6 +4,7 @@ from tkinter import ttk
 
 from app.ui.views.base import BaseView
 from app.ui.widgets.common import LabeledValue, SectionHeader, StatusPill
+from app.version import __version__
 
 
 class AboutView(BaseView):
@@ -32,12 +33,14 @@ class AboutView(BaseView):
         self.mode_badge.pack(side="left")
         self.identity_values = {
             "name": LabeledValue(identity, "Nom"),
+            "version": LabeledValue(identity, "Version"),
             "team": LabeledValue(identity, "Auteur / equipe"),
             "org": LabeledValue(identity, "Organisation"),
         }
         self.identity_values["name"].grid(row=1, column=0, sticky="ew", pady=(14, 0))
-        self.identity_values["team"].grid(row=2, column=0, sticky="ew", pady=(10, 0))
-        self.identity_values["org"].grid(row=3, column=0, sticky="ew", pady=(10, 0))
+        self.identity_values["version"].grid(row=2, column=0, sticky="ew", pady=(10, 0))
+        self.identity_values["team"].grid(row=3, column=0, sticky="ew", pady=(10, 0))
+        self.identity_values["org"].grid(row=4, column=0, sticky="ew", pady=(10, 0))
 
         mission = ttk.Frame(self, style="Card.TFrame", padding=18)
         mission.grid(row=1, column=1, sticky="nsew", padx=(8, 0), pady=(0, 12))
@@ -86,6 +89,7 @@ class AboutView(BaseView):
     def refresh_data(self) -> None:
         settings = self.controller.settings
         self.identity_values["name"].set(settings.app_name)
+        self.identity_values["version"].set(__version__)
         self.identity_values["team"].set(settings.author_name or "Equipe non renseignee")
         self.identity_values["org"].set(settings.organization_name or "Organisation non renseignee")
         if self.controller.demo_mode:

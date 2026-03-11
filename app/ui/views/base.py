@@ -16,9 +16,27 @@ class BaseView(ttk.Frame):
         super().__init__(master, padding=18)
         self.controller = controller
         self.app = app
+        self._scheduled_refresh_id: str | None = None
 
     def refresh_data(self) -> None:
         """Override in subclasses."""
+
+    def schedule_refresh(self, delay_ms: int = 250) -> None:
+        self.cancel_scheduled_refresh()
+        self._scheduled_refresh_id = self.after(delay_ms, self._run_scheduled_refresh)
+
+    def cancel_scheduled_refresh(self) -> None:
+        if self._scheduled_refresh_id is None:
+            return
+        try:
+            self.after_cancel(self._scheduled_refresh_id)
+        except Exception:
+            pass
+        self._scheduled_refresh_id = None
+
+    def _run_scheduled_refresh(self) -> None:
+        self._scheduled_refresh_id = None
+        self.refresh_data()
 
     def run_action(
         self,

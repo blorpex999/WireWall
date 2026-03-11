@@ -42,11 +42,20 @@ class AppController:
             error_event="background_task_error",
         )
 
+    def request_brain_refresh(self) -> bool:
+        return self.container.background_tasks.submit_unique(
+            "brain_refresh",
+            lambda: self.container.brain_service.refresh(self.demo_mode),
+            success_event="brain_refresh_completed",
+            error_event="background_task_error",
+        )
+
     def get_dashboard_data(self) -> dict[str, Any]:
         devices = self.container.device_repo.list_all(demo_mode=self.demo_mode)
         alerts = self.container.alert_repo.list_all(demo_mode=self.demo_mode)
         events = self.container.event_repo.list_recent(limit=15, demo_mode=self.demo_mode)
         health = self.container.health_repo.list_all()
+        brain_snapshot = self.container.brain_service.latest(self.demo_mode)
         counts = self.container.device_repo.counts(self.demo_mode)
         alert_counts = self.container.alert_repo.counts(self.demo_mode)
         usb_status = self.container.usb_control_service.get_status()
@@ -64,6 +73,7 @@ class AppController:
             "health": health,
             "usb_status": usb_status,
             "ollama_status": ollama_status,
+            "brain_snapshot": brain_snapshot,
         }
 
     def list_devices(self, search: str = "", category: str = "", status: str = ""):
@@ -215,10 +225,12 @@ class AppController:
         self.container.usb_monitor.update_settings(settings)
         self.container.retention_service.apply(settings.history_retention_days)
         self.request_health_refresh()
+        self.request_brain_refresh()
         return settings
 
     def _run_ai_analysis_sync(self) -> AIAnalysis:
-        context = self.container.report_service.build_context(self.demo_mode)
+        self.container.brain_service.refresh(self.demo_mode)
+        context = self.container.report_service.build_ai_context(self.demo_mode)
         analysis = self.container.ollama_service.analyze(context)
         self.container.ai_analysis_repo.add(analysis)
         return analysis

@@ -19,7 +19,7 @@ def test_controller_save_settings_rejects_invalid_numeric_values() -> None:
                 "history_retention_days": "30",
                 "log_level": "INFO",
                 "ollama_base_url": "http://127.0.0.1:11434",
-                "ollama_model": "llama3.2:3b",
+                "ollama_model": "qwen2.5:3b",
                 "ollama_timeout_seconds": "10",
                 "security_profile": "Normal",
                 "export_directory": "",

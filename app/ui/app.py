@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ctypes
 import tkinter as tk
 from tkinter import ttk
 
@@ -16,12 +17,13 @@ from app.ui.views.settings import SettingsView
 from app.ui.views.usb_control import USBControlView
 from app.ui.widgets.common import DemoBanner, StatusBar, StatusPill
 from app.utils.windows import WindowsDeviceNotificationHook
+from app.version import __version__
 
 
 class WireWallApp(tk.Tk):
     def __init__(self, container) -> None:
         super().__init__()
-        self.title("WireWall")
+        self.title(f"WireWall {__version__}")
         self.geometry("1450x920")
         self.minsize(1180, 780)
         apply_dark_theme(self)
@@ -30,6 +32,7 @@ class WireWallApp(tk.Tk):
         self.controller = AppController(container)
         self.hook = WindowsDeviceNotificationHook()
         self.nav_buttons: dict[str, ttk.Button] = {}
+        self._repaint_scheduled = False
 
         self.columnconfigure(1, weight=1)
         self.rowconfigure(1, weight=1)
@@ -91,6 +94,7 @@ class WireWallApp(tk.Tk):
         self.controller.start_services()
         self.show_view("dashboard")
         self.controller.request_health_refresh()
+        self.controller.request_brain_refresh()
         self.set_status("WireWall initialise.", "OK")
 
     def show_view(self, name: str) -> None:
@@ -101,49 +105,64 @@ class WireWallApp(tk.Tk):
         view.refresh_data()
         self.current_view_key = name
         self._refresh_nav_state()
-        self.title(f"WireWall - {self._view_label(name)}")
+        self.title(f"WireWall {__version__} - {self._view_label(name)}")
         self.set_status(f"Vue active : {self._view_label(name)}", "INFO")
+        self.request_repaint()
 
     def set_status(self, message: str, level: str = "INFO") -> None:
         self.status_bar.set_status(message, level)
+        self.request_repaint()
 
     def _attach_hook(self) -> None:
         self.update_idletasks()
-        attached = self.hook.attach(self, lambda _reason, _code: self.controller.refresh_monitor())
+        attached = self.hook.attach(self, lambda _reason, _code: self.after_idle(self.controller.refresh_monitor))
         if attached:
             self.set_status("Hook Windows USB attache.", "INFO")
 
     def _poll_backend_events(self) -> None:
-        refresh_current = False
-        refresh_dashboard = False
+        refresh_views: set[str] = set()
         for event in self.container.event_bus.drain():
             event_type = event["type"]
-            if event_type in {"device_event", "snapshot_updated", "ai_analysis"}:
-                refresh_current = True
-                refresh_dashboard = True
+            if event_type == "device_event":
+                self.controller.request_brain_refresh()
+                refresh_views.update({"dashboard", "devices", "history", "alerts"})
+            elif event_type in {"snapshot_updated", "ai_analysis"}:
+                refresh_views.update({"dashboard", "devices", "history", "alerts"})
             elif event_type == "ai_analysis_completed":
                 analysis = event["payload"]["result"]
+                self.controller.request_brain_refresh()
                 self.set_status(
                     "Analyse IA terminee." if analysis.success else analysis.summary,
                     "OK" if analysis.success else "WARNING",
                 )
-                refresh_current = True
-                refresh_dashboard = True
+                refresh_views.update({"dashboard", "ai_analysis"})
             elif event_type == "health_refresh_completed":
-                refresh_current = True
-                refresh_dashboard = True
+                self.controller.request_brain_refresh()
+                refresh_views.update({"dashboard", "ai_analysis", "usb_control"})
+            elif event_type == "brain_refresh_completed":
+                refresh_views.add("dashboard")
             elif event_type == "monitor_error":
                 self.set_status(event["payload"].get("message", "Erreur de monitoring."), "ERROR")
+                refresh_views.add("dashboard")
             elif event_type == "monitor_warning":
                 self.set_status(event["payload"].get("message", "Degradation du monitoring USB."), "WARNING")
+                refresh_views.add("dashboard")
             elif event_type == "background_task_error":
                 self.set_status(event["payload"].get("message", "Erreur de tache de fond."), "ERROR")
-                refresh_current = True
+                task_name = event["payload"].get("task")
+                if task_name == "ai_analysis":
+                    refresh_views.add("ai_analysis")
+                elif task_name == "health_refresh":
+                    refresh_views.update({"dashboard", "ai_analysis", "usb_control"})
+                elif task_name == "brain_refresh":
+                    refresh_views.add("dashboard")
 
-        if refresh_dashboard:
+        if "dashboard" in refresh_views:
             self.views["dashboard"].refresh_data()
-        if refresh_current and self.current_view_key is not None and self.current_view_key != "dashboard":
+        if self.current_view_key is not None and self.current_view_key != "dashboard" and self.current_view_key in refresh_views:
             self.views[self.current_view_key].refresh_data()
+        if refresh_views:
+            self.request_repaint()
         self.after(250, self._poll_backend_events)
 
     def _periodic_refresh(self) -> None:
@@ -170,3 +189,19 @@ class WireWallApp(tk.Tk):
         self.hook.detach()
         self.controller.stop_services()
         self.destroy()
+
+    def request_repaint(self) -> None:
+        if self._repaint_scheduled:
+            return
+        self._repaint_scheduled = True
+        self.after_idle(self._force_repaint)
+
+    def _force_repaint(self) -> None:
+        self._repaint_scheduled = False
+        try:
+            self.update_idletasks()
+            if self.winfo_exists() and self.tk.call("tk", "windowingsystem") == "win32":
+                flags = 0x0001 | 0x0004 | 0x0080 | 0x0100
+                ctypes.windll.user32.RedrawWindow(self.winfo_id(), None, None, flags)
+        except Exception:
+            pass

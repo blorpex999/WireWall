@@ -12,6 +12,7 @@ from app.infrastructure.repositories import (
     AIAnalysisRepository,
     AlertRepository,
     AssessmentRepository,
+    BrainSnapshotRepository,
     DeviceRepository,
     EventRepository,
     HealthRepository,
@@ -48,6 +49,7 @@ def repositories(temp_db: DatabaseManager) -> dict[str, object]:
         "settings_repo": SettingsRepository(temp_db),
         "health_repo": HealthRepository(temp_db),
         "ai_repo": AIAnalysisRepository(temp_db),
+        "brain_repo": BrainSnapshotRepository(temp_db),
     }
 
 

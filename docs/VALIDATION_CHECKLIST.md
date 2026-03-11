@@ -5,6 +5,7 @@
 - [ ] Le poste cible est sous Windows 10/11 x64
 - [ ] Le runtime cible est `Python 3.11`
 - [ ] `python scripts\check_runtime.py --require-python 3.11 --require-tk` passe
+- [ ] `python scripts\check_release_consistency.py` passe avant la release
 - [ ] Le poste de soutenance n'est pas le host Python 3.13 non supporte
 
 ## Application
@@ -51,8 +52,20 @@
 - [ ] `scripts\release_check.bat` passe sur le builder officiel
 - [ ] `dist\WireWall\WireWall.exe` est genere
 - [ ] `libusb-1.0.dll` est presente dans le bundle
-- [ ] Le package demarre sur une machine de test propre
+- [ ] `release\WireWall-<version>-win64-portable.zip` est genere
+- [ ] `release\WireWall-Setup-<version>.exe` est genere
+- [ ] Le package portable demarre sur une machine de test propre
+- [ ] L'installateur se lance sur une machine de test propre
+- [ ] L'application installee demarre sur une machine de test propre
 - [ ] Le package affiche un message visible en cas d'echec de preflight Tk
+
+## Installation / desinstallation
+
+- [ ] L'installateur cree les raccourcis menu demarrer
+- [ ] Les outils `Assistant IA locale` et `Diagnostic prerequis` sont presents
+- [ ] `%LOCALAPPDATA%\WireWall\` est prepare
+- [ ] La desinstallation retire les fichiers applicatifs
+- [ ] La documentation signale clairement que les donnees utilisateur restent sur le poste sauf suppression manuelle
 
 ## Runtime et logs
 

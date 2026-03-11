@@ -3,7 +3,7 @@ from __future__ import annotations
 from app.models.entities import AppSettings
 
 APP_NAME = "WireWall"
-DEFAULT_OLLAMA_MODEL = "llama3.2:3b"
+DEFAULT_OLLAMA_MODEL = "qwen2.5:3b"
 DEFAULT_OLLAMA_URL = "http://127.0.0.1:11434"
 
 PROFILE_PRESETS: dict[str, dict[str, int | str]] = {

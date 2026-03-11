@@ -11,5 +11,6 @@ wirewall_test_artifacts/
 pytest-cache-files-*/
 build/
 dist/
+release/
 .coverage
 *.log

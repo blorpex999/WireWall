@@ -25,6 +25,7 @@ class AlertsView(BaseView):
         self.columnconfigure(1, weight=2)
         self.rowconfigure(2, weight=1)
         self._rows: dict[str, object] = {}
+        self._selected_alert_key: str | None = None
 
         self.header = SectionHeader(
             self,
@@ -40,19 +41,21 @@ class AlertsView(BaseView):
         self.severity_var = tk.StringVar(value="Toutes")
         self.ack_var = tk.StringVar(value="Toutes")
         ttk.Label(filters, text="Gravite").grid(row=0, column=0, sticky="w", padx=(0, 8))
-        ttk.Combobox(
+        self.severity_combo = ttk.Combobox(
             filters,
             textvariable=self.severity_var,
             values=["Toutes", "LOW", "MEDIUM", "HIGH", "CRITICAL"],
             state="readonly",
-        ).grid(row=0, column=1, sticky="ew", padx=(0, 12))
+        )
+        self.severity_combo.grid(row=0, column=1, sticky="ew", padx=(0, 12))
         ttk.Label(filters, text="Etat").grid(row=0, column=2, sticky="w", padx=(0, 8))
-        ttk.Combobox(
+        self.ack_combo = ttk.Combobox(
             filters,
             textvariable=self.ack_var,
             values=list(self.ACK_OPTIONS.keys()),
             state="readonly",
-        ).grid(row=0, column=3, sticky="ew")
+        )
+        self.ack_combo.grid(row=0, column=3, sticky="ew")
         ttk.Button(filters, text="Appliquer", command=self.refresh_data).grid(row=1, column=2, sticky="e", pady=(12, 0))
         ttk.Button(filters, text="Rafraichir", style="Accent.TButton", command=self.refresh_data).grid(
             row=1,
@@ -60,6 +63,8 @@ class AlertsView(BaseView):
             sticky="e",
             pady=(12, 0),
         )
+        self.severity_combo.bind("<<ComboboxSelected>>", lambda _event: self.refresh_data())
+        self.ack_combo.bind("<<ComboboxSelected>>", lambda _event: self.refresh_data())
 
         list_frame = ttk.LabelFrame(self, text="Liste des alertes", style="Section.TLabelframe", padding=12)
         list_frame.grid(row=2, column=0, sticky="nsew", padx=(0, 8))
@@ -122,9 +127,11 @@ class AlertsView(BaseView):
     def refresh_data(self) -> None:
         severity = "" if self.severity_var.get() == "Toutes" else self.severity_var.get()
         acknowledged = self.ACK_OPTIONS[self.ack_var.get()]
+        selected_key = self._get_selected_alert_key() or self._selected_alert_key
         alerts = self.controller.list_alerts(severity, acknowledged)
         self._rows.clear()
         self.table.clear()
+        item_to_restore: str | None = None
         for alert in alerts:
             tags = [alert.severity]
             if alert.acknowledged:
@@ -142,8 +149,16 @@ class AlertsView(BaseView):
                 tags=tuple(tags),
             )
             self._rows[item_id] = alert
+            if self._alert_key(alert) == selected_key:
+                item_to_restore = item_id
         self.table.set_empty(bool(alerts), "Aucune alerte ne correspond aux filtres actifs.")
-        self._clear_selection_state()
+        if item_to_restore is not None:
+            self.table.tree.selection_set(item_to_restore)
+            self.table.tree.focus(item_to_restore)
+            self.table.tree.see(item_to_restore)
+            self._show_selected()
+        else:
+            self._clear_selection_state()
 
     def _selected_alert(self):
         selection = self.table.tree.selection()
@@ -156,6 +171,7 @@ class AlertsView(BaseView):
         if alert is None:
             self._clear_selection_state()
             return
+        self._selected_alert_key = self._alert_key(alert)
         self.severity_badge.set(alert.severity, alert.severity)
         self.ack_badge.set("ACQUITTEE" if alert.acknowledged else "ACTIVE", "OK" if alert.acknowledged else "WARNING")
         self.values["title"].set(alert.title)
@@ -172,12 +188,24 @@ class AlertsView(BaseView):
         self.ack_button.configure(state="disabled" if alert.acknowledged else "normal")
 
     def _clear_selection_state(self) -> None:
+        self._selected_alert_key = None
         self.severity_badge.set("AUCUNE", "INFO")
         self.ack_badge.set("AUCUNE", "INFO")
         for value in self.values.values():
             value.set("-")
         self.detail_text.set_text("Selectionnez une alerte pour consulter son detail et ses recommandations.")
         self.ack_button.configure(state="disabled")
+
+    def _get_selected_alert_key(self) -> str | None:
+        alert = self._selected_alert()
+        if alert is None:
+            return None
+        return self._alert_key(alert)
+
+    def _alert_key(self, alert) -> str:
+        if alert.id is not None:
+            return f"id:{alert.id}"
+        return f"{alert.created_at}|{alert.title}|{alert.severity}"
 
     def _acknowledge(self) -> None:
         alert = self._selected_alert()

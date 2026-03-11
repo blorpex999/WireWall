@@ -8,6 +8,19 @@ if errorlevel 1 (
   exit /b 1
 )
 
+if not exist ".venv\Scripts\python.exe" (
+  echo Environnement Python introuvable apres les tests.
+  popd
+  exit /b 1
+)
+set "VENV_PYTHON=%CD%\.venv\Scripts\python.exe"
+
+"%VENV_PYTHON%" scripts\check_release_consistency.py
+if errorlevel 1 (
+  popd
+  exit /b 1
+)
+
 call scripts\build.bat
 if errorlevel 1 (
   popd

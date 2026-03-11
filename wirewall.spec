@@ -1,5 +1,7 @@
 # -*- mode: python ; coding: utf-8 -*-
 
+from pathlib import Path
+
 from PyInstaller.utils.hooks import collect_data_files
 
 block_cipher = None
@@ -7,7 +9,9 @@ block_cipher = None
 datas = collect_data_files("libusb_package", include_py_files=False)
 datas += [
     ("config.example.json", "."),
+    ("VERSION", "."),
 ]
+version_file = Path("build") / "version_info.txt"
 
 a = Analysis(
     ["main.py"],
@@ -38,6 +42,7 @@ exe = EXE(
     strip=False,
     upx=False,
     console=False,
+    version=str(version_file) if version_file.exists() else None,
 )
 
 coll = COLLECT(

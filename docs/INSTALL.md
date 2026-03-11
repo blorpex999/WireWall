@@ -1,75 +1,147 @@
 # Installation WireWall
 
-## Prerequis
+## Modes d'installation supportes
+
+- installateur Windows `Inno Setup`
+- package portable `zip`
+- execution developpeur depuis les sources
+
+## Prerequis poste cible
+
+### Obligatoires
 
 - Windows 10 ou 11 x64
-- Python 3.11 x64
-- `Tcl/Tk` fonctionnel pour Tkinter
-- Droits administrateur uniquement si vous voulez agir sur `USBSTOR`
-- Ollama installe localement si vous voulez utiliser l'analyse IA
+- droits d'ecriture utilisateur sur `%LOCALAPPDATA%`
 
-## Verification du runtime
+### Optionnels selon les fonctions
 
-Avant de lancer WireWall :
+- droits administrateur pour les actions `USBSTOR`
+- Ollama local pour l'analyse IA
+- acces Internet initial si vous voulez installer Ollama ou telecharger un modele via `winget` / `ollama pull`
+- un installeur Ollama officiel offline si le poste cible n'a ni `winget` ni acces Internet
+
+### Non requis sur poste cible si vous utilisez le package ou l'installateur
+
+- Python
+- `pip`
+- dependances Python du projet
+
+## Option 1 - Installateur
+
+Lancer :
 
 ```bat
-python scripts\check_runtime.py --require-python 3.11 --require-tk
+WireWall-Setup-<version>.exe
 ```
 
-Si ce script echoue, ne preparez pas la demo sur ce poste.
+L'installateur :
 
-## Installation developpeur
+- copie l'application dans `Program Files`
+- cree les raccourcis menu demarrer
+- prepare les repertoires utilisateur usuels sous `%LOCALAPPDATA%\WireWall`
+- installe les outils d'assistance IA et de diagnostic prerequis dans le dossier `tools\` de l'application
+
+Il n'embarque pas :
+
+- Ollama
+- le modele local
+
+## Option 2 - Portable
+
+Dezipper :
+
+```text
+WireWall-<version>-win64-portable.zip
+```
+
+Puis lancer :
+
+```bat
+WireWall.exe
+```
+
+Le package portable contient aussi :
+
+- `README.md`
+- `CHANGELOG.md`
+- `docs\`
+- `tools\setup_ai.ps1`
+- `tools\setup_ai.bat`
+- `tools\check_target_prereqs.ps1`
+- `tools\check_target_prereqs.bat`
+
+## Option 3 - Sources
 
 ```bat
 py -3.11 -m venv .venv
 .venv\Scripts\activate
 python -m pip install --upgrade pip
 python -m pip install -r requirements-dev.txt
+python scripts\check_runtime.py --require-python 3.11 --require-tk
 copy config.example.json %LOCALAPPDATA%\WireWall\config\config.json
+python main.py
 ```
 
-## Lancement
+## Configuration IA locale
 
-- Mode reel :
+Option recommandee :
 
-```bat
-scripts\run_dev.bat
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\setup_ai.ps1 -Model qwen2.5:3b
 ```
 
-- Mode demo :
+Ou depuis le repo :
 
-```bat
-scripts\run_demo.bat
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\setup_ai.ps1 -Model qwen2.5:3b
 ```
 
-- Mode eleve pour les tests `USBSTOR` :
+Le script :
 
-```bat
-scripts\run_admin.bat
+- detecte Ollama
+- tente son installation via `winget` si besoin
+- telecharge le modele recommande
+- laisse l'application utilisable sans IA si une etape echoue
+
+Si vous disposez d'un installeur Ollama offline officiel :
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\setup_ai.ps1 -Model qwen2.5:3b -OfflineInstallerPath C:\Temp\OllamaSetup.exe
 ```
+
+## Diagnostic poste cible
+
+Le package installe aussi un diagnostic simple :
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\check_target_prereqs.ps1 -Model qwen2.5:3b
+```
+
+Ou via le raccourci menu demarrer `Diagnostic prerequis`.
 
 ## Emplacements runtime
 
-Par defaut, WireWall cree ses donnees sous `%LOCALAPPDATA%\WireWall\` :
+Par defaut, WireWall utilise :
 
-- `data\wirewall.db` : base reelle
-- `demo\wirewall_demo.db` : base demo
-- `logs\wirewall.log` : logs applicatifs
-- `exports\` : rapports et exports
-- `config\config.json` : configuration locale
+- `%LOCALAPPDATA%\WireWall\data\wirewall.db`
+- `%LOCALAPPDATA%\WireWall\demo\wirewall_demo.db`
+- `%LOCALAPPDATA%\WireWall\logs\wirewall.log`
+- `%LOCALAPPDATA%\WireWall\exports\`
+- `%LOCALAPPDATA%\WireWall\config\config.json`
 
-Si ce repertoire n'est pas accessible, WireWall bascule sur un fallback portable `.wirewall-runtime\WireWall\`.
+Fallback :
 
-## Verification post-installation
+- `.wirewall-runtime\WireWall\` si `%LOCALAPPDATA%` n'est pas accessible
 
-- L'application demarre sans erreur Tkinter
-- Les dossiers `data`, `logs`, `exports`, `config` sont crees
-- Le dashboard charge sans freeze
-- Les health checks se mettent a jour sans bloquer l'interface
-- `USB Control` lit l'etat `USBSTOR`
+## Desinstallation
 
-Pour la configuration, le build et le troubleshooting, utilisez aussi :
+L'installateur desinstalle les fichiers applicatifs sous `Program Files`.
 
-- [Configuration](CONFIGURATION.md)
-- [Build](BUILD.md)
-- [Troubleshooting](TROUBLESHOOTING.md)
+Les donnees utilisateur sous `%LOCALAPPDATA%\WireWall` sont conservees par defaut pour ne pas detruire :
+
+- la base d'audit
+- les exports
+- les logs
+- la configuration locale
+
+Si vous voulez une suppression complete, supprimez aussi manuellement `%LOCALAPPDATA%\WireWall` apres desinstallation.

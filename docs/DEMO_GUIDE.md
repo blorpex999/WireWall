@@ -8,6 +8,7 @@
 - Au moins un peripherique USB reel si vous voulez montrer la detection live
 - Session admin uniquement si vous devez montrer `USBSTOR`
 - Ollama local disponible uniquement si vous voulez montrer l'analyse IA
+- Pour un autre poste, privilegier l'installateur ou le package portable plutot qu'un lancement source
 
 ## Ordre conseille des ecrans
 
@@ -39,12 +40,12 @@
 
 ## Points a mettre en avant
 
-- Separation claire entre mode reel et mode demo
-- Monitoring utilisateur honnete base sur `PyUSB/libusb1`
-- Policies persistantes et auditables
-- Blocage reel `USBSTOR` avec verification de lecture/ecriture
+- separation claire entre mode reel et mode demo
+- monitoring utilisateur honnete base sur `PyUSB/libusb1`
+- policies persistantes et auditables
+- blocage reel `USBSTOR` avec verification de lecture/ecriture
 - IA locale sans dependance Internet
-- Historique et rapports exploitables pour un poste de travail
+- historique et rapports exploitables pour un poste de travail
 
 ## Phrases utiles pour expliquer la valeur cyber
 
@@ -57,25 +58,27 @@
 
 ### Si Ollama n'est pas disponible
 
-- Montrer l'ecran `Analyse IA`
-- Montrer le diagnostic d'indisponibilite
-- Expliquer que l'analyse est locale, optionnelle et non simulee
+- montrer l'ecran `Analyse IA`
+- montrer le diagnostic d'indisponibilite
+- expliquer que l'analyse est locale, optionnelle et non simulee
+- montrer au besoin `Assistant IA locale` ou `Diagnostic prerequis`
 
 ### Si les droits admin ne sont pas disponibles
 
-- Montrer l'ecran `Controle USB`
-- Montrer l'etat non admin et le diagnostic explicite
-- Expliquer que le logiciel refuse toute fausse confirmation
+- montrer l'ecran `Controle USB`
+- montrer l'etat non admin et le diagnostic explicite
+- expliquer que le logiciel refuse toute fausse confirmation
 
 ### Si aucun vrai peripherique USB n'est branche
 
-- Utiliser `scripts\run_demo.bat`
-- Montrer la banniere demo et expliquer que la base est separee
-- Presenter alertes, historique et scoring sans pretendre a une detection materielle live
+- utiliser `scripts\run_demo.bat`
+- montrer la banniere demo et expliquer que la base est separee
+- presenter alertes, historique et scoring sans pretendre a une detection materielle live
 
 ## Risques a eviter en live
 
-- Ne pas faire la demo officielle sur un host `Python 3.13` hors baseline supportee
-- Ne pas promettre un blocage de tout l'USB
-- Ne pas affirmer un temps reel noyau ou driver
-- Ne pas lancer une action admin sans etre sur de la session elevee
+- ne pas faire la demo officielle sur un host `Python 3.13` hors baseline supportee
+- ne pas promettre un blocage de tout l'USB
+- ne pas affirmer un temps reel noyau ou driver
+- ne pas lancer une action admin sans etre sur de la session elevee
+- ne pas promettre qu'un installateur installe automatiquement Ollama et un gros modele sans validation utilisateur

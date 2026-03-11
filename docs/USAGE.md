@@ -5,6 +5,8 @@
 - Mode reel : `scripts\run_dev.bat`
 - Mode demo : `scripts\run_demo.bat`
 - Mode admin : `scripts\run_admin.bat`
+- Version installee : `WireWall` via le raccourci menu demarrer
+- Version portable : `WireWall.exe`
 
 ## Ecrans a connaitre
 
@@ -33,3 +35,4 @@
 - En mode demo, l'application l'indique visuellement et la base utilisee est separee.
 - Si Ollama est indisponible, l'ecran IA affiche un diagnostic au lieu d'un faux resultat.
 - Si la session n'est pas admin, les actions `USBSTOR` restent explicites sur cette limite.
+- La version installee ajoute aussi des outils `Assistant IA locale` et `Diagnostic prerequis` dans le menu demarrer.

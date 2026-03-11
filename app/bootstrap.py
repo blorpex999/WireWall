@@ -16,6 +16,7 @@ from app.infrastructure.repositories import (
     AIAnalysisRepository,
     AlertRepository,
     AssessmentRepository,
+    BrainSnapshotRepository,
     DeviceRepository,
     EventRepository,
     HealthRepository,
@@ -25,6 +26,7 @@ from app.infrastructure.repositories import (
 from app.models.entities import AppSettings
 from app.services.demo_service import DemoDataService, DemoUsbEnumerator
 from app.services.background_tasks import BackgroundTaskService
+from app.services.brain_service import BrainService
 from app.services.event_bus import EventBus
 from app.services.health_service import HealthCheckService
 from app.services.ollama_service import OllamaService
@@ -51,8 +53,10 @@ class ApplicationContainer:
     settings_repo: SettingsRepository
     health_repo: HealthRepository
     ai_analysis_repo: AIAnalysisRepository
+    brain_snapshot_repo: BrainSnapshotRepository
     background_tasks: BackgroundTaskService
     retention_service: RetentionService
+    brain_service: BrainService
     policy_service: PolicyService
     usb_control_service: UsbControlService
     ollama_service: OllamaService
@@ -113,6 +117,7 @@ def build_container(config_path: str | None = None, force_demo: bool = False) ->
     assessment_repo = AssessmentRepository(db)
     health_repo = HealthRepository(db)
     ai_analysis_repo = AIAnalysisRepository(db)
+    brain_snapshot_repo = BrainSnapshotRepository(db)
 
     classifier = DeviceClassifier()
     enumerator = DemoUsbEnumerator(classifier) if settings.mode == "demo" else UsbEnumerator(classifier)
@@ -133,6 +138,15 @@ def build_container(config_path: str | None = None, force_demo: bool = False) ->
         alert_repo=alert_repo,
         health_repo=health_repo,
         ai_analysis_repo=ai_analysis_repo,
+        brain_snapshot_repo=brain_snapshot_repo,
+    )
+    brain_service = BrainService(
+        device_repo=device_repo,
+        event_repo=event_repo,
+        alert_repo=alert_repo,
+        health_repo=health_repo,
+        ai_analysis_repo=ai_analysis_repo,
+        brain_snapshot_repo=brain_snapshot_repo,
     )
     health_service = HealthCheckService(
         db=db,
@@ -143,7 +157,7 @@ def build_container(config_path: str | None = None, force_demo: bool = False) ->
         health_repo=health_repo,
         exports_dir_getter=lambda: report_service.exports_dir,
     )
-    retention_service = RetentionService(event_repo, alert_repo, assessment_repo, ai_analysis_repo)
+    retention_service = RetentionService(event_repo, alert_repo, assessment_repo, ai_analysis_repo, brain_snapshot_repo)
     usb_monitor = UsbMonitorService(
         enumerator=enumerator,
         device_repo=device_repo,
@@ -159,6 +173,7 @@ def build_container(config_path: str | None = None, force_demo: bool = False) ->
     retention_service.apply(settings.history_retention_days)
     if settings.mode == "demo":
         DemoDataService().seed(policy_service, alert_repo, event_repo)
+    brain_service.refresh(settings.mode == "demo")
 
     return ApplicationContainer(
         paths=paths,
@@ -174,8 +189,10 @@ def build_container(config_path: str | None = None, force_demo: bool = False) ->
         settings_repo=settings_repo,
         health_repo=health_repo,
         ai_analysis_repo=ai_analysis_repo,
+        brain_snapshot_repo=brain_snapshot_repo,
         background_tasks=background_tasks,
         retention_service=retention_service,
+        brain_service=brain_service,
         policy_service=policy_service,
         usb_control_service=usb_control_service,
         ollama_service=ollama_service,

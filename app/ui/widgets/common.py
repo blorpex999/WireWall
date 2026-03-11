@@ -178,6 +178,9 @@ class DetailText(tk.Text):
         )
 
     def set_text(self, content: str) -> None:
+        current = self.get("1.0", "end-1c")
+        if current == content:
+            return
         self.configure(state="normal")
         self.delete("1.0", "end")
         self.insert("1.0", content)

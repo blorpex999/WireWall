@@ -17,6 +17,7 @@ class DashboardView(BaseView):
             self.columnconfigure(column, weight=1)
         self.rowconfigure(3, weight=2)
         self.rowconfigure(4, weight=1)
+        self.rowconfigure(5, weight=1)
 
         self.header = SectionHeader(
             self,
@@ -51,6 +52,10 @@ class DashboardView(BaseView):
         alerts_frame.grid(row=3, column=2, columnspan=2, sticky="nsew", padx=(8, 0), pady=(0, 12))
         health_frame = ttk.LabelFrame(self, text="Etat des composants", style="Section.TLabelframe", padding=12)
         health_frame.grid(row=4, column=0, columnspan=4, sticky="nsew")
+        brain_frame = ttk.LabelFrame(self, text="Moteur d'analyse continu", style="Section.TLabelframe", padding=12)
+        brain_frame.grid(row=5, column=0, columnspan=4, sticky="nsew", pady=(12, 0))
+        for column in range(3):
+            brain_frame.columnconfigure(column, weight=1 if column == 0 else 0)
 
         self.event_table = ScrollableTree(events_frame, ("date", "type", "summary", "severity"), height=9)
         self.event_table.pack(fill="both", expand=True)
@@ -88,6 +93,19 @@ class DashboardView(BaseView):
             self.event_table.tree.tag_configure(level, foreground=severity_color(level))
             self.alert_table.tree.tag_configure(level, foreground=severity_color(level))
             self.health_table.tree.tag_configure(level, foreground=severity_color(level))
+
+        self.brain_level_badge = StatusPill(brain_frame, "N/A", "INFO")
+        self.brain_level_badge.grid(row=0, column=1, sticky="e", padx=(12, 8))
+        self.brain_progress_badge = StatusPill(brain_frame, "STABLE", "INFO")
+        self.brain_progress_badge.grid(row=0, column=2, sticky="e")
+        self.brain_summary = ttk.Label(brain_frame, text="", style="Muted.TLabel", wraplength=1220, justify="left")
+        self.brain_summary.grid(row=0, column=0, sticky="w")
+        self.brain_incidents = LabeledValue(brain_frame, "Incidents actifs", "-")
+        self.brain_incidents.grid(row=1, column=0, sticky="ew", pady=(12, 0), padx=(0, 12))
+        self.brain_alerts = LabeledValue(brain_frame, "Alertes ouvertes", "-")
+        self.brain_alerts.grid(row=1, column=1, sticky="ew", pady=(12, 0), padx=(0, 12))
+        self.brain_focus = LabeledValue(brain_frame, "Points de focus", "-")
+        self.brain_focus.grid(row=1, column=2, sticky="ew", pady=(12, 0))
 
     def refresh_data(self) -> None:
         data = self.controller.get_dashboard_data()
@@ -156,6 +174,29 @@ class DashboardView(BaseView):
                 tags=(tone_for_status(status.status),),
             )
         self.health_table.set_empty(bool(data["health"]), "Aucun health check disponible pour le moment.")
+
+        brain_snapshot = data.get("brain_snapshot")
+        if brain_snapshot is None:
+            self.brain_level_badge.set("N/A", "INFO")
+            self.brain_progress_badge.set("EN ATTENTE", "INFO")
+            self.brain_summary.configure(text="Le moteur d'analyse n'a pas encore produit de synthese continue.")
+            self.brain_incidents.set("-")
+            self.brain_alerts.set("-")
+            self.brain_focus.set("-")
+            return
+
+        progress_tone = {
+            "LEARNING": "INFO",
+            "STABLE": "OK",
+            "IMPROVING": "OK",
+            "DETERIORATING": "WARNING",
+        }.get(brain_snapshot.progress_status, "INFO")
+        self.brain_level_badge.set(brain_snapshot.global_level, brain_snapshot.global_level)
+        self.brain_progress_badge.set(brain_snapshot.progress_status, progress_tone)
+        self.brain_summary.configure(text=brain_snapshot.summary)
+        self.brain_incidents.set(str(brain_snapshot.incident_count))
+        self.brain_alerts.set(str(brain_snapshot.open_alert_count))
+        self.brain_focus.set(", ".join(brain_snapshot.focus_areas) if brain_snapshot.focus_areas else "Aucun focus prioritaire")
 
     def _build_tile(self, master, column: int, title: str) -> dict[str, object]:
         frame = ttk.Frame(master, style="CardInner.TFrame", padding=(8, 4))

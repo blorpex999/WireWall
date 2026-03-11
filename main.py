@@ -5,9 +5,11 @@ import ctypes
 import logging
 import sys
 
+from app.version import __version__
+
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="WireWall - Surveillance USB Windows")
+    parser = argparse.ArgumentParser(description=f"WireWall {__version__} - Surveillance USB Windows")
     parser.add_argument(
         "--demo",
         action="store_true",
@@ -18,6 +20,11 @@ def parse_args() -> argparse.Namespace:
         type=str,
         default=None,
         help="Chemin vers un fichier JSON de configuration.",
+    )
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=f"WireWall {__version__}",
     )
     return parser.parse_args()
 

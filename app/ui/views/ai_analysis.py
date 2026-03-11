@@ -17,6 +17,7 @@ class AIAnalysisView(BaseView):
         self.columnconfigure(1, weight=3)
         self.rowconfigure(2, weight=1)
         self._rows: dict[str, object] = {}
+        self._selected_analysis_key: str | None = None
 
         self.header = SectionHeader(
             self,
@@ -106,6 +107,7 @@ class AIAnalysisView(BaseView):
     def refresh_data(self) -> None:
         analyses = self.controller.list_ai_analyses()
         health = self.controller.get_ollama_health_status()
+        selected_key = self._get_selected_analysis_key() or self._selected_analysis_key
         self.model_value.set(self.controller.settings.ollama_model)
         self.ollama_badge.set(health_status_text(health.status).upper(), tone_for_status(health.status))
         self.ollama_detail.configure(text=shorten_text(health.details, 120))
@@ -113,7 +115,9 @@ class AIAnalysisView(BaseView):
 
         self._rows.clear()
         self.table.clear()
+        item_to_restore: str | None = None
         for analysis in analyses:
+            analysis_key = self._analysis_key(analysis)
             item_id = self.table.tree.insert(
                 "",
                 "end",
@@ -121,8 +125,16 @@ class AIAnalysisView(BaseView):
                 tags=(analysis.global_level,),
             )
             self._rows[item_id] = analysis
+            if analysis_key == selected_key:
+                item_to_restore = item_id
         self.table.set_empty(bool(analyses), "Aucune analyse IA n'a encore ete lancee.")
-        self._clear_selection_state()
+        if item_to_restore is not None:
+            self.table.tree.selection_set(item_to_restore)
+            self.table.tree.focus(item_to_restore)
+            self.table.tree.see(item_to_restore)
+            self._show_selected()
+        else:
+            self._clear_selection_state()
 
     def _run_analysis(self) -> None:
         started = self.controller.request_ai_analysis()
@@ -141,6 +153,7 @@ class AIAnalysisView(BaseView):
         if analysis is None:
             self._clear_selection_state()
             return
+        self._selected_analysis_key = self._analysis_key(analysis)
         self.level_badge.set(analysis.global_level, analysis.global_level)
         self.values["date"].set(format_for_ui(analysis.created_at))
         self.values["model"].set(analysis.model)
@@ -153,9 +166,24 @@ class AIAnalysisView(BaseView):
         )
 
     def _clear_selection_state(self) -> None:
+        self._selected_analysis_key = None
         self.level_badge.set("N/A", "INFO")
         for value in self.values.values():
             value.set("-")
         self.summary_text.set_text("Selectionnez une analyse pour afficher le resume genere localement.")
         self.threats_text.set_text("Menaces\n- Aucune analyse selectionnee.")
         self.recommendations_text.set_text("Recommandations\n- Aucune analyse selectionnee.")
+
+    def _get_selected_analysis_key(self) -> str | None:
+        selection = self.table.tree.selection()
+        if not selection:
+            return None
+        analysis = self._rows.get(selection[0])
+        if analysis is None:
+            return None
+        return self._analysis_key(analysis)
+
+    def _analysis_key(self, analysis) -> str:
+        if getattr(analysis, "id", None) is not None:
+            return f"id:{analysis.id}"
+        return f"{analysis.created_at}|{analysis.model}|{analysis.global_level}"

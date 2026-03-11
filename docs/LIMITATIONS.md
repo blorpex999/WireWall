@@ -22,6 +22,8 @@
 ## Ollama
 
 - Ollama n'est pas embarque avec WireWall.
+- Le modele recommande `qwen2.5:3b` n'est pas embarque non plus.
+- L'installation IA sur un autre poste reste une deuxieme phase guidee, pas une installation silencieuse monolithique.
 - L'analyse IA ne fonctionne que si le service local repond sur `localhost`.
 - En cas d'indisponibilite, WireWall retourne un diagnostic et ne fabrique pas de resultat.
 
@@ -29,4 +31,6 @@
 
 - Un build PyInstaller genere sur un host dont Tkinter est casse n'est pas une validation exploitable de l'UI.
 - La validation finale du package doit etre faite sur un poste Windows propre avec `Python 3.11`, `Tcl/Tk` valide, `libusb` et les droits adequats.
-- Le bundle PyInstaller n'embarque pas toute la documentation du depot : les guides restent dans le repo source.
+- Le bundle `dist\WireWall\` seul n'est pas une experience complete d'installation.
+- La documentation et les assistants de prerequis sont ajoutes dans le package portable et l'installateur, pas dans le seul dossier `dist\WireWall\`.
+- L'installateur n'efface pas automatiquement `%LOCALAPPDATA%\WireWall` a la desinstallation pour eviter de perdre audit, logs, exports et configuration.

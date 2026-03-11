@@ -6,6 +6,8 @@ Le fichier local de configuration est attendu dans :
 
 `%LOCALAPPDATA%\WireWall\config\config.json`
 
+La version officielle de l'application est stockee dans `VERSION`. Elle n'est pas ecrite dans `config.json`.
+
 Vous pouvez aussi lancer l'application avec :
 
 ```bat
@@ -44,3 +46,14 @@ Les valeurs `scan_interval_seconds`, `alert_threshold` et `dedup_window_seconds`
 - Utiliser `scripts\run_demo.bat` pour un scenario demo separe
 - Definir `export_directory` si vous voulez un dossier d'exports visible et stable pendant la soutenance
 - Garder `ollama_timeout_seconds` raisonnable pour eviter une attente trop longue en demo
+
+## Conseils de configuration distribution
+
+- Ne versionnez pas votre `config.json` local depuis `%LOCALAPPDATA%`
+- Laissez `ollama_model` sur `qwen2.5:3b` si vous voulez rester aligne avec les scripts et la documentation
+- Si vous changez de modele recommande, mettez aussi a jour :
+  - `config.example.json`
+  - `README.md`
+  - `docs/INSTALL.md`
+  - `docs/RELEASE.md`
+  - `installer/WireWall.iss`

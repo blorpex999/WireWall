@@ -2,49 +2,102 @@
 
 ## Builder officiel
 
-Le build de release doit etre realise sur un poste :
+Le build officiel doit etre realise sur un poste :
 
 - Windows 10/11 x64
 - Python 3.11 x64
-- `Tcl/Tk` fonctionnel
+- Tcl/Tk fonctionnel
+- Inno Setup 6 si l'installateur doit etre produit
 
-Un host Python 3.13 ou un runtime Tk casse n'est pas un builder officiel, meme si un bundle sort.
+Un poste `Python 3.13` ou un runtime Tk casse n'est pas un builder officiel, meme si un bundle peut etre produit.
 
-## Commande officielle
+## Build du bundle PyInstaller
 
 ```bat
 scripts\build.bat
 ```
 
-Le script :
+Ce script :
 
-1. verifie Python 3.11 et Tkinter
+1. selectionne Python 3.11
 2. cree `.venv` si necessaire
 3. installe `requirements-dev.txt`
-4. lance `python -m PyInstaller --clean --noconfirm wirewall.spec`
-5. verifie la presence de `dist\WireWall\WireWall.exe`
+4. genere `build\version_info.txt`
+5. lance `PyInstaller` avec `wirewall.spec`
+6. verifie `dist\WireWall\WireWall.exe`
 
-## Verification release complete
+## Verification de coherence release
 
 ```bat
-scripts\release_check.bat
+python scripts\check_release_consistency.py
 ```
 
-Ce script enchaine :
+Ce controle verifie au minimum :
 
-1. tests `pytest`
-2. build PyInstaller
-3. verification de `WireWall.exe`
-4. verification de `libusb-1.0.dll` dans le bundle
+- la presence de `VERSION`
+- la validite de `config.example.json`
+- la presence des guides de distribution
+- la coherence du packaging `PyInstaller`
+- la coherence du script installateur
+
+## Build du package portable
+
+```bat
+scripts\package_portable.bat
+```
+
+Ce script :
+
+1. reconstruit le bundle
+2. prepare un dossier de staging versionne
+3. ajoute `README`, `CHANGELOG`, `docs`, `VERSION`, `config.example.json` et les outils IA/prerequis
+4. genere `release\WireWall-<version>-win64-portable.zip`
+
+## Build de l'installateur
+
+```bat
+scripts\build_installer.bat
+```
+
+Prerequis supplementaires :
+
+- Inno Setup 6 installe
+- `ISCC.exe` disponible dans :
+  - `%ProgramFiles(x86)%\Inno Setup 6\ISCC.exe`
+  - ou `%ProgramFiles%\Inno Setup 6\ISCC.exe`
+  - ou via la variable d'environnement `ISCC_EXE`
+
+## Release complete
+
+```bat
+scripts\release.bat
+```
+
+Ce pipeline enchaine :
+
+1. tests
+2. verification de coherence release
+3. build executable
+4. package portable
+5. build installateur
+6. manifest de release
+7. hashes SHA-256
+8. validation des artefacts
 
 ## Artefacts attendus
 
 - `dist\WireWall\WireWall.exe`
-- `dist\WireWall\_internal\libusb-1.0.dll` ou equivalent dans le bundle
-- `config.example.json` embarque
+- `dist\WireWall\...libusb-1.0.dll`
+- `release\WireWall-<version>-win64-portable.zip`
+- `release\WireWall-Setup-<version>.exe`
+- `release\WireWall-<version>-manifest.json`
+- `release\SHA256SUMS.txt`
 
 ## Notes packaging
 
-- Format officiel : `PyInstaller one-folder`
-- Pas de MSI, pas d'installateur, pas de signature de code dans ce lot
-- La documentation du repo n'est pas embarquee dans le bundle final
+- Format principal : installateur Inno Setup
+- Format secondaire : zip portable
+- Le bundle embarque `libusb_package`, `config.example.json` et `VERSION`
+- Le package portable et l'installateur embarquent aussi la documentation et les assistants IA/prerequis
+- Ollama et le modele `qwen2.5:3b` ne sont pas embarques
+- L'installateur compile l'application, mais n'installe pas silencieusement Ollama ni un gros modele local

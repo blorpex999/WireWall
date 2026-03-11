@@ -25,6 +25,12 @@ if errorlevel 1 (
   exit /b 1
 )
 
+python scripts\build_version_info.py
+if errorlevel 1 (
+  popd
+  exit /b 1
+)
+
 python -m PyInstaller --clean --noconfirm wirewall.spec
 if errorlevel 1 (
   popd

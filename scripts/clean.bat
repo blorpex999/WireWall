@@ -5,6 +5,7 @@ pushd "%~dp0.."
 for %%D in (
   build
   dist
+  release
   .pytest_cache
   .wirewall-runtime
   .wirewall-pytest-tmp

@@ -34,6 +34,7 @@ class DevicesView(BaseView):
         self.columnconfigure(1, weight=2)
         self.rowconfigure(2, weight=1)
         self._rows: dict[str, object] = {}
+        self._selected_device_key: str | None = None
 
         self.header = SectionHeader(
             self,
@@ -54,21 +55,24 @@ class DevicesView(BaseView):
         self.status_var = tk.StringVar(value="Tous les statuts")
 
         ttk.Label(filters, text="Recherche").grid(row=0, column=0, sticky="w", padx=(0, 8))
-        ttk.Entry(filters, textvariable=self.search_var).grid(row=0, column=1, sticky="ew", padx=(0, 12))
+        self.search_entry = ttk.Entry(filters, textvariable=self.search_var)
+        self.search_entry.grid(row=0, column=1, sticky="ew", padx=(0, 12))
         ttk.Label(filters, text="Categorie").grid(row=0, column=2, sticky="w", padx=(0, 8))
-        ttk.Combobox(
+        self.category_combo = ttk.Combobox(
             filters,
             textvariable=self.category_var,
             values=list(self.CATEGORY_OPTIONS.keys()),
             state="readonly",
-        ).grid(row=0, column=3, sticky="ew", padx=(0, 12))
+        )
+        self.category_combo.grid(row=0, column=3, sticky="ew", padx=(0, 12))
         ttk.Label(filters, text="Statut").grid(row=0, column=4, sticky="w", padx=(0, 8))
-        ttk.Combobox(
+        self.status_combo = ttk.Combobox(
             filters,
             textvariable=self.status_var,
             values=list(self.STATUS_OPTIONS.keys()),
             state="readonly",
-        ).grid(row=0, column=5, sticky="ew")
+        )
+        self.status_combo.grid(row=0, column=5, sticky="ew")
         ttk.Button(filters, text="Appliquer les filtres", command=self.refresh_data).grid(row=1, column=4, sticky="e", pady=(12, 0))
         ttk.Button(filters, text="Rafraichir l'USB", style="Accent.TButton", command=self._refresh_monitor).grid(
             row=1,
@@ -76,6 +80,10 @@ class DevicesView(BaseView):
             sticky="e",
             pady=(12, 0),
         )
+        self.search_var.trace_add("write", lambda *_args: self.schedule_refresh(250))
+        self.search_entry.bind("<Return>", lambda _event: self.refresh_data())
+        self.category_combo.bind("<<ComboboxSelected>>", lambda _event: self.refresh_data())
+        self.status_combo.bind("<<ComboboxSelected>>", lambda _event: self.refresh_data())
 
         tree_frame = ttk.LabelFrame(self, text="Inventaire des peripheriques", style="Section.TLabelframe", padding=12)
         tree_frame.grid(row=2, column=0, sticky="nsew", padx=(0, 8))
@@ -164,6 +172,7 @@ class DevicesView(BaseView):
         self._clear_selection_state()
 
     def refresh_data(self) -> None:
+        selected_key = self._get_selected_device_key() or self._selected_device_key
         devices = self.controller.list_devices(
             search=self.search_var.get().strip(),
             category=self.CATEGORY_OPTIONS[self.category_var.get()],
@@ -171,6 +180,7 @@ class DevicesView(BaseView):
         )
         self._rows.clear()
         self.table.clear()
+        item_to_restore: str | None = None
         for device in devices:
             item_id = self.table.tree.insert(
                 "",
@@ -186,8 +196,16 @@ class DevicesView(BaseView):
                 tags=(device.risk_level, device.status),
             )
             self._rows[item_id] = device
+            if device.device_key == selected_key:
+                item_to_restore = item_id
         self.table.set_empty(bool(devices), "Aucun peripherique ne correspond aux filtres actifs.")
-        self._clear_selection_state()
+        if item_to_restore is not None:
+            self.table.tree.selection_set(item_to_restore)
+            self.table.tree.focus(item_to_restore)
+            self.table.tree.see(item_to_restore)
+            self._show_selected()
+        else:
+            self._clear_selection_state()
 
     def _selected_device(self):
         selection = self.table.tree.selection()
@@ -200,6 +218,7 @@ class DevicesView(BaseView):
         if device is None:
             self._clear_selection_state()
             return
+        self._selected_device_key = device.device_key
         self.status_badge.set(device_status_text(device.status), device.status)
         self.risk_badge.set(device.risk_level, device.risk_level)
         self.values["name"].set(device.display_name)
@@ -229,6 +248,7 @@ class DevicesView(BaseView):
         self.blacklist_button.configure(state="normal")
 
     def _clear_selection_state(self) -> None:
+        self._selected_device_key = None
         self.status_badge.set("AUCUNE SELECTION", "INFO")
         self.risk_badge.set("N/A", "INFO")
         for value in self.values.values():
@@ -236,6 +256,12 @@ class DevicesView(BaseView):
         self.detail_text.set_text("Selectionnez un peripherique pour afficher sa fiche technique et ses actions.")
         self.whitelist_button.configure(state="disabled")
         self.blacklist_button.configure(state="disabled")
+
+    def _get_selected_device_key(self) -> str | None:
+        device = self._selected_device()
+        if device is None:
+            return None
+        return device.device_key
 
     def _whitelist(self) -> None:
         device = self._selected_device()

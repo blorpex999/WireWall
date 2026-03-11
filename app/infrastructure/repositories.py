@@ -9,6 +9,7 @@ from app.models.entities import (
     AIAnalysis,
     Alert,
     AppSettings,
+    BrainSnapshot,
     DeviceEvent,
     HealthStatus,
     PolicyEntry,
@@ -652,3 +653,81 @@ class AIAnalysisRepository:
     def cleanup(self, keep_since: str) -> None:
         with self.db.session() as connection:
             connection.execute("DELETE FROM ai_analyses WHERE created_at < ?", (keep_since,))
+
+
+class BrainSnapshotRepository:
+    def __init__(self, db: DatabaseManager) -> None:
+        self.db = db
+
+    def add(self, snapshot: BrainSnapshot) -> int:
+        payload = asdict(snapshot)
+        payload["recommendations_json"] = _dumps(payload.pop("recommendations"))
+        payload["focus_areas_json"] = _dumps(payload.pop("focus_areas"))
+        payload["metadata_json"] = _dumps(payload.pop("metadata"))
+        payload["demo_mode"] = int(payload["demo_mode"])
+        payload.pop("id", None)
+        with self.db.session() as connection:
+            cursor = connection.execute(
+                """
+                INSERT INTO brain_snapshots (
+                    created_at, global_score, global_level, progress_status, summary,
+                    incident_count, open_alert_count, monitored_device_count,
+                    recommendations_json, focus_areas_json, metadata_json, demo_mode
+                ) VALUES (
+                    :created_at, :global_score, :global_level, :progress_status, :summary,
+                    :incident_count, :open_alert_count, :monitored_device_count,
+                    :recommendations_json, :focus_areas_json, :metadata_json, :demo_mode
+                )
+                """,
+                payload,
+            )
+        return int(cursor.lastrowid)
+
+    def latest(self, demo_mode: bool) -> BrainSnapshot | None:
+        with self.db.session() as connection:
+            row = connection.execute(
+                """
+                SELECT * FROM brain_snapshots
+                WHERE demo_mode = ?
+                ORDER BY created_at DESC, id DESC
+                LIMIT 1
+                """,
+                (int(demo_mode),),
+            ).fetchone()
+        if row is None:
+            return None
+        return self._map(row)
+
+    def list_recent(self, demo_mode: bool, limit: int = 10) -> list[BrainSnapshot]:
+        with self.db.session() as connection:
+            rows = connection.execute(
+                """
+                SELECT * FROM brain_snapshots
+                WHERE demo_mode = ?
+                ORDER BY created_at DESC, id DESC
+                LIMIT ?
+                """,
+                (int(demo_mode), limit),
+            ).fetchall()
+        return [self._map(row) for row in rows]
+
+    def cleanup(self, keep_since: str) -> None:
+        with self.db.session() as connection:
+            connection.execute("DELETE FROM brain_snapshots WHERE created_at < ?", (keep_since,))
+
+    def _map(self, row) -> BrainSnapshot:
+        return BrainSnapshot(
+            id=row["id"],
+            created_at=row["created_at"],
+            global_score=row["global_score"] or 0,
+            global_level=row["global_level"] or "LOW",
+            progress_status=row["progress_status"] or "LEARNING",
+            summary=row["summary"] or "",
+            incident_count=row["incident_count"] or 0,
+            open_alert_count=row["open_alert_count"] or 0,
+            monitored_device_count=row["monitored_device_count"] or 0,
+            recommendations=_loads(row["recommendations_json"], []),
+            focus_areas=_loads(row["focus_areas_json"], []),
+            metadata=_loads(row["metadata_json"], {}),
+            demo_mode=bool(row["demo_mode"]),
+        )
