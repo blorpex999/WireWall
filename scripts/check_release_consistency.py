@@ -47,8 +47,11 @@ def ensure_files(errors: list[str]) -> None:
         "scripts/build.bat",
         "scripts/package_portable.bat",
         "scripts/build_installer.bat",
+        "scripts/build_full_installer.bat",
         "scripts/release.bat",
+        "scripts/release_full.bat",
         "scripts/check_target_prereqs.ps1",
+        "scripts/fetch_ollama_installer.ps1",
         "scripts/setup_ai.ps1",
         "scripts/install_ollama.ps1",
         "scripts/install_ollama_model.ps1",
@@ -117,6 +120,7 @@ def ensure_docs(errors: list[str]) -> None:
         "docs/INSTALL.md",
         "docs/BUILD.md",
         "docs/RELEASE.md",
+        "release_full.bat",
     ]
     for token in readme_tokens:
         if token not in readme:

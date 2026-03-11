@@ -11,6 +11,14 @@ $statusJson = powershell -NoProfile -ExecutionPolicy Bypass -File "$PSScriptRoot
 $status = $statusJson | ConvertFrom-Json
 
 if (-not $status.installed) {
+    if (-not $OfflineInstallerPath) {
+        $bundledInstaller = Join-Path $PSScriptRoot "OllamaSetup.exe"
+        if (Test-Path $bundledInstaller) {
+            $OfflineInstallerPath = $bundledInstaller
+            Write-Output "Installeur Ollama embarque detecte: $bundledInstaller"
+        }
+    }
+
     if ($SkipOllamaInstall) {
         Write-Error "Ollama n'est pas installe et -SkipOllamaInstall est actif."
         exit 1

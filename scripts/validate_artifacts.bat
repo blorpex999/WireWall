@@ -24,9 +24,11 @@ if not exist "release\WireWall-%WIREWALL_VERSION%-win64-portable.zip" (
 )
 
 if not exist "release\WireWall-Setup-%WIREWALL_VERSION%.exe" (
-  echo Artefact manquant : release\WireWall-Setup-%WIREWALL_VERSION%.exe
-  popd
-  exit /b 1
+  if not exist "release\WireWall-Setup-%WIREWALL_VERSION%-full.exe" (
+    echo Artefact manquant : installeur release standard ou full.
+    popd
+    exit /b 1
+  )
 )
 
 if not exist "release\WireWall-%WIREWALL_VERSION%-manifest.json" (

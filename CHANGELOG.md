@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.2.0 - 2026-03-11
+
+- Ajout d'une variante de distribution "full demo" avec installeur WireWall capable d'embarquer l'installeur officiel Ollama quand il est disponible au build.
+- Ajout d'un script de telechargement de l'installeur Ollama pour le builder Windows.
+- Ajout d'un script `release_full.bat` pour produire une distribution de demo plus autonome.
+- Mise a jour de l'assistant IA pour reutiliser automatiquement l'installeur Ollama embarque s'il est present dans `tools\OllamaSetup.exe`.
+- Mise a jour de la documentation de distribution pour distinguer le package standard du package demo "full".
+
 ## 1.1.0 - 2026-03-11
 
 - Consolidation de la chaine de distribution Windows avec une source de version unique via `VERSION`.

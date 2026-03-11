@@ -8,6 +8,7 @@ Ce document decrit la chaine officielle de distribution Windows pour WireWall.
 
 - format principal : installateur `Inno Setup`
 - format secondaire : archive portable `zip`
+- format demo autonome : installateur `Inno Setup` avec installeur Ollama embarque
 - format developpeur : execution depuis les sources
 
 ## Source de verite de version
@@ -39,11 +40,18 @@ Le pipeline execute :
 7. `scripts\write_release_hashes.ps1`
 8. `scripts\validate_artifacts.bat`
 
+Variante demo :
+
+```bat
+scripts\release_full.bat
+```
+
 ## Artefacts attendus
 
 - `dist\WireWall\`
 - `release\WireWall-<version>-win64-portable.zip`
 - `release\WireWall-Setup-<version>.exe`
+- `release\WireWall-Setup-<version>-full.exe`
 - `release\WireWall-<version>-manifest.json`
 - `release\SHA256SUMS.txt`
 
@@ -62,6 +70,12 @@ Le pipeline execute :
   - installer WireWall
   - executer l'assistant IA local si necessaire
   - laisser l'application fonctionner sans IA si Ollama n'est pas disponible
+
+Pour la release demo `full` :
+
+- l'installeur officiel Ollama peut etre embarque
+- le modele n'est toujours pas embarque
+- l'assistant IA local reste responsable du telechargement du modele
 
 ## Git et synchronisation
 

@@ -25,7 +25,7 @@ if errorlevel 1 (
   exit /b 1
 )
 
-python -m pytest -q
+python -m pytest -q tests
 set "EXIT_CODE=%ERRORLEVEL%"
 popd
 exit /b %EXIT_CODE%

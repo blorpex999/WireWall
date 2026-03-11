@@ -21,13 +21,26 @@ if errorlevel 1 (
   exit /b 1
 )
 
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\fetch_ollama_installer.ps1
+if errorlevel 1 (
+  echo Echec du telechargement de l'installeur Ollama.
+  popd
+  exit /b 1
+)
+
 set /p WIREWALL_VERSION=<VERSION
 set "WIREWALL_DIST_DIR=%CD%\dist\WireWall"
 set "WIREWALL_RELEASE_DIR=%CD%\release"
+set "OLLAMA_INSTALLER=%CD%\build\third_party\OllamaSetup.exe"
 
 if not exist "%WIREWALL_RELEASE_DIR%" mkdir "%WIREWALL_RELEASE_DIR%"
 if not exist "%WIREWALL_DIST_DIR%\WireWall.exe" (
   echo Build incomplet: %WIREWALL_DIST_DIR%\WireWall.exe introuvable.
+  popd
+  exit /b 1
+)
+if not exist "%OLLAMA_INSTALLER%" (
+  echo Installeur Ollama introuvable: %OLLAMA_INSTALLER%
   popd
   exit /b 1
 )
@@ -48,13 +61,15 @@ if not defined ISCC_BIN (
   /DAppVersion=%WIREWALL_VERSION% ^
   "/DSourceDist=%WIREWALL_DIST_DIR%" ^
   "/DReleaseDir=%WIREWALL_RELEASE_DIR%" ^
+  /DBundleOllamaInstaller=1 ^
+  "/DOllamaInstallerSource=%OLLAMA_INSTALLER%" ^
   installer\WireWall.iss
 if errorlevel 1 (
-  echo Echec de compilation de l'installateur Inno Setup.
+  echo Echec de compilation de l'installateur full Inno Setup.
   popd
   exit /b 1
 )
 
-echo Installateur genere dans %WIREWALL_RELEASE_DIR%
+echo Installateur full genere dans %WIREWALL_RELEASE_DIR%
 popd
 exit /b 0

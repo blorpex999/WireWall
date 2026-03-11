@@ -24,6 +24,7 @@ Ce script :
 3. installe `requirements-dev.txt`
 4. genere `build\version_info.txt`
 5. lance `PyInstaller` avec `wirewall.spec`
+   - workdir temporaire : `%LOCALAPPDATA%\WireWallBuilder\pyinstaller-work`
 6. verifie `dist\WireWall\WireWall.exe`
 
 ## Verification de coherence release
@@ -67,6 +68,22 @@ Prerequis supplementaires :
   - ou `%ProgramFiles%\Inno Setup 6\ISCC.exe`
   - ou via la variable d'environnement `ISCC_EXE`
 
+## Build de l'installateur full demo
+
+```bat
+scripts\build_full_installer.bat
+```
+
+Ce script :
+
+1. construit WireWall
+2. telecharge l'installeur officiel Ollama dans `build\third_party\OllamaSetup.exe`
+3. compile un installateur `WireWall-Setup-<version>-full.exe`
+
+Limite :
+
+- le modele `qwen2.5:3b` n'est pas embarque ; il sera telecharge ensuite par `setup_ai`
+
 ## Release complete
 
 ```bat
@@ -84,12 +101,19 @@ Ce pipeline enchaine :
 7. hashes SHA-256
 8. validation des artefacts
 
+Variante demo :
+
+```bat
+scripts\release_full.bat
+```
+
 ## Artefacts attendus
 
 - `dist\WireWall\WireWall.exe`
 - `dist\WireWall\...libusb-1.0.dll`
 - `release\WireWall-<version>-win64-portable.zip`
 - `release\WireWall-Setup-<version>.exe`
+- `release\WireWall-Setup-<version>-full.exe`
 - `release\WireWall-<version>-manifest.json`
 - `release\SHA256SUMS.txt`
 
@@ -97,7 +121,8 @@ Ce pipeline enchaine :
 
 - Format principal : installateur Inno Setup
 - Format secondaire : zip portable
+- Variante demo : installateur full avec installeur Ollama embarque
 - Le bundle embarque `libusb_package`, `config.example.json` et `VERSION`
 - Le package portable et l'installateur embarquent aussi la documentation et les assistants IA/prerequis
 - Ollama et le modele `qwen2.5:3b` ne sont pas embarques
-- L'installateur compile l'application, mais n'installe pas silencieusement Ollama ni un gros modele local
+- L'installateur full peut embarquer l'installeur officiel Ollama, mais pas un gros modele local

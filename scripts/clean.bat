@@ -21,5 +21,9 @@ for /d /r %%D in (__pycache__) do (
 
 if exist ".coverage" del /f /q ".coverage"
 
+if defined LOCALAPPDATA (
+  if exist "%LOCALAPPDATA%\WireWallBuilder" rmdir /s /q "%LOCALAPPDATA%\WireWallBuilder"
+)
+
 popd
 exit /b 0

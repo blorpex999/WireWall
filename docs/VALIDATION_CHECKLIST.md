@@ -54,8 +54,10 @@
 - [ ] `libusb-1.0.dll` est presente dans le bundle
 - [ ] `release\WireWall-<version>-win64-portable.zip` est genere
 - [ ] `release\WireWall-Setup-<version>.exe` est genere
+- [ ] `release\WireWall-Setup-<version>-full.exe` est genere si la variante demo a ete construite
 - [ ] Le package portable demarre sur une machine de test propre
 - [ ] L'installateur se lance sur une machine de test propre
+- [ ] L'installateur full se lance sur une machine de test propre
 - [ ] L'application installee demarre sur une machine de test propre
 - [ ] Le package affiche un message visible en cas d'echec de preflight Tk
 
@@ -63,6 +65,7 @@
 
 - [ ] L'installateur cree les raccourcis menu demarrer
 - [ ] Les outils `Assistant IA locale` et `Diagnostic prerequis` sont presents
+- [ ] `tools\OllamaSetup.exe` est present dans la variante full
 - [ ] `%LOCALAPPDATA%\WireWall\` est prepare
 - [ ] La desinstallation retire les fichiers applicatifs
 - [ ] La documentation signale clairement que les donnees utilisateur restent sur le poste sauf suppression manuelle

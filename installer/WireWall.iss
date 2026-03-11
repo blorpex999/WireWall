@@ -7,6 +7,12 @@
 #ifndef ReleaseDir
   #define ReleaseDir "..\\release"
 #endif
+#ifndef BundleOllamaInstaller
+  #define BundleOllamaInstaller 0
+#endif
+#ifndef OllamaInstallerSource
+  #define OllamaInstallerSource "..\\build\\third_party\\OllamaSetup.exe"
+#endif
 
 #define AppName "WireWall"
 #define AppPublisher "Ynov Campus"
@@ -25,7 +31,11 @@ ArchitecturesInstallIn64BitMode=x64compatible
 Compression=lzma
 SolidCompression=yes
 OutputDir={#ReleaseDir}
+#if BundleOllamaInstaller
+OutputBaseFilename=WireWall-Setup-{#AppVersion}-full
+#else
 OutputBaseFilename=WireWall-Setup-{#AppVersion}
+#endif
 PrivilegesRequired=admin
 WizardStyle=modern
 DisableProgramGroupPage=yes
@@ -51,6 +61,7 @@ Source: "..\scripts\check_ollama.ps1"; DestDir: "{app}\tools"; Flags: ignorevers
 Source: "..\scripts\install_ollama.ps1"; DestDir: "{app}\tools"; Flags: ignoreversion
 Source: "..\scripts\install_ollama_model.ps1"; DestDir: "{app}\tools"; Flags: ignoreversion
 Source: "..\scripts\setup_ai.ps1"; DestDir: "{app}\tools"; Flags: ignoreversion
+Source: "{#OllamaInstallerSource}"; DestDir: "{app}\tools"; DestName: "OllamaSetup.exe"; Flags: ignoreversion skipifsourcedoesntexist
 
 [Dirs]
 Name: "{localappdata}\WireWall"; Permissions: users-modify
@@ -64,6 +75,9 @@ Name: "{localappdata}\WireWall\demo"; Permissions: users-modify
 Name: "{autoprograms}\{#AppName}\{#AppName}"; Filename: "{app}\{#AppExeName}"
 Name: "{autoprograms}\{#AppName}\Assistant IA locale"; Filename: "{app}\tools\setup_ai.bat"; WorkingDir: "{app}\tools"
 Name: "{autoprograms}\{#AppName}\Diagnostic prerequis"; Filename: "{app}\tools\check_target_prereqs.bat"; WorkingDir: "{app}\tools"
+#if BundleOllamaInstaller
+Name: "{autoprograms}\{#AppName}\Installer Ollama local"; Filename: "{app}\tools\OllamaSetup.exe"; WorkingDir: "{app}\tools"
+#endif
 Name: "{autoprograms}\{#AppName}\Documentation"; Filename: "{app}\README.md"
 Name: "{autoprograms}\{#AppName}\Desinstaller {#AppName}"; Filename: "{uninstallexe}"
 Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExeName}"; Tasks: desktopicon
@@ -82,7 +96,7 @@ begin
   MsgBox(
     'WireWall installe l''application locale et ses outils d''assistance.' + #13#10#13#10 +
     'Important :' + #13#10 +
-    '- l''IA locale depend d''Ollama, non embarque dans l''installeur' + #13#10 +
+    '- l''IA locale depend d''Ollama ; seul son installeur officiel peut etre embarque dans la variante full' + #13#10 +
     '- le modele recommande ({#RecommendedModel}) sera telecharge separement si vous lancez l''assistant' + #13#10 +
     '- les fonctions USBSTOR reelles restent conditionnees aux droits administrateur',
     mbInformation,

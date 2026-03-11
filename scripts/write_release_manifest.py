@@ -20,12 +20,14 @@ def main() -> int:
             "bundle_dir": "dist/WireWall",
             "portable_zip": f"release/WireWall-{version}-win64-portable.zip",
             "installer": f"release/WireWall-Setup-{version}.exe",
+            "installer_full": f"release/WireWall-Setup-{version}-full.exe",
         },
         "installer_engine": "Inno Setup 6",
         "ai_strategy": {
             "ollama_required_for_ai": True,
             "default_model": "qwen2.5:3b",
             "embedded_in_installer": False,
+            "bundled_official_installer_optional": True,
             "fallback": "Application utilisable sans IA locale",
         },
         "assistant_scripts": {

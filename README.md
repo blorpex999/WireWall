@@ -1,4 +1,4 @@
-# WireWall 1.1.0
+# WireWall 1.2.0
 
 WireWall est une application desktop Windows de supervision USB orientee cybersecurite. Le projet combine detection USB reelle via `PyUSB` avec backend `libusb1`, journalisation `SQLite`, scoring de risque, policies whitelist/blacklist, controle reel `USBSTOR`, analyse IA locale via Ollama et exports d'audit `HTML`, `CSV`, `JSON`.
 
@@ -7,15 +7,15 @@ WireWall est une application desktop Windows de supervision USB orientee cyberse
 - developpement source depuis le repo
 - bundle `PyInstaller` one-folder
 - package portable `zip`
-- installateur Windows `Inno Setup`
+- installateur Windows standard `Inno Setup`
+- installateur Windows `full demo` avec installeur Ollama embarque
 
 ## Verites importantes
 
 - WireWall fonctionne sans Ollama. L'analyse IA est optionnelle et strictement locale.
-- Ollama et le modele recommande `qwen2.5:3b` ne sont pas embarques dans l'executable, le package portable ni l'installateur.
-- La strategie IA reelle est une installation en deux phases :
-  - installer WireWall
-  - lancer l'assistant IA local seulement si vous voulez activer l'analyse
+- Ollama et le modele recommande `qwen2.5:3b` ne sont pas embarques dans l'executable.
+- La distribution `full demo` peut embarquer l'installeur officiel Ollama, mais pas le modele lui-meme.
+- Le modele reste telecharge en seconde phase par l'assistant IA local.
 - `USBSTOR` bloque le stockage USB, pas tous les peripheriques USB.
 - Le monitoring USB reste un monitoring utilisateur par snapshots `PyUSB/libusb1`, pas un driver noyau.
 
@@ -61,28 +61,38 @@ scripts\build.bat
 scripts\package_portable.bat
 ```
 
-### Installateur Windows
+### Installateur Windows standard
 
 ```bat
 scripts\build_installer.bat
 ```
 
-Prerequis builder :
+### Installateur Windows full demo
 
-- build `PyInstaller` valide
-- Inno Setup 6 installe avec `ISCC.exe`
+```bat
+scripts\build_full_installer.bat
+```
 
-### Release complete
+Ce mode telecharge l'installeur officiel Ollama et l'embarque dans l'installateur WireWall. Le modele `qwen2.5:3b` n'est toujours pas embarque.
+
+### Release complete standard
 
 ```bat
 scripts\release.bat
 ```
 
-Le pipeline genere :
+### Release complete full demo
+
+```bat
+scripts\release_full.bat
+```
+
+Le pipeline peut generer :
 
 - `dist\WireWall\`
 - `release\WireWall-<version>-win64-portable.zip`
 - `release\WireWall-Setup-<version>.exe`
+- `release\WireWall-Setup-<version>-full.exe`
 - `release\WireWall-<version>-manifest.json`
 - `release\SHA256SUMS.txt`
 
@@ -95,10 +105,11 @@ Mode recommande pour un autre poste :
 3. executer `tools\setup_ai.bat` ou `tools\setup_ai.ps1`
 4. laisser l'assistant :
    - detecter Ollama
-   - installer Ollama via `winget` si possible
+   - reutiliser l'installeur Ollama embarque si present
+   - sinon installer Ollama via `winget` si possible
    - telecharger `qwen2.5:3b`
 
-Si `winget` est indisponible ou si le poste est offline, l'assistant bascule en mode guide et indique clairement quoi faire. Vous pouvez aussi fournir un installeur Ollama offline officiel au script PowerShell.
+Si `winget` est indisponible ou si le poste est offline, l'assistant bascule en mode guide. Avec la distribution `full demo`, l'installeur officiel Ollama est deja inclus, mais le modele reste a telecharger separement.
 
 ## Scripts principaux
 
@@ -108,11 +119,14 @@ Si `winget` est indisponible ou si le poste est offline, l'assistant bascule en 
 - `scripts\test.bat` : suite `pytest`
 - `scripts\build.bat` : build `PyInstaller`
 - `scripts\package_portable.bat` : zip portable versionne
-- `scripts\build_installer.bat` : compilation Inno Setup
+- `scripts\build_installer.bat` : compilation Inno Setup standard
+- `scripts\build_full_installer.bat` : compilation Inno Setup avec installeur Ollama embarque
 - `scripts\release_check.bat` : validation tests + coherence release + build bundle
-- `scripts\release.bat` : pipeline de release complet
+- `scripts\release.bat` : pipeline de release standard
+- `scripts\release_full.bat` : pipeline de release demo avec installeur Ollama embarque
 - `scripts\validate_artifacts.bat` : verification des artefacts de release
 - `scripts\check_release_consistency.py` : verification docs/package/version/scripts
+- `scripts\fetch_ollama_installer.ps1` : telechargement de l'installeur officiel Ollama pour le builder
 - `scripts\check_target_prereqs.ps1` : diagnostic prerequis poste cible
 - `scripts\setup_ai.ps1` : assistant IA local
 - `scripts\check_ollama.ps1` : diagnostic Ollama/modele
@@ -124,7 +138,7 @@ Avant chaque release :
 1. mettre a jour `VERSION` si la distribution ou le comportement changent
 2. mettre a jour `CHANGELOG.md`
 3. mettre a jour `README.md` et les guides impactes
-4. executer `scripts\release.bat` sur un builder Windows 10/11 avec Python 3.11 et Tcl/Tk valide
+4. executer `scripts\release.bat` ou `scripts\release_full.bat` sur un builder Windows 10/11 avec Python 3.11 et Tcl/Tk valide
 5. verifier les artefacts et les hashes
 
 ## Documentation

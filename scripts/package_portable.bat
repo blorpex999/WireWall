@@ -58,6 +58,9 @@ copy /y "scripts\check_ollama.ps1" "%PORTABLE_STAGE%\tools\check_ollama.ps1" >nu
 copy /y "scripts\install_ollama.ps1" "%PORTABLE_STAGE%\tools\install_ollama.ps1" >nul
 copy /y "scripts\install_ollama_model.ps1" "%PORTABLE_STAGE%\tools\install_ollama_model.ps1" >nul
 copy /y "scripts\setup_ai.ps1" "%PORTABLE_STAGE%\tools\setup_ai.ps1" >nul
+if exist "build\third_party\OllamaSetup.exe" (
+  copy /y "build\third_party\OllamaSetup.exe" "%PORTABLE_STAGE%\tools\OllamaSetup.exe" >nul
+)
 
 powershell -NoProfile -Command "Compress-Archive -Path '%PORTABLE_STAGE%\*' -DestinationPath '%PORTABLE_ZIP%' -Force"
 if errorlevel 1 (

@@ -43,6 +43,21 @@ Action :
   - `%ProgramFiles%\Inno Setup 6\ISCC.exe`
 - ou definir `ISCC_EXE`
 
+## `build_full_installer.bat` echoue
+
+Cause probable :
+
+- Inno Setup 6 absent
+- echec de telechargement de `OllamaSetup.exe`
+- `winget show Ollama.Ollama` indisponible
+
+Action :
+
+- verifier la connectivite Internet du builder
+- verifier `winget show Ollama.Ollama`
+- lancer `powershell -File scripts\fetch_ollama_installer.ps1` a la main
+- verifier `build\third_party\OllamaSetup.exe`
+
 ## `check_release_consistency.py` echoue
 
 Cause probable :

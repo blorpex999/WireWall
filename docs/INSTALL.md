@@ -3,6 +3,7 @@
 ## Modes d'installation supportes
 
 - installateur Windows `Inno Setup`
+- installateur Windows `full demo` avec installeur Ollama embarque
 - package portable `zip`
 - execution developpeur depuis les sources
 
@@ -45,6 +46,24 @@ Il n'embarque pas :
 
 - Ollama
 - le modele local
+
+## Option 1 bis - Installateur full demo
+
+Lancer :
+
+```bat
+WireWall-Setup-<version>-full.exe
+```
+
+Cette variante :
+
+- installe WireWall comme l'installeur standard
+- embarque aussi `tools\OllamaSetup.exe`
+- permet a `Assistant IA locale` de reutiliser cet installeur local sans `winget`
+
+Elle n'embarque toujours pas :
+
+- le modele `qwen2.5:3b`
 
 ## Option 2 - Portable
 
@@ -99,6 +118,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\setup_ai.ps1 -Mode
 Le script :
 
 - detecte Ollama
+- reutilise `tools\OllamaSetup.exe` s'il est present
 - tente son installation via `winget` si besoin
 - telecharge le modele recommande
 - laisse l'application utilisable sans IA si une etape echoue
