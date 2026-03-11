@@ -70,6 +70,7 @@ scripts\release_full.bat
   - installer WireWall
   - executer l'assistant IA local si necessaire
   - laisser l'application fonctionner sans IA si Ollama n'est pas disponible
+- Les dossiers runtime utilisateur sont crees par l'application au premier lancement, pas par l'installateur.
 
 Pour la release demo `full` :
 

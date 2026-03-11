@@ -39,8 +39,8 @@ L'installateur :
 
 - copie l'application dans `Program Files`
 - cree les raccourcis menu demarrer
-- prepare les repertoires utilisateur usuels sous `%LOCALAPPDATA%\WireWall`
 - installe les outils d'assistance IA et de diagnostic prerequis dans le dossier `tools\` de l'application
+- laisse l'application creer `%LOCALAPPDATA%\WireWall` au premier lancement
 
 Il n'embarque pas :
 

@@ -98,12 +98,12 @@ def ensure_packaging(errors: list[str]) -> None:
 
     installer_text = (ROOT / "installer" / "WireWall.iss").read_text(encoding="utf-8")
     installer_tokens = [
-        r"{localappdata}\WireWall",
         "setup_ai.ps1",
         "check_target_prereqs.ps1",
         "README.md",
         "CHANGELOG.md",
         "VERSION",
+        "dossiers runtime utilisateur seront crees au premier lancement",
     ]
     for token in installer_tokens:
         if token not in installer_text:

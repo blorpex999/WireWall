@@ -61,15 +61,9 @@ Source: "..\scripts\check_ollama.ps1"; DestDir: "{app}\tools"; Flags: ignorevers
 Source: "..\scripts\install_ollama.ps1"; DestDir: "{app}\tools"; Flags: ignoreversion
 Source: "..\scripts\install_ollama_model.ps1"; DestDir: "{app}\tools"; Flags: ignoreversion
 Source: "..\scripts\setup_ai.ps1"; DestDir: "{app}\tools"; Flags: ignoreversion
+#if BundleOllamaInstaller
 Source: "{#OllamaInstallerSource}"; DestDir: "{app}\tools"; DestName: "OllamaSetup.exe"; Flags: ignoreversion skipifsourcedoesntexist
-
-[Dirs]
-Name: "{localappdata}\WireWall"; Permissions: users-modify
-Name: "{localappdata}\WireWall\config"; Permissions: users-modify
-Name: "{localappdata}\WireWall\logs"; Permissions: users-modify
-Name: "{localappdata}\WireWall\exports"; Permissions: users-modify
-Name: "{localappdata}\WireWall\data"; Permissions: users-modify
-Name: "{localappdata}\WireWall\demo"; Permissions: users-modify
+#endif
 
 [Icons]
 Name: "{autoprograms}\{#AppName}\{#AppName}"; Filename: "{app}\{#AppExeName}"
@@ -98,6 +92,7 @@ begin
     'Important :' + #13#10 +
     '- l''IA locale depend d''Ollama ; seul son installeur officiel peut etre embarque dans la variante full' + #13#10 +
     '- le modele recommande ({#RecommendedModel}) sera telecharge separement si vous lancez l''assistant' + #13#10 +
+    '- les dossiers runtime utilisateur seront crees au premier lancement' + #13#10 +
     '- les fonctions USBSTOR reelles restent conditionnees aux droits administrateur',
     mbInformation,
     MB_OK

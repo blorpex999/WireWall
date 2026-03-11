@@ -66,7 +66,7 @@
 - [ ] L'installateur cree les raccourcis menu demarrer
 - [ ] Les outils `Assistant IA locale` et `Diagnostic prerequis` sont presents
 - [ ] `tools\OllamaSetup.exe` est present dans la variante full
-- [ ] `%LOCALAPPDATA%\WireWall\` est prepare
+- [ ] `%LOCALAPPDATA%\WireWall\` est cree au premier lancement
 - [ ] La desinstallation retire les fichiers applicatifs
 - [ ] La documentation signale clairement que les donnees utilisateur restent sur le poste sauf suppression manuelle
 

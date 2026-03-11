@@ -16,6 +16,7 @@ WireWall est une application desktop Windows de supervision USB orientee cyberse
 - Ollama et le modele recommande `qwen2.5:3b` ne sont pas embarques dans l'executable.
 - La distribution `full demo` peut embarquer l'installeur officiel Ollama, mais pas le modele lui-meme.
 - Le modele reste telecharge en seconde phase par l'assistant IA local.
+- Les dossiers runtime `%LOCALAPPDATA%\WireWall` sont crees par l'application au premier lancement.
 - `USBSTOR` bloque le stockage USB, pas tous les peripheriques USB.
 - Le monitoring USB reste un monitoring utilisateur par snapshots `PyUSB/libusb1`, pas un driver noyau.
 
