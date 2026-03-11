@@ -12,9 +12,11 @@
 
 - [ ] L'application demarre sans erreur Python ni erreur Tkinter
 - [ ] Un second lancement n'ouvre pas une deuxieme instance
+- [ ] Lancement source : aucune console parasite ne reste visible par defaut
 - [ ] L'UI reste reactive pendant les health checks et l'analyse IA
 - [ ] Chaque vue se charge sans bouton casse ni message incoherent
 - [ ] Le mode demo est visuellement distinct du mode reel
+- [ ] L'icone WireWall personnalisee apparait dans la fenetre et la barre des taches
 
 ## USB
 

@@ -26,6 +26,8 @@ if errorlevel 1 (
 )
 
 set "WIREWALL_PYTHON_EXE=%CD%\.venv\Scripts\python.exe"
+set "WIREWALL_PYTHONW_EXE=%CD%\.venv\Scripts\pythonw.exe"
+if exist "%WIREWALL_PYTHONW_EXE%" set "WIREWALL_PYTHON_EXE=%WIREWALL_PYTHONW_EXE%"
 set "WIREWALL_ENTRY=%CD%\main.py"
 set "WIREWALL_ARGS=\"%WIREWALL_ENTRY%\" %*"
 set "WIREWALL_WORKDIR=%CD%"

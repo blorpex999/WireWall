@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.2.2 - 2026-03-11
+
+- Masquage de la console Windows par defaut lors du lancement de WireWall en mode source pour eviter une fenetre de logs parasite.
+- Ajout d'une variable `WIREWALL_KEEP_CONSOLE=1` pour conserver explicitement la console en debug.
+- Integration d'un nouveau jeu d'icones WireWall pour la fenetre Tkinter, l'executable PyInstaller et l'installateur Inno Setup.
+- Mise a jour des scripts de lancement source pour preferer `pythonw.exe` quand il est disponible.
+- Le pipeline `full demo` reutilise desormais `build\third_party\OllamaSetup.exe` s'il est deja en cache local.
+
 ## 1.2.1 - 2026-03-11
 
 - Ajout d'un verrou Windows d'instance unique pour empecher l'ouverture simultanee de plusieurs fenetres WireWall.

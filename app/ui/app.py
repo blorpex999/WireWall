@@ -16,7 +16,8 @@ from app.ui.views.policies import PoliciesView
 from app.ui.views.settings import SettingsView
 from app.ui.views.usb_control import USBControlView
 from app.ui.widgets.common import DemoBanner, StatusBar, StatusPill
-from app.utils.windows import WindowsDeviceNotificationHook
+from app.utils.resources import asset_path
+from app.utils.windows import WindowsDeviceNotificationHook, set_app_user_model_id
 from app.version import __version__
 
 
@@ -33,6 +34,9 @@ class WireWallApp(tk.Tk):
         self.hook = WindowsDeviceNotificationHook()
         self.nav_buttons: dict[str, ttk.Button] = {}
         self._repaint_scheduled = False
+        self._window_icon_image: tk.PhotoImage | None = None
+        self._header_logo_image: tk.PhotoImage | None = None
+        self._configure_window_icon()
 
         self.columnconfigure(1, weight=1)
         self.rowconfigure(1, weight=1)
@@ -47,10 +51,13 @@ class WireWallApp(tk.Tk):
 
         header = ttk.Frame(self.sidebar, style="SidebarHeader.TFrame", padding=(4, 2, 4, 16))
         header.grid(row=0, column=0, sticky="ew")
-        ttk.Label(header, text="WireWall", style="NavTitle.TLabel").grid(row=0, column=0, sticky="w")
-        ttk.Label(header, text="Surveillance USB Windows", style="NavSubTitle.TLabel").grid(row=1, column=0, sticky="w", pady=(4, 6))
+        if self._header_logo_image is not None:
+            ttk.Label(header, image=self._header_logo_image, style="SidebarLogo.TLabel").grid(row=0, column=0, rowspan=2, sticky="w", padx=(0, 10))
+        ttk.Label(header, text="WireWall", style="NavTitle.TLabel").grid(row=0, column=1, sticky="w")
+        ttk.Label(header, text="Surveillance USB Windows", style="NavSubTitle.TLabel").grid(row=1, column=1, sticky="w", pady=(4, 6))
         self.sidebar_mode = StatusPill(header, "", "INFO")
-        self.sidebar_mode.grid(row=0, column=1, rowspan=2, sticky="e")
+        self.sidebar_mode.grid(row=0, column=2, rowspan=2, sticky="e")
+        header.columnconfigure(1, weight=1)
         self._refresh_mode_badges()
 
         self.content = ttk.Frame(self, padding=(0, 14, 14, 0))
@@ -96,6 +103,24 @@ class WireWallApp(tk.Tk):
         self.controller.request_health_refresh()
         self.controller.request_brain_refresh()
         self.set_status("WireWall initialise.", "OK")
+
+    def _configure_window_icon(self) -> None:
+        try:
+            set_app_user_model_id("WireWall.Desktop")
+            logo_ico = asset_path("assets", "wirewall.ico")
+            logo_png = asset_path("assets", "wirewall_logo_128.png")
+            if logo_png.exists():
+                self._window_icon_image = tk.PhotoImage(file=str(logo_png))
+                self._header_logo_image = self._window_icon_image.subsample(2, 2)
+                self.iconphoto(True, self._window_icon_image)
+            if logo_ico.exists():
+                try:
+                    self.iconbitmap(str(logo_ico))
+                except Exception:
+                    pass
+        except Exception:
+            self._window_icon_image = None
+            self._header_logo_image = None
 
     def show_view(self, name: str) -> None:
         if self.current_view_key is not None:

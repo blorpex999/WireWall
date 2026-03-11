@@ -10,8 +10,12 @@ datas = collect_data_files("libusb_package", include_py_files=False)
 datas += [
     ("config.example.json", "."),
     ("VERSION", "."),
+    ("assets/wirewall_logo.png", "assets"),
+    ("assets/wirewall_logo_128.png", "assets"),
+    ("assets/wirewall.ico", "assets"),
 ]
 version_file = Path("build") / "version_info.txt"
+icon_file = Path("assets") / "wirewall.ico"
 
 a = Analysis(
     ["main.py"],
@@ -43,6 +47,7 @@ exe = EXE(
     upx=False,
     console=False,
     version=str(version_file) if version_file.exists() else None,
+    icon=str(icon_file) if icon_file.exists() else None,
 )
 
 coll = COLLECT(

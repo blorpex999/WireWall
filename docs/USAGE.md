@@ -8,6 +8,8 @@
 - Version installee : `WireWall` via le raccourci menu demarrer
 - Version portable : `WireWall.exe`
 - Si WireWall est deja ouvert, un second lancement est refuse et la fenetre existante est reactivee si possible
+- En mode source, WireWall masque la console Windows par defaut pour un rendu plus propre
+- Pour garder la console de debug : `set WIREWALL_KEEP_CONSOLE=1`
 
 ## Ecrans a connaitre
 

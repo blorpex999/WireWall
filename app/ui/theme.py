@@ -61,6 +61,7 @@ def apply_dark_theme(root: tk.Tk) -> None:
     style.configure("CardTitle.TLabel", background=COLORS["panel"], font=section_font, foreground=COLORS["text"])
     style.configure("NavTitle.TLabel", background=COLORS["panel_alt"], font=("Segoe UI Semibold", 18), foreground=COLORS["text"])
     style.configure("NavSubTitle.TLabel", background=COLORS["panel_alt"], font=small_font, foreground=COLORS["muted"])
+    style.configure("SidebarLogo.TLabel", background=COLORS["panel_alt"])
     style.configure("Muted.TLabel", foreground=COLORS["muted"], font=small_font)
     style.configure("Hero.TLabel", font=hero_font, foreground=COLORS["text"])
     style.configure("Metric.TLabel", background=COLORS["panel"], foreground=COLORS["text"], font=hero_font)

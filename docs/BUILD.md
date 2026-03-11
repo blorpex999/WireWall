@@ -77,7 +77,7 @@ scripts\build_full_installer.bat
 Ce script :
 
 1. construit WireWall
-2. telecharge l'installeur officiel Ollama dans `build\third_party\OllamaSetup.exe`
+2. telecharge l'installeur officiel Ollama dans `build\third_party\OllamaSetup.exe`, ou reutilise le cache local s'il existe deja
 3. compile un installateur `WireWall-Setup-<version>-full.exe`
 
 Limite :

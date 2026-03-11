@@ -40,6 +40,7 @@ PrivilegesRequired=admin
 WizardStyle=modern
 DisableProgramGroupPage=yes
 UninstallDisplayIcon={app}\{#AppExeName}
+SetupIconFile=..\assets\wirewall.ico
 
 [Languages]
 Name: "french"; MessagesFile: "compiler:Languages\French.isl"

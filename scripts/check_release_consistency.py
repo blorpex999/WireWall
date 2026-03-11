@@ -44,6 +44,9 @@ def ensure_files(errors: list[str]) -> None:
         "config.example.json",
         "wirewall.spec",
         "installer/WireWall.iss",
+        "assets/wirewall.ico",
+        "assets/wirewall_logo.png",
+        "assets/wirewall_logo_128.png",
         "scripts/build.bat",
         "scripts/package_portable.bat",
         "scripts/build_installer.bat",
@@ -92,7 +95,7 @@ def ensure_config(errors: list[str]) -> None:
 
 def ensure_packaging(errors: list[str]) -> None:
     spec_text = (ROOT / "wirewall.spec").read_text(encoding="utf-8")
-    for token in ['("config.example.json", ".")', '("VERSION", ".")']:
+    for token in ['("config.example.json", ".")', '("VERSION", ".")', '("assets/wirewall.ico", "assets")', 'icon=str(icon_file)']:
         if token not in spec_text:
             errors.append(f"wirewall.spec missing packaging token: {token}")
 
@@ -103,6 +106,7 @@ def ensure_packaging(errors: list[str]) -> None:
         "README.md",
         "CHANGELOG.md",
         "VERSION",
+        "SetupIconFile=..\\assets\\wirewall.ico",
         "dossiers runtime utilisateur seront crees au premier lancement",
     ]
     for token in installer_tokens:

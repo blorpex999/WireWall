@@ -40,6 +40,26 @@ Action :
 - verifier la barre des taches Windows
 - fermer l'instance existante avant de relancer si vous voulez une nouvelle session propre
 
+## Je veux voir la console de debug au lancement source
+
+Cause probable :
+
+- WireWall masque volontairement la console Windows par defaut pour eviter une fenetre parasite
+
+Action :
+
+```bat
+set WIREWALL_KEEP_CONSOLE=1
+scripts\run_dev.bat
+```
+
+Ou :
+
+```bat
+set WIREWALL_KEEP_CONSOLE=1
+python main.py
+```
+
 ## `build_installer.bat` echoue
 
 Cause probable :

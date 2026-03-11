@@ -6,6 +6,7 @@ import logging
 import sys
 
 from app.utils.single_instance import acquire_single_instance
+from app.utils.windows import hide_console_window
 from app.version import __version__
 
 
@@ -54,7 +55,7 @@ def notify_user_message(message: str, title: str = "WireWall", flags: int = 0x10
     except Exception:
         pass
 
-    if not getattr(sys, "frozen", False) or sys.platform != "win32":
+    if sys.platform != "win32":
         return
 
     try:
@@ -69,6 +70,7 @@ def notify_startup_error(message: str, title: str = "WireWall") -> None:
 
 def main() -> int:
     args = parse_args()
+    hide_console_window()
     instance_guard = None
     container = None
 

@@ -1,4 +1,4 @@
-# WireWall 1.2.1
+# WireWall 1.2.2
 
 WireWall est une application desktop Windows de supervision USB orientee cybersecurite. Le projet combine detection USB reelle via `PyUSB` avec backend `libusb1`, journalisation `SQLite`, scoring de risque, policies whitelist/blacklist, controle reel `USBSTOR`, analyse IA locale via Ollama et exports d'audit `HTML`, `CSV`, `JSON`.
 
@@ -18,6 +18,7 @@ WireWall est une application desktop Windows de supervision USB orientee cyberse
 - Le modele reste telecharge en seconde phase par l'assistant IA local.
 - Les dossiers runtime `%LOCALAPPDATA%\WireWall` sont crees par l'application au premier lancement.
 - Une seule instance WireWall peut tourner a la fois sur un poste ; un second lancement tente de reactiver la fenetre existante.
+- Le lancement GUI est silencieux par defaut en mode source ; utilisez `WIREWALL_KEEP_CONSOLE=1` si vous voulez garder la console de debug.
 - `USBSTOR` bloque le stockage USB, pas tous les peripheriques USB.
 - Le monitoring USB reste un monitoring utilisateur par snapshots `PyUSB/libusb1`, pas un driver noyau.
 
@@ -75,7 +76,7 @@ scripts\build_installer.bat
 scripts\build_full_installer.bat
 ```
 
-Ce mode telecharge l'installeur officiel Ollama et l'embarque dans l'installateur WireWall. Le modele `qwen2.5:3b` n'est toujours pas embarque.
+Ce mode telecharge l'installeur officiel Ollama et l'embarque dans l'installateur WireWall. Si `build\third_party\OllamaSetup.exe` est deja present, le cache local est reutilise. Le modele `qwen2.5:3b` n'est toujours pas embarque.
 
 ### Release complete standard
 
@@ -128,7 +129,7 @@ Si `winget` est indisponible ou si le poste est offline, l'assistant bascule en 
 - `scripts\release_full.bat` : pipeline de release demo avec installeur Ollama embarque
 - `scripts\validate_artifacts.bat` : verification des artefacts de release
 - `scripts\check_release_consistency.py` : verification docs/package/version/scripts
-- `scripts\fetch_ollama_installer.ps1` : telechargement de l'installeur officiel Ollama pour le builder
+- `scripts\fetch_ollama_installer.ps1` : telechargement ou reutilisation du cache local de l'installeur officiel Ollama pour le builder
 - `scripts\check_target_prereqs.ps1` : diagnostic prerequis poste cible
 - `scripts\setup_ai.ps1` : assistant IA local
 - `scripts\check_ollama.ps1` : diagnostic Ollama/modele

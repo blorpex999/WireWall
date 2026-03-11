@@ -1,6 +1,7 @@
 param(
     [string]$OutputPath = "",
-    [string]$Url = ""
+    [string]$Url = "",
+    [switch]$ForceDownload
 )
 
 $ErrorActionPreference = "Stop"
@@ -12,6 +13,14 @@ if (-not $OutputPath) {
 $OutputPath = [System.IO.Path]::GetFullPath($OutputPath)
 $targetDir = Split-Path -Parent $OutputPath
 New-Item -ItemType Directory -Force -Path $targetDir | Out-Null
+
+if ((-not $ForceDownload) -and (Test-Path $OutputPath)) {
+    $existing = Get-Item $OutputPath
+    if ($existing.Length -gt 100MB) {
+        Write-Output "Installeur Ollama deja en cache: $OutputPath"
+        exit 0
+    }
+}
 
 if (-not $Url) {
     $wingetShow = winget show Ollama.Ollama --accept-source-agreements 2>$null

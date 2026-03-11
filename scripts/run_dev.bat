@@ -25,7 +25,12 @@ if errorlevel 1 (
   exit /b 1
 )
 
-python main.py
+set "WIREWALL_PYTHONW=%CD%\.venv\Scripts\pythonw.exe"
+if exist "%WIREWALL_PYTHONW%" (
+  "%WIREWALL_PYTHONW%" main.py
+) else (
+  python main.py
+)
 set "EXIT_CODE=%ERRORLEVEL%"
 popd
 exit /b %EXIT_CODE%

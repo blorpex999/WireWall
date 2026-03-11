@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import ctypes
 import logging
+import os
 import platform
+import sys
 from ctypes import wintypes
 from typing import Callable
 
@@ -82,3 +84,26 @@ class WindowsDeviceNotificationHook:
             self._hwnd = None
             self._old_proc = None
             self._new_proc = None
+
+
+def hide_console_window() -> None:
+    if platform.system() != "Windows" or os.environ.get("WIREWALL_KEEP_CONSOLE") == "1":
+        return
+
+    try:
+        kernel32 = ctypes.windll.kernel32
+        user32 = ctypes.windll.user32
+        hwnd = kernel32.GetConsoleWindow()
+        if hwnd:
+            user32.ShowWindow(hwnd, 0)
+    except Exception:
+        LOGGER.exception("Impossible de masquer la console Windows WireWall.")
+
+
+def set_app_user_model_id(app_id: str = "WireWall.Desktop") -> None:
+    if platform.system() != "Windows":
+        return
+    try:
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(app_id)
+    except Exception:
+        LOGGER.exception("Impossible de definir l'AppUserModelID Windows de WireWall.")
