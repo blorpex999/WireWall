@@ -28,6 +28,18 @@ Action :
 - verifier `dist\WireWall\WireWall.exe`
 - verifier la presence de `libusb-1.0.dll` dans `dist\WireWall`
 
+## Un second lancement n'ouvre pas une nouvelle fenetre
+
+Cause probable :
+
+- une instance WireWall est deja active
+
+Action :
+
+- revenir a la fenetre WireWall deja ouverte
+- verifier la barre des taches Windows
+- fermer l'instance existante avant de relancer si vous voulez une nouvelle session propre
+
 ## `build_installer.bat` echoue
 
 Cause probable :

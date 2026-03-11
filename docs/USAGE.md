@@ -7,6 +7,7 @@
 - Mode admin : `scripts\run_admin.bat`
 - Version installee : `WireWall` via le raccourci menu demarrer
 - Version portable : `WireWall.exe`
+- Si WireWall est deja ouvert, un second lancement est refuse et la fenetre existante est reactivee si possible
 
 ## Ecrans a connaitre
 

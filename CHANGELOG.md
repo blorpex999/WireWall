@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.1 - 2026-03-11
+
+- Ajout d'un verrou Windows d'instance unique pour empecher l'ouverture simultanee de plusieurs fenetres WireWall.
+- Lors d'un second lancement, l'application informe l'utilisateur et tente de reactiver la fenetre deja ouverte.
+- Mise a jour de la documentation d'usage et de troubleshooting pour decrire ce comportement.
+
 ## 1.2.0 - 2026-03-11
 
 - Ajout d'une variante de distribution "full demo" avec installeur WireWall capable d'embarquer l'installeur officiel Ollama quand il est disponible au build.

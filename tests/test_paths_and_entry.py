@@ -30,6 +30,15 @@ def test_build_app_paths_falls_back_to_portable_dir(monkeypatch, workspace_tmp_d
 def test_main_returns_error_and_notifies_when_tk_runtime_is_invalid(monkeypatch) -> None:
     notified: dict[str, str] = {}
     monkeypatch.setattr(main_module, "parse_args", lambda: SimpleNamespace(demo=False, config=None))
+    monkeypatch.setattr(
+        main_module,
+        "acquire_single_instance",
+        lambda app_name="WireWall": SimpleNamespace(
+            already_running=False,
+            existing_window_activated=False,
+            release=lambda: None,
+        ),
+    )
     monkeypatch.setattr(main_module, "validate_tk_runtime", lambda: (False, "Tk broken"))
     monkeypatch.setattr(main_module, "notify_startup_error", lambda message, title="WireWall": notified.setdefault("message", message))
 
@@ -37,6 +46,33 @@ def test_main_returns_error_and_notifies_when_tk_runtime_is_invalid(monkeypatch)
 
     assert exit_code == 1
     assert "Tk broken" in notified["message"]
+
+
+def test_main_returns_cleanly_when_another_instance_is_running(monkeypatch) -> None:
+    notifications: list[str] = []
+
+    class Guard:
+        already_running = True
+        existing_window_activated = True
+
+        def __init__(self) -> None:
+            self.released = False
+
+        def release(self) -> None:
+            self.released = True
+
+    guard = Guard()
+
+    monkeypatch.setattr(main_module, "parse_args", lambda: SimpleNamespace(demo=False, config=None))
+    monkeypatch.setattr(main_module, "acquire_single_instance", lambda app_name="WireWall": guard)
+    monkeypatch.setattr(main_module, "notify_user_message", lambda message, title="WireWall", flags=0x10: notifications.append(message))
+
+    exit_code = main_module.main()
+
+    assert exit_code == 0
+    assert guard.released is True
+    assert notifications
+    assert "deja lance" in notifications[0]
 
 
 def test_force_demo_does_not_persist_demo_mode_in_config(monkeypatch, workspace_tmp_dir) -> None:
