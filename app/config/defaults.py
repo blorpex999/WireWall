@@ -47,6 +47,9 @@ def build_default_settings() -> AppSettings:
         alert_threshold=int(PROFILE_PRESETS["Normal"]["alert_threshold"]),
         dedup_window_seconds=int(PROFILE_PRESETS["Normal"]["dedup_window_seconds"]),
         dashboard_refresh_ms=1500,
+        autostart_enabled=False,
+        desktop_notifications_enabled=True,
+        recommendation_mode="balanced",
         author_name="Equipe Ydays",
         organization_name="Ynov Campus",
     )

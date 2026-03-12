@@ -3,7 +3,9 @@ from __future__ import annotations
 from app.config.defaults import build_default_settings
 from app.core.risk_engine import RiskEngine
 from app.models.entities import EnumerationResult, USBDevice
+from app.services.baseline_service import BaselineService
 from app.services.event_bus import EventBus
+from app.services.incident_service import IncidentService
 from app.services.policy_service import PolicyService
 from app.services.usb_monitor import UsbMonitorService
 
@@ -27,6 +29,13 @@ def build_monitor(repositories, snapshots):
     settings.mode = "demo"
     settings.export_directory = ""
     policy_service = PolicyService(repositories["policy_repo"], repositories["device_repo"])
+    incident_service = IncidentService(
+        incident_repo=repositories["incident_repo"],
+        alert_repo=repositories["alert_repo"],
+        policy_service=policy_service,
+        device_repo=repositories["device_repo"],
+        operator_name_getter=lambda: "Tests",
+    )
     bus = EventBus()
     monitor = UsbMonitorService(
         enumerator=FakeEnumerator(snapshots),
@@ -36,6 +45,8 @@ def build_monitor(repositories, snapshots):
         alert_repo=repositories["alert_repo"],
         policy_service=policy_service,
         risk_engine=RiskEngine(),
+        baseline_service=BaselineService(),
+        incident_service=incident_service,
         event_bus=bus,
         settings=settings,
     )

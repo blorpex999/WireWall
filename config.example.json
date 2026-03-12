@@ -13,6 +13,9 @@
   "alert_threshold": 50,
   "dedup_window_seconds": 60,
   "dashboard_refresh_ms": 1500,
+  "autostart_enabled": false,
+  "desktop_notifications_enabled": true,
+  "recommendation_mode": "balanced",
   "author_name": "Equipe Ydays",
   "organization_name": "Ynov Campus"
 }

@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.3.0 - 2026-03-12
+
+- Ajout d'une baseline locale par peripherique avec etats `NEW`, `RARE`, `KNOWN`, `DEVIATION`.
+- Enrichissement du scoring pour prendre en compte l'habitude, les deviations horaires et la stabilite d'usage.
+- Ajout d'un workflow incident relie aux alertes avec commentaire analyste, decision et resolution.
+- Ajout de suggestions supervisees validables depuis l'interface au lieu d'actions automatiques silencieuses.
+- Ajout d'un audit d'export verifiable avec hash du fichier, sidecar `.sha256` et chainage local des rapports.
+- Ajout du suivi de reprise apres fermeture non propre et du contexte runtime associe.
+- Ajout du demarrage automatique avec Windows via `HKCU\\Run`.
+- Ajout de notifications locales discretes pour les alertes `HIGH` / `CRITICAL`.
+- Mise a jour du dashboard, des vues `Peripheriques`, `Alertes`, `Parametres` et `Analyse IA` pour exposer baseline, incidents et suggestions.
+
 ## 1.2.2 - 2026-03-11
 
 - Masquage de la console Windows par defaut lors du lancement de WireWall en mode source pour eviter une fenetre de logs parasite.

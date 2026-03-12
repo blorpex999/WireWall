@@ -33,6 +33,11 @@ SCHEMA_STATEMENTS = [
         identification_source TEXT,
         source_backend TEXT,
         metadata_json TEXT,
+        seen_count INTEGER NOT NULL DEFAULT 0,
+        usual_hours_json TEXT NOT NULL DEFAULT '{}',
+        trust_state TEXT NOT NULL DEFAULT 'NEW',
+        last_decision TEXT NOT NULL DEFAULT '',
+        recent_variation TEXT NOT NULL DEFAULT 'stable',
         demo_mode INTEGER NOT NULL DEFAULT 0
     )
     """,
@@ -75,10 +80,13 @@ SCHEMA_STATEMENTS = [
         message TEXT NOT NULL,
         device_key TEXT,
         event_id INTEGER,
+        case_id INTEGER,
         acknowledged INTEGER NOT NULL DEFAULT 0,
         acknowledged_at TEXT,
         score INTEGER NOT NULL DEFAULT 0,
         recommendations_json TEXT NOT NULL DEFAULT '[]',
+        analyst_comment TEXT NOT NULL DEFAULT '',
+        resolution_reason TEXT NOT NULL DEFAULT '',
         demo_mode INTEGER NOT NULL DEFAULT 0
     )
     """,
@@ -134,10 +142,70 @@ SCHEMA_STATEMENTS = [
         incident_count INTEGER NOT NULL DEFAULT 0,
         open_alert_count INTEGER NOT NULL DEFAULT 0,
         monitored_device_count INTEGER NOT NULL DEFAULT 0,
+        open_incident_count INTEGER NOT NULL DEFAULT 0,
+        suggestion_count INTEGER NOT NULL DEFAULT 0,
+        new_device_count INTEGER NOT NULL DEFAULT 0,
+        deviation_count INTEGER NOT NULL DEFAULT 0,
         recommendations_json TEXT NOT NULL DEFAULT '[]',
         focus_areas_json TEXT NOT NULL DEFAULT '[]',
         metadata_json TEXT NOT NULL DEFAULT '{}',
         demo_mode INTEGER NOT NULL DEFAULT 0
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS incidents (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        device_key TEXT,
+        alert_id INTEGER,
+        status TEXT NOT NULL DEFAULT 'new',
+        decision TEXT NOT NULL DEFAULT 'none',
+        comment TEXT NOT NULL DEFAULT '',
+        resolution_reason TEXT NOT NULL DEFAULT '',
+        operator_name TEXT NOT NULL DEFAULT '',
+        closed_at TEXT,
+        demo_mode INTEGER NOT NULL DEFAULT 0
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS recommendations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        stable_key TEXT NOT NULL UNIQUE,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        recommendation_type TEXT NOT NULL,
+        priority TEXT NOT NULL,
+        title TEXT NOT NULL,
+        details TEXT NOT NULL,
+        proposed_action TEXT NOT NULL,
+        target_device_key TEXT,
+        target_alert_id INTEGER,
+        status TEXT NOT NULL DEFAULT 'pending',
+        operator_comment TEXT NOT NULL DEFAULT '',
+        context_json TEXT NOT NULL DEFAULT '{}',
+        demo_mode INTEGER NOT NULL DEFAULT 0
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS report_exports (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        created_at TEXT NOT NULL,
+        export_format TEXT NOT NULL,
+        file_path TEXT NOT NULL,
+        file_sha256 TEXT NOT NULL,
+        chain_hash TEXT NOT NULL,
+        config_summary_json TEXT NOT NULL DEFAULT '{}',
+        demo_mode INTEGER NOT NULL DEFAULT 0
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS runtime_state (
+        singleton_id INTEGER PRIMARY KEY CHECK (singleton_id = 1),
+        last_startup_at TEXT,
+        last_shutdown_at TEXT,
+        last_mode TEXT NOT NULL DEFAULT 'real',
+        last_clean_exit INTEGER NOT NULL DEFAULT 1
     )
     """,
     "CREATE INDEX IF NOT EXISTS idx_device_events_occurred_at ON device_events(occurred_at DESC)",
@@ -145,6 +213,10 @@ SCHEMA_STATEMENTS = [
     "CREATE INDEX IF NOT EXISTS idx_alerts_created_at ON alerts(created_at DESC)",
     "CREATE INDEX IF NOT EXISTS idx_assessments_device_key ON risk_assessments(device_key)",
     "CREATE INDEX IF NOT EXISTS idx_brain_snapshots_created_at ON brain_snapshots(created_at DESC)",
+    "CREATE INDEX IF NOT EXISTS idx_incidents_alert_id ON incidents(alert_id)",
+    "CREATE INDEX IF NOT EXISTS idx_incidents_status ON incidents(status)",
+    "CREATE INDEX IF NOT EXISTS idx_recommendations_status ON recommendations(status)",
+    "CREATE INDEX IF NOT EXISTS idx_report_exports_created_at ON report_exports(created_at DESC)",
 ]
 
 
@@ -159,9 +231,12 @@ class DatabaseManager:
             connection.execute("PRAGMA foreign_keys=ON")
             for statement in SCHEMA_STATEMENTS:
                 connection.execute(statement)
+            self._migrate_schema(connection)
             count = connection.execute("SELECT COUNT(*) FROM schema_version").fetchone()[0]
             if count == 0:
-                connection.execute("INSERT INTO schema_version(version) VALUES (1)")
+                connection.execute("INSERT INTO schema_version(version) VALUES (2)")
+            else:
+                connection.execute("UPDATE schema_version SET version = 2")
 
     @contextmanager
     def session(self) -> Iterator[sqlite3.Connection]:
@@ -181,3 +256,37 @@ class DatabaseManager:
         with self.session() as connection:
             result = connection.execute("SELECT 1").fetchone()
         return bool(result)
+
+    def _migrate_schema(self, connection: sqlite3.Connection) -> None:
+        self._ensure_column(connection, "devices", "seen_count", "INTEGER NOT NULL DEFAULT 0")
+        self._ensure_column(connection, "devices", "usual_hours_json", "TEXT NOT NULL DEFAULT '{}'")
+        self._ensure_column(connection, "devices", "trust_state", "TEXT NOT NULL DEFAULT 'NEW'")
+        self._ensure_column(connection, "devices", "last_decision", "TEXT NOT NULL DEFAULT ''")
+        self._ensure_column(connection, "devices", "recent_variation", "TEXT NOT NULL DEFAULT 'stable'")
+
+        self._ensure_column(connection, "alerts", "case_id", "INTEGER")
+        self._ensure_column(connection, "alerts", "analyst_comment", "TEXT NOT NULL DEFAULT ''")
+        self._ensure_column(connection, "alerts", "resolution_reason", "TEXT NOT NULL DEFAULT ''")
+
+        self._ensure_column(connection, "brain_snapshots", "open_incident_count", "INTEGER NOT NULL DEFAULT 0")
+        self._ensure_column(connection, "brain_snapshots", "suggestion_count", "INTEGER NOT NULL DEFAULT 0")
+        self._ensure_column(connection, "brain_snapshots", "new_device_count", "INTEGER NOT NULL DEFAULT 0")
+        self._ensure_column(connection, "brain_snapshots", "deviation_count", "INTEGER NOT NULL DEFAULT 0")
+
+        runtime_count = connection.execute("SELECT COUNT(*) FROM runtime_state").fetchone()[0]
+        if runtime_count == 0:
+            connection.execute(
+                """
+                INSERT INTO runtime_state(singleton_id, last_startup_at, last_shutdown_at, last_mode, last_clean_exit)
+                VALUES (1, NULL, NULL, 'real', 1)
+                """
+            )
+
+    def _ensure_column(self, connection: sqlite3.Connection, table_name: str, column_name: str, ddl: str) -> None:
+        existing = {
+            row["name"]
+            for row in connection.execute(f"PRAGMA table_info({table_name})").fetchall()
+        }
+        if column_name in existing:
+            return
+        connection.execute(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {ddl}")

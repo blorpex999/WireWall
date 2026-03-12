@@ -28,6 +28,19 @@
 - L'analyse IA ne fonctionne que si le service local repond sur `localhost`.
 - En cas d'indisponibilite, WireWall retourne un diagnostic et ne fabrique pas de resultat.
 
+## Cerveau local, baseline et suggestions
+
+- Le "cerveau" WireWall repose sur une memoire locale `SQLite`, pas sur un apprentissage autonome du code.
+- Les suggestions restent supervisees et ne sont jamais appliquees silencieusement.
+- La baseline par peripherique reste locale au poste et a son historique ; elle n'est pas partagee entre machines.
+- Deux peripheriques strictement identiques sans numero de serie peuvent rester ambigus.
+
+## Notifications et demarrage auto
+
+- Les notifications WireWall sont des notifications locales de l'application, pas des toasts integres a Windows Action Center.
+- Le demarrage automatique utilise `HKCU\\Run`, pas un service Windows.
+- Si le poste applique des restrictions de registre utilisateur, l'activation du demarrage auto peut echouer proprement.
+
 ## Packaging
 
 - Un build PyInstaller genere sur un host dont Tkinter est casse n'est pas une validation exploitable de l'UI.

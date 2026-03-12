@@ -18,7 +18,7 @@ class SettingsView(BaseView):
         self.header = SectionHeader(
             self,
             "Parametres",
-            "Reglage du monitoring, de la retention, du profil de securite et de l'integration Ollama.",
+            "Reglage du monitoring, de la retention, du profil de securite, des suggestions et de l'integration Ollama.",
         )
         self.header.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 16))
 
@@ -31,6 +31,11 @@ class SettingsView(BaseView):
             "ollama_timeout_seconds": tk.StringVar(),
             "security_profile": tk.StringVar(),
             "export_directory": tk.StringVar(),
+            "recommendation_mode": tk.StringVar(),
+        }
+        self.bool_vars = {
+            "autostart_enabled": tk.BooleanVar(value=False),
+            "desktop_notifications_enabled": tk.BooleanVar(value=True),
         }
 
         monitoring = ttk.LabelFrame(self, text="Monitoring", style="Section.TLabelframe", padding=16)
@@ -38,12 +43,23 @@ class SettingsView(BaseView):
         monitoring.columnconfigure(1, weight=1)
         self._add_entry_field(monitoring, 0, "Frequence de scan (s)", "scan_interval_seconds")
         self._add_combo_field(monitoring, 1, "Profil de securite", "security_profile", ["Normal", "Strict", "Presentation"])
+        ttk.Checkbutton(
+            monitoring,
+            text="Activer le demarrage avec Windows",
+            variable=self.bool_vars["autostart_enabled"],
+        ).grid(row=2, column=0, columnspan=2, sticky="w", pady=(14, 0))
 
-        audit = ttk.LabelFrame(self, text="Audit et logs", style="Section.TLabelframe", padding=16)
+        audit = ttk.LabelFrame(self, text="Audit, alertes et suggestions", style="Section.TLabelframe", padding=16)
         audit.grid(row=1, column=1, sticky="nsew", padx=(8, 0), pady=(0, 12))
         audit.columnconfigure(1, weight=1)
         self._add_entry_field(audit, 0, "Retention historique (jours)", "history_retention_days")
         self._add_combo_field(audit, 1, "Niveau de logs", "log_level", ["DEBUG", "INFO", "WARNING", "ERROR"])
+        self._add_combo_field(audit, 2, "Mode recommandations", "recommendation_mode", ["conservative", "balanced", "proactive"])
+        ttk.Checkbutton(
+            audit,
+            text="Notifications locales des alertes HIGH / CRITICAL",
+            variable=self.bool_vars["desktop_notifications_enabled"],
+        ).grid(row=3, column=0, columnspan=2, sticky="w", pady=(14, 0))
 
         ollama = ttk.LabelFrame(self, text="IA locale Ollama", style="Section.TLabelframe", padding=16)
         ollama.grid(row=2, column=0, sticky="nsew", padx=(0, 8), pady=(0, 12))
@@ -70,7 +86,7 @@ class SettingsView(BaseView):
         footer.columnconfigure(0, weight=1)
         ttk.Label(
             footer,
-            text="Les changements prennent effet sur le prochain cycle de monitoring ou sur le prochain appel Ollama.",
+            text="Les changements prennent effet au prochain cycle de monitoring, au prochain rapport et au prochain appel Ollama.",
             style="Muted.TLabel",
             wraplength=980,
             justify="left",
@@ -85,14 +101,25 @@ class SettingsView(BaseView):
         settings = self.controller.settings
         for field_name, variable in self.vars.items():
             variable.set(str(getattr(settings, field_name)))
+        for field_name, variable in self.bool_vars.items():
+            variable.set(bool(getattr(settings, field_name)))
         self.db_path_var.set(str(self.controller.get_database_path()))
 
     def _save(self) -> None:
+        values = {key: variable.get() for key, variable in self.vars.items()}
+        values.update({key: variable.get() for key, variable in self.bool_vars.items()})
         self.run_action(
-            lambda: self.controller.save_settings({key: variable.get() for key, variable in self.vars.items()}),
-            success_message=lambda settings: f"Parametres enregistres. Profil actif : {settings.security_profile}",
+            lambda: self.controller.save_settings(values),
+            success_message=self._success_message,
             refresh=True,
         )
+
+    def _success_message(self, settings) -> str:
+        notice = self.controller.consume_settings_notice()
+        base_message = f"Parametres enregistres. Profil actif : {settings.security_profile}"
+        if notice is None:
+            return base_message
+        return f"{base_message} | {notice[0]}"
 
     def _add_entry_field(self, master, row: int, label: str, var_name: str) -> None:
         ttk.Label(master, text=label).grid(row=row, column=0, sticky="w", padx=(0, 12), pady=(0 if row == 0 else 12, 0))

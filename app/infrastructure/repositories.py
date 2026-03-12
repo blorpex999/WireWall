@@ -12,7 +12,10 @@ from app.models.entities import (
     BrainSnapshot,
     DeviceEvent,
     HealthStatus,
+    IncidentCase,
     PolicyEntry,
+    RecommendationEntry,
+    ReportAudit,
     RiskAssessment,
     USBDevice,
 )
@@ -50,6 +53,7 @@ class DeviceRepository:
     def upsert(self, device: USBDevice) -> None:
         payload = asdict(device)
         payload["metadata_json"] = _dumps(payload.pop("metadata"))
+        payload["usual_hours_json"] = _dumps(payload.pop("usual_hours"))
         payload["demo_mode"] = int(payload["demo_mode"])
         columns = ", ".join(payload.keys())
         placeholders = ", ".join(f":{key}" for key in payload)
@@ -64,6 +68,11 @@ class DeviceRepository:
                 payload,
             )
 
+    def get(self, device_key: str) -> USBDevice | None:
+        with self.db.session() as connection:
+            row = connection.execute("SELECT * FROM devices WHERE device_key = ?", (device_key,)).fetchone()
+        return self._map(row) if row else None
+
     def list_all(
         self,
         *,
@@ -76,7 +85,16 @@ class DeviceRepository:
         params: dict[str, Any] = {}
         if search:
             conditions.append(
-                "(device_key LIKE :search OR vendor_name LIKE :search OR product_name LIKE :search OR serial_number LIKE :search)"
+                """
+                (
+                    device_key LIKE :search
+                    OR vendor_name LIKE :search
+                    OR product_name LIKE :search
+                    OR serial_number LIKE :search
+                    OR trust_state LIKE :search
+                    OR last_decision LIKE :search
+                )
+                """
             )
             params["search"] = f"%{search}%"
         if category:
@@ -95,11 +113,6 @@ class DeviceRepository:
                 params,
             ).fetchall()
         return [self._map(row) for row in rows]
-
-    def get(self, device_key: str) -> USBDevice | None:
-        with self.db.session() as connection:
-            row = connection.execute("SELECT * FROM devices WHERE device_key = ?", (device_key,)).fetchone()
-        return self._map(row) if row else None
 
     def find_reconnect_candidate(self, device: USBDevice, demo_mode: bool) -> USBDevice | None:
         matches = [candidate for candidate in self.list_all(demo_mode=demo_mode) if self._same_logical_device(candidate, device)]
@@ -129,6 +142,13 @@ class DeviceRepository:
         with self.db.session() as connection:
             for duplicate in duplicates:
                 connection.execute("DELETE FROM devices WHERE device_key = ?", (duplicate.device_key,))
+
+    def update_decision(self, device_key: str, decision: str) -> None:
+        with self.db.session() as connection:
+            connection.execute(
+                "UPDATE devices SET last_decision = ? WHERE device_key = ?",
+                (decision, device_key),
+            )
 
     def counts(self, demo_mode: bool) -> dict[str, int]:
         with self.db.session() as connection:
@@ -192,6 +212,11 @@ class DeviceRepository:
             identification_source=row["identification_source"] or "unknown",
             source_backend=row["source_backend"] or "pyusb",
             metadata=_loads(row["metadata_json"], {}),
+            seen_count=row["seen_count"] or 0,
+            usual_hours=_loads(row["usual_hours_json"], {}),
+            trust_state=row["trust_state"] or "NEW",
+            last_decision=row["last_decision"] or "",
+            recent_variation=row["recent_variation"] or "stable",
             demo_mode=bool(row["demo_mode"]),
         )
 
@@ -263,6 +288,20 @@ class EventRepository:
         with self.db.session() as connection:
             rows = connection.execute(
                 f"SELECT * FROM device_events {where_clause} ORDER BY occurred_at DESC LIMIT :limit",
+                params,
+            ).fetchall()
+        return [self._map(row) for row in rows]
+
+    def list_for_device(self, device_key: str, *, limit: int = 12, demo_mode: bool | None = None) -> list[DeviceEvent]:
+        conditions = ["device_key = :device_key"]
+        params: dict[str, Any] = {"device_key": device_key, "limit": limit}
+        if demo_mode is not None:
+            conditions.append("demo_mode = :demo_mode")
+            params["demo_mode"] = int(demo_mode)
+        where_clause = " AND ".join(conditions)
+        with self.db.session() as connection:
+            rows = connection.execute(
+                f"SELECT * FROM device_events WHERE {where_clause} ORDER BY occurred_at DESC LIMIT :limit",
                 params,
             ).fetchall()
         return [self._map(row) for row in rows]
@@ -414,15 +453,22 @@ class AlertRepository:
                 """
                 INSERT INTO alerts (
                     created_at, severity, title, message, device_key, event_id,
-                    acknowledged, acknowledged_at, score, recommendations_json, demo_mode
+                    case_id, acknowledged, acknowledged_at, score, recommendations_json,
+                    analyst_comment, resolution_reason, demo_mode
                 ) VALUES (
                     :created_at, :severity, :title, :message, :device_key, :event_id,
-                    :acknowledged, :acknowledged_at, :score, :recommendations_json, :demo_mode
+                    :case_id, :acknowledged, :acknowledged_at, :score, :recommendations_json,
+                    :analyst_comment, :resolution_reason, :demo_mode
                 )
                 """,
                 payload,
             )
         return int(cursor.lastrowid)
+
+    def get(self, alert_id: int) -> Alert | None:
+        with self.db.session() as connection:
+            row = connection.execute("SELECT * FROM alerts WHERE id = ?", (alert_id,)).fetchone()
+        return self._map(row) if row else None
 
     def list_all(self, severity: str = "", acknowledged: str = "", demo_mode: bool | None = None) -> list[Alert]:
         conditions = []
@@ -451,6 +497,45 @@ class AlertRepository:
                 (acknowledged_at, alert_id),
             )
 
+    def attach_case(self, alert_id: int, case_id: int) -> None:
+        with self.db.session() as connection:
+            connection.execute("UPDATE alerts SET case_id = ? WHERE id = ?", (case_id, alert_id))
+
+    def update_workflow(
+        self,
+        alert_id: int,
+        *,
+        analyst_comment: str | None = None,
+        resolution_reason: str | None = None,
+        acknowledged: bool | None = None,
+        acknowledged_at: str | None = None,
+        case_id: int | None = None,
+    ) -> None:
+        updates: list[str] = []
+        params: list[Any] = []
+        if analyst_comment is not None:
+            updates.append("analyst_comment = ?")
+            params.append(analyst_comment)
+        if resolution_reason is not None:
+            updates.append("resolution_reason = ?")
+            params.append(resolution_reason)
+        if acknowledged is not None:
+            updates.append("acknowledged = ?")
+            params.append(int(acknowledged))
+            if not acknowledged and acknowledged_at is None:
+                updates.append("acknowledged_at = NULL")
+        if acknowledged_at is not None:
+            updates.append("acknowledged_at = ?")
+            params.append(acknowledged_at)
+        if case_id is not None:
+            updates.append("case_id = ?")
+            params.append(case_id)
+        if not updates:
+            return
+        params.append(alert_id)
+        with self.db.session() as connection:
+            connection.execute(f"UPDATE alerts SET {', '.join(updates)} WHERE id = ?", tuple(params))
+
     def counts(self, demo_mode: bool) -> dict[str, int]:
         with self.db.session() as connection:
             rows = connection.execute(
@@ -477,10 +562,121 @@ class AlertRepository:
             message=row["message"],
             device_key=row["device_key"],
             event_id=row["event_id"],
+            case_id=row["case_id"],
             acknowledged=bool(row["acknowledged"]),
             acknowledged_at=row["acknowledged_at"],
             score=row["score"] or 0,
             recommendations=_loads(row["recommendations_json"], []),
+            analyst_comment=row["analyst_comment"] or "",
+            resolution_reason=row["resolution_reason"] or "",
+            demo_mode=bool(row["demo_mode"]),
+        )
+
+
+class IncidentRepository:
+    def __init__(self, db: DatabaseManager) -> None:
+        self.db = db
+
+    def add(self, case: IncidentCase) -> int:
+        payload = asdict(case)
+        payload["demo_mode"] = int(payload["demo_mode"])
+        payload.pop("id", None)
+        with self.db.session() as connection:
+            cursor = connection.execute(
+                """
+                INSERT INTO incidents (
+                    created_at, updated_at, device_key, alert_id, status, decision,
+                    comment, resolution_reason, operator_name, closed_at, demo_mode
+                ) VALUES (
+                    :created_at, :updated_at, :device_key, :alert_id, :status, :decision,
+                    :comment, :resolution_reason, :operator_name, :closed_at, :demo_mode
+                )
+                """,
+                payload,
+            )
+        return int(cursor.lastrowid)
+
+    def save(self, case: IncidentCase) -> None:
+        if case.id is None:
+            case.id = self.add(case)
+            return
+        payload = asdict(case)
+        payload["demo_mode"] = int(payload["demo_mode"])
+        with self.db.session() as connection:
+            connection.execute(
+                """
+                UPDATE incidents SET
+                    created_at = :created_at,
+                    updated_at = :updated_at,
+                    device_key = :device_key,
+                    alert_id = :alert_id,
+                    status = :status,
+                    decision = :decision,
+                    comment = :comment,
+                    resolution_reason = :resolution_reason,
+                    operator_name = :operator_name,
+                    closed_at = :closed_at,
+                    demo_mode = :demo_mode
+                WHERE id = :id
+                """,
+                payload,
+            )
+
+    def get(self, case_id: int) -> IncidentCase | None:
+        with self.db.session() as connection:
+            row = connection.execute("SELECT * FROM incidents WHERE id = ?", (case_id,)).fetchone()
+        return self._map(row) if row else None
+
+    def get_by_alert(self, alert_id: int) -> IncidentCase | None:
+        with self.db.session() as connection:
+            row = connection.execute(
+                "SELECT * FROM incidents WHERE alert_id = ? ORDER BY created_at DESC LIMIT 1",
+                (alert_id,),
+            ).fetchone()
+        return self._map(row) if row else None
+
+    def list_all(self, *, status: str = "", demo_mode: bool | None = None, limit: int = 100) -> list[IncidentCase]:
+        conditions = []
+        params: dict[str, Any] = {"limit": limit}
+        if status:
+            conditions.append("status = :status")
+            params["status"] = status
+        if demo_mode is not None:
+            conditions.append("demo_mode = :demo_mode")
+            params["demo_mode"] = int(demo_mode)
+        where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
+        with self.db.session() as connection:
+            rows = connection.execute(
+                f"SELECT * FROM incidents {where_clause} ORDER BY updated_at DESC LIMIT :limit",
+                params,
+            ).fetchall()
+        return [self._map(row) for row in rows]
+
+    def count_open(self, demo_mode: bool) -> int:
+        with self.db.session() as connection:
+            row = connection.execute(
+                """
+                SELECT COUNT(*) AS total
+                FROM incidents
+                WHERE demo_mode = ? AND status NOT IN ('resolved', 'false_positive')
+                """,
+                (int(demo_mode),),
+            ).fetchone()
+        return int(row["total"])
+
+    def _map(self, row) -> IncidentCase:
+        return IncidentCase(
+            id=row["id"],
+            created_at=row["created_at"],
+            updated_at=row["updated_at"],
+            device_key=row["device_key"],
+            alert_id=row["alert_id"],
+            status=row["status"] or "new",
+            decision=row["decision"] or "none",
+            comment=row["comment"] or "",
+            resolution_reason=row["resolution_reason"] or "",
+            operator_name=row["operator_name"] or "",
+            closed_at=row["closed_at"],
             demo_mode=bool(row["demo_mode"]),
         )
 
@@ -533,6 +729,144 @@ class AssessmentRepository:
     def cleanup(self, keep_since: str) -> None:
         with self.db.session() as connection:
             connection.execute("DELETE FROM risk_assessments WHERE assessed_at < ?", (keep_since,))
+
+
+class RecommendationRepository:
+    def __init__(self, db: DatabaseManager) -> None:
+        self.db = db
+
+    def upsert(self, entry: RecommendationEntry) -> int:
+        payload = asdict(entry)
+        payload["context_json"] = _dumps(payload.pop("context"))
+        payload["demo_mode"] = int(payload["demo_mode"])
+        payload.pop("id", None)
+        with self.db.session() as connection:
+            connection.execute(
+                """
+                INSERT INTO recommendations (
+                    stable_key, created_at, updated_at, recommendation_type, priority,
+                    title, details, proposed_action, target_device_key, target_alert_id,
+                    status, operator_comment, context_json, demo_mode
+                ) VALUES (
+                    :stable_key, :created_at, :updated_at, :recommendation_type, :priority,
+                    :title, :details, :proposed_action, :target_device_key, :target_alert_id,
+                    :status, :operator_comment, :context_json, :demo_mode
+                )
+                ON CONFLICT(stable_key) DO UPDATE SET
+                    updated_at = excluded.updated_at,
+                    recommendation_type = excluded.recommendation_type,
+                    priority = excluded.priority,
+                    title = excluded.title,
+                    details = excluded.details,
+                    proposed_action = excluded.proposed_action,
+                    target_device_key = excluded.target_device_key,
+                    target_alert_id = excluded.target_alert_id,
+                    context_json = excluded.context_json,
+                    demo_mode = excluded.demo_mode
+                """,
+                payload,
+            )
+            row = connection.execute(
+                "SELECT id FROM recommendations WHERE stable_key = ?",
+                (entry.stable_key,),
+            ).fetchone()
+        return int(row["id"])
+
+    def get(self, recommendation_id: int) -> RecommendationEntry | None:
+        with self.db.session() as connection:
+            row = connection.execute("SELECT * FROM recommendations WHERE id = ?", (recommendation_id,)).fetchone()
+        return self._map(row) if row else None
+
+    def list_all(
+        self,
+        *,
+        status: str = "",
+        demo_mode: bool | None = None,
+        limit: int = 100,
+    ) -> list[RecommendationEntry]:
+        conditions = []
+        params: dict[str, Any] = {"limit": limit}
+        if status:
+            conditions.append("status = :status")
+            params["status"] = status
+        if demo_mode is not None:
+            conditions.append("demo_mode = :demo_mode")
+            params["demo_mode"] = int(demo_mode)
+        where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
+        with self.db.session() as connection:
+            rows = connection.execute(
+                f"SELECT * FROM recommendations {where_clause} ORDER BY updated_at DESC LIMIT :limit",
+                params,
+            ).fetchall()
+        return [self._map(row) for row in rows]
+
+    def count_pending(self, demo_mode: bool) -> int:
+        with self.db.session() as connection:
+            row = connection.execute(
+                "SELECT COUNT(*) AS total FROM recommendations WHERE demo_mode = ? AND status = 'pending'",
+                (int(demo_mode),),
+            ).fetchone()
+        return int(row["total"])
+
+    def update_status(self, recommendation_id: int, status: str, operator_comment: str = "", updated_at: str | None = None) -> None:
+        timestamp = updated_at or ""
+        with self.db.session() as connection:
+            if timestamp:
+                connection.execute(
+                    "UPDATE recommendations SET status = ?, operator_comment = ?, updated_at = ? WHERE id = ?",
+                    (status, operator_comment, timestamp, recommendation_id),
+                )
+            else:
+                connection.execute(
+                    "UPDATE recommendations SET status = ?, operator_comment = ? WHERE id = ?",
+                    (status, operator_comment, recommendation_id),
+                )
+
+    def expire_missing(self, active_keys: set[str], demo_mode: bool, updated_at: str | None = None) -> None:
+        with self.db.session() as connection:
+            rows = connection.execute(
+                """
+                SELECT id, stable_key
+                FROM recommendations
+                WHERE demo_mode = ? AND status = 'pending'
+                """,
+                (int(demo_mode),),
+            ).fetchall()
+            for row in rows:
+                if row["stable_key"] not in active_keys:
+                    if updated_at:
+                        connection.execute(
+                            "UPDATE recommendations SET status = 'expired', updated_at = ? WHERE id = ?",
+                            (updated_at, row["id"]),
+                        )
+                    else:
+                        connection.execute(
+                            "UPDATE recommendations SET status = 'expired' WHERE id = ?",
+                            (row["id"],),
+                        )
+
+    def cleanup(self, keep_since: str) -> None:
+        with self.db.session() as connection:
+            connection.execute("DELETE FROM recommendations WHERE updated_at < ?", (keep_since,))
+
+    def _map(self, row) -> RecommendationEntry:
+        return RecommendationEntry(
+            id=row["id"],
+            stable_key=row["stable_key"],
+            created_at=row["created_at"],
+            updated_at=row["updated_at"],
+            recommendation_type=row["recommendation_type"],
+            priority=row["priority"],
+            title=row["title"],
+            details=row["details"],
+            proposed_action=row["proposed_action"],
+            target_device_key=row["target_device_key"],
+            target_alert_id=row["target_alert_id"],
+            status=row["status"],
+            operator_comment=row["operator_comment"] or "",
+            context=_loads(row["context_json"], {}),
+            demo_mode=bool(row["demo_mode"]),
+        )
 
 
 class SettingsRepository:
@@ -672,10 +1006,12 @@ class BrainSnapshotRepository:
                 INSERT INTO brain_snapshots (
                     created_at, global_score, global_level, progress_status, summary,
                     incident_count, open_alert_count, monitored_device_count,
+                    open_incident_count, suggestion_count, new_device_count, deviation_count,
                     recommendations_json, focus_areas_json, metadata_json, demo_mode
                 ) VALUES (
                     :created_at, :global_score, :global_level, :progress_status, :summary,
                     :incident_count, :open_alert_count, :monitored_device_count,
+                    :open_incident_count, :suggestion_count, :new_device_count, :deviation_count,
                     :recommendations_json, :focus_areas_json, :metadata_json, :demo_mode
                 )
                 """,
@@ -726,8 +1062,111 @@ class BrainSnapshotRepository:
             incident_count=row["incident_count"] or 0,
             open_alert_count=row["open_alert_count"] or 0,
             monitored_device_count=row["monitored_device_count"] or 0,
+            open_incident_count=row["open_incident_count"] or 0,
+            suggestion_count=row["suggestion_count"] or 0,
+            new_device_count=row["new_device_count"] or 0,
+            deviation_count=row["deviation_count"] or 0,
             recommendations=_loads(row["recommendations_json"], []),
             focus_areas=_loads(row["focus_areas_json"], []),
             metadata=_loads(row["metadata_json"], {}),
             demo_mode=bool(row["demo_mode"]),
         )
+
+
+class ReportAuditRepository:
+    def __init__(self, db: DatabaseManager) -> None:
+        self.db = db
+
+    def add(self, audit: ReportAudit) -> int:
+        payload = asdict(audit)
+        payload["config_summary_json"] = _dumps(payload.pop("config_summary"))
+        payload["demo_mode"] = int(payload["demo_mode"])
+        payload.pop("id", None)
+        with self.db.session() as connection:
+            cursor = connection.execute(
+                """
+                INSERT INTO report_exports (
+                    created_at, export_format, file_path, file_sha256, chain_hash, config_summary_json, demo_mode
+                ) VALUES (
+                    :created_at, :export_format, :file_path, :file_sha256, :chain_hash, :config_summary_json, :demo_mode
+                )
+                """,
+                payload,
+            )
+        return int(cursor.lastrowid)
+
+    def latest(self, demo_mode: bool) -> ReportAudit | None:
+        with self.db.session() as connection:
+            row = connection.execute(
+                """
+                SELECT * FROM report_exports
+                WHERE demo_mode = ?
+                ORDER BY created_at DESC, id DESC
+                LIMIT 1
+                """,
+                (int(demo_mode),),
+            ).fetchone()
+        return self._map(row) if row else None
+
+    def list_recent(self, demo_mode: bool, limit: int = 10) -> list[ReportAudit]:
+        with self.db.session() as connection:
+            rows = connection.execute(
+                """
+                SELECT * FROM report_exports
+                WHERE demo_mode = ?
+                ORDER BY created_at DESC, id DESC
+                LIMIT ?
+                """,
+                (int(demo_mode), limit),
+            ).fetchall()
+        return [self._map(row) for row in rows]
+
+    def cleanup(self, keep_since: str) -> None:
+        with self.db.session() as connection:
+            connection.execute("DELETE FROM report_exports WHERE created_at < ?", (keep_since,))
+
+    def _map(self, row) -> ReportAudit:
+        return ReportAudit(
+            id=row["id"],
+            created_at=row["created_at"],
+            export_format=row["export_format"],
+            file_path=row["file_path"],
+            file_sha256=row["file_sha256"],
+            chain_hash=row["chain_hash"],
+            config_summary=_loads(row["config_summary_json"], {}),
+            demo_mode=bool(row["demo_mode"]),
+        )
+
+
+class RuntimeStateRepository:
+    def __init__(self, db: DatabaseManager) -> None:
+        self.db = db
+
+    def load(self) -> dict[str, Any]:
+        with self.db.session() as connection:
+            row = connection.execute("SELECT * FROM runtime_state WHERE singleton_id = 1").fetchone()
+        return dict(row) if row else {"last_clean_exit": 1, "last_mode": "real"}
+
+    def mark_startup(self, mode: str, started_at: str) -> dict[str, Any]:
+        previous = self.load()
+        with self.db.session() as connection:
+            connection.execute(
+                """
+                UPDATE runtime_state
+                SET last_startup_at = ?, last_mode = ?, last_clean_exit = 0
+                WHERE singleton_id = 1
+                """,
+                (started_at, mode),
+            )
+        return previous
+
+    def mark_shutdown(self, shutdown_at: str) -> None:
+        with self.db.session() as connection:
+            connection.execute(
+                """
+                UPDATE runtime_state
+                SET last_shutdown_at = ?, last_clean_exit = 1
+                WHERE singleton_id = 1
+                """,
+                (shutdown_at,),
+            )

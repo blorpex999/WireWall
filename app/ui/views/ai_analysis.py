@@ -93,7 +93,7 @@ class AIAnalysisView(BaseView):
         self.summary_text = ScrollableDetailText(summary_frame, height=6)
         self.summary_text.pack(fill="both", expand=True)
 
-        threats_frame = ttk.LabelFrame(detail_frame, text="Menaces probables", style="Section.TLabelframe", padding=8)
+        threats_frame = ttk.LabelFrame(detail_frame, text="Anomalies probables", style="Section.TLabelframe", padding=8)
         threats_frame.grid(row=3, column=0, sticky="nsew", pady=(0, 10))
         self.threats_text = ScrollableDetailText(threats_frame, height=6)
         self.threats_text.pack(fill="both", expand=True)
@@ -160,7 +160,7 @@ class AIAnalysisView(BaseView):
         self.values["level"].set(analysis.global_level)
         self.values["success"].set("Oui" if analysis.success else "Non")
         self.summary_text.set_text(analysis.summary or "Aucun resume disponible.")
-        self.threats_text.set_text("\n- ".join(["Menaces"] + (analysis.threats or ["Aucune menace detaillee."])))
+        self.threats_text.set_text("\n- ".join(["Anomalies"] + (analysis.threats or ["Aucune anomalie detaillee."])))
         self.recommendations_text.set_text(
             "\n- ".join(["Recommandations"] + (analysis.recommendations or ["Aucune recommandation detaillee."]))
         )
@@ -171,7 +171,7 @@ class AIAnalysisView(BaseView):
         for value in self.values.values():
             value.set("-")
         self.summary_text.set_text("Selectionnez une analyse pour afficher le resume genere localement.")
-        self.threats_text.set_text("Menaces\n- Aucune analyse selectionnee.")
+        self.threats_text.set_text("Anomalies\n- Aucune analyse selectionnee.")
         self.recommendations_text.set_text("Recommandations\n- Aucune analyse selectionnee.")
 
     def _get_selected_analysis_key(self) -> str | None:

@@ -15,6 +15,10 @@ SEVERITY_COLORS = {
     "WARNING": "#F6C344",
     "ERROR": "#FF5D73",
     "UNKNOWN": "#93A0B0",
+    "NEW": "#4AB0FF",
+    "RARE": "#F6C344",
+    "KNOWN": "#6BC46D",
+    "DEVIATION": "#FF944D",
 }
 
 CATEGORY_LABELS = {
@@ -66,6 +70,51 @@ STATUS_TONES = {
     "unknown": "UNKNOWN",
 }
 
+TRUST_STATE_LABELS = {
+    "NEW": "Nouveau",
+    "RARE": "Rare",
+    "KNOWN": "Connu",
+    "DEVIATION": "Deviation",
+}
+
+TRUST_STATE_TONES = {
+    "NEW": "INFO",
+    "RARE": "WARNING",
+    "KNOWN": "OK",
+    "DEVIATION": "HIGH",
+}
+
+DECISION_LABELS = {
+    "none": "Aucune",
+    "whitelist": "Whitelist",
+    "blacklist": "Blacklist",
+    "watch": "Surveiller",
+    "trust": "Connu fiable",
+    "trusted": "Connu fiable",
+    "ignore_temporary": "Ignorer temporairement",
+}
+
+INCIDENT_STATUS_LABELS = {
+    "new": "Nouvelle",
+    "investigating": "En cours",
+    "false_positive": "Fausse alerte",
+    "resolved": "Resolue",
+}
+
+INCIDENT_STATUS_TONES = {
+    "new": "WARNING",
+    "investigating": "HIGH",
+    "false_positive": "INFO",
+    "resolved": "OK",
+}
+
+RECOMMENDATION_PRIORITY_LABELS = {
+    "LOW": "Basse",
+    "MEDIUM": "Moyenne",
+    "HIGH": "Haute",
+    "CRITICAL": "Critique",
+}
+
 
 def severity_color(level: str) -> str:
     return SEVERITY_COLORS.get(level.upper(), SEVERITY_COLORS["UNKNOWN"])
@@ -97,6 +146,30 @@ def match_type_text(value: str) -> str:
 
 def tone_for_status(status: str) -> str:
     return STATUS_TONES.get(status.lower(), "INFO")
+
+
+def trust_state_text(value: str) -> str:
+    return TRUST_STATE_LABELS.get((value or "").upper(), value or "Inconnu")
+
+
+def trust_state_tone(value: str) -> str:
+    return TRUST_STATE_TONES.get((value or "").upper(), "INFO")
+
+
+def decision_text(value: str) -> str:
+    return DECISION_LABELS.get((value or "").lower(), value or "Aucune")
+
+
+def incident_status_text(value: str) -> str:
+    return INCIDENT_STATUS_LABELS.get((value or "").lower(), value or "Inconnu")
+
+
+def incident_status_tone(value: str) -> str:
+    return INCIDENT_STATUS_TONES.get((value or "").lower(), "INFO")
+
+
+def recommendation_priority_text(value: str) -> str:
+    return RECOMMENDATION_PRIORITY_LABELS.get((value or "").upper(), value or "Inconnue")
 
 
 def risk_level_from_score(score: int) -> str:

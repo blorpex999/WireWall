@@ -36,6 +36,7 @@ class WireWallApp(tk.Tk):
         self._repaint_scheduled = False
         self._window_icon_image: tk.PhotoImage | None = None
         self._header_logo_image: tk.PhotoImage | None = None
+        self._toast_windows: list[tk.Toplevel] = []
         self._configure_window_icon()
 
         self.columnconfigure(1, weight=1)
@@ -166,6 +167,17 @@ class WireWallApp(tk.Tk):
                 refresh_views.update({"dashboard", "ai_analysis", "usb_control"})
             elif event_type == "brain_refresh_completed":
                 refresh_views.add("dashboard")
+            elif event_type == "alert_created":
+                payload = event["payload"]
+                self.controller.request_brain_refresh()
+                self.set_status(payload.get("message", "Nouvelle alerte."), payload.get("severity", "WARNING"))
+                refresh_views.update({"dashboard", "alerts"})
+                if self.controller.settings.desktop_notifications_enabled and payload.get("severity") in {"HIGH", "CRITICAL"}:
+                    self._show_notification_toast(
+                        payload.get("title", "Alerte WireWall"),
+                        payload.get("message", "Nouvelle alerte."),
+                        payload.get("severity", "WARNING"),
+                    )
             elif event_type == "monitor_error":
                 self.set_status(event["payload"].get("message", "Erreur de monitoring."), "ERROR")
                 refresh_views.add("dashboard")
@@ -213,6 +225,8 @@ class WireWallApp(tk.Tk):
     def _on_close(self) -> None:
         self.hook.detach()
         self.controller.stop_services()
+        for toast in list(self._toast_windows):
+            self._dismiss_toast(toast)
         self.destroy()
 
     def request_repaint(self) -> None:
@@ -228,5 +242,43 @@ class WireWallApp(tk.Tk):
             if self.winfo_exists() and self.tk.call("tk", "windowingsystem") == "win32":
                 flags = 0x0001 | 0x0004 | 0x0080 | 0x0100
                 ctypes.windll.user32.RedrawWindow(self.winfo_id(), None, None, flags)
+        except Exception:
+            pass
+
+    def _show_notification_toast(self, title: str, message: str, level: str) -> None:
+        try:
+            toast = tk.Toplevel(self)
+            toast.overrideredirect(True)
+            toast.attributes("-topmost", True)
+            toast.configure(bg="#18212b")
+            frame = tk.Frame(toast, bg="#18212b", highlightbackground="#263241", highlightthickness=1, padx=12, pady=10)
+            frame.pack(fill="both", expand=True)
+            indicator = tk.Canvas(frame, width=10, height=10, bg="#18212b", highlightthickness=0)
+            indicator.grid(row=0, column=0, rowspan=2, sticky="nw", padx=(0, 10))
+            indicator.create_oval(0, 0, 10, 10, fill={"HIGH": "#FF944D", "CRITICAL": "#FF5D73"}.get(level, "#4AB0FF"), outline="")
+            tk.Label(frame, text=title, bg="#18212b", fg="#FFFFFF", font=("Segoe UI Semibold", 10)).grid(row=0, column=1, sticky="w")
+            tk.Label(frame, text=message, bg="#18212b", fg="#C7D2DE", font=("Segoe UI", 9), justify="left", wraplength=320).grid(
+                row=1,
+                column=1,
+                sticky="w",
+                pady=(4, 0),
+            )
+            toast.update_idletasks()
+            width = toast.winfo_width()
+            height = toast.winfo_height()
+            x = self.winfo_screenwidth() - width - 24
+            y = self.winfo_screenheight() - height - 80 - (len(self._toast_windows) * (height + 8))
+            toast.geometry(f"+{max(20, x)}+{max(20, y)}")
+            self._toast_windows.append(toast)
+            toast.after(4200, lambda current=toast: self._dismiss_toast(current))
+        except Exception:
+            pass
+
+    def _dismiss_toast(self, toast: tk.Toplevel) -> None:
+        try:
+            if toast in self._toast_windows:
+                self._toast_windows.remove(toast)
+            if toast.winfo_exists():
+                toast.destroy()
         except Exception:
             pass

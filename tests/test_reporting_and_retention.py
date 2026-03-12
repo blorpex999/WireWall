@@ -2,7 +2,18 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from app.models.entities import AIAnalysis, Alert, BrainSnapshot, DeviceEvent, HealthStatus, RiskAssessment, USBDevice
+from app.config.defaults import build_default_settings
+from app.models.entities import (
+    AIAnalysis,
+    Alert,
+    BrainSnapshot,
+    DeviceEvent,
+    HealthStatus,
+    RecommendationEntry,
+    ReportAudit,
+    RiskAssessment,
+    USBDevice,
+)
 from app.services.policy_service import PolicyService
 from app.services.report_service import ReportService
 from app.services.retention_service import RetentionService
@@ -257,6 +268,48 @@ def test_retention_service_cleans_multiple_tables(temp_db, repositories) -> None
             summary="recent memory",
         )
     )
+    repositories["recommendation_repo"].upsert(
+        RecommendationEntry(
+            stable_key="old:rec",
+            created_at=old_timestamp,
+            updated_at=old_timestamp,
+            recommendation_type="baseline_whitelist",
+            priority="LOW",
+            title="old recommendation",
+            details="old details",
+            proposed_action="trust_device",
+        )
+    )
+    repositories["recommendation_repo"].upsert(
+        RecommendationEntry(
+            stable_key="recent:rec",
+            created_at=recent_timestamp,
+            updated_at=recent_timestamp,
+            recommendation_type="baseline_whitelist",
+            priority="LOW",
+            title="recent recommendation",
+            details="recent details",
+            proposed_action="trust_device",
+        )
+    )
+    repositories["report_audit_repo"].add(
+        ReportAudit(
+            created_at=old_timestamp,
+            export_format="html",
+            file_path="old.html",
+            file_sha256="old",
+            chain_hash="old-chain",
+        )
+    )
+    repositories["report_audit_repo"].add(
+        ReportAudit(
+            created_at=recent_timestamp,
+            export_format="html",
+            file_path="recent.html",
+            file_sha256="recent",
+            chain_hash="recent-chain",
+        )
+    )
 
     service = RetentionService(
         repositories["event_repo"],
@@ -264,6 +317,8 @@ def test_retention_service_cleans_multiple_tables(temp_db, repositories) -> None
         repositories["assessment_repo"],
         repositories["ai_repo"],
         repositories["brain_repo"],
+        repositories["recommendation_repo"],
+        repositories["report_audit_repo"],
     )
     keep_since = service.apply(30)
 
@@ -274,12 +329,16 @@ def test_retention_service_cleans_multiple_tables(temp_db, repositories) -> None
         assessment_count = connection.execute("SELECT COUNT(*) AS total FROM risk_assessments").fetchone()["total"]
         ai_count = connection.execute("SELECT COUNT(*) AS total FROM ai_analyses").fetchone()["total"]
         brain_count = connection.execute("SELECT COUNT(*) AS total FROM brain_snapshots").fetchone()["total"]
+        recommendation_count = connection.execute("SELECT COUNT(*) AS total FROM recommendations").fetchone()["total"]
+        audit_count = connection.execute("SELECT COUNT(*) AS total FROM report_exports").fetchone()["total"]
 
     assert event_count == 1
     assert alert_count == 1
     assert assessment_count == 1
     assert ai_count == 1
     assert brain_count == 1
+    assert recommendation_count == 1
+    assert audit_count == 1
 
 
 def test_event_repository_count_today_uses_given_cutoff(repositories) -> None:
@@ -305,3 +364,71 @@ def test_event_repository_count_today_uses_given_cutoff(repositories) -> None:
     )
 
     assert repositories["event_repo"].count_today(False, hours_ago(24)) == 1
+
+
+def test_report_service_persists_export_hash_and_chain(workspace_tmp_dir, repositories) -> None:
+    settings = build_default_settings()
+    device_repo = repositories["device_repo"]
+    event_repo = repositories["event_repo"]
+    alert_repo = repositories["alert_repo"]
+    health_repo = repositories["health_repo"]
+    ai_repo = repositories["ai_repo"]
+    brain_repo = repositories["brain_repo"]
+    policy_service = PolicyService(repositories["policy_repo"], device_repo)
+
+    device_repo.upsert(
+        USBDevice(
+            device_key="046D:C539",
+            vid=0x046D,
+            pid=0xC539,
+            vendor_name="Logitech",
+            product_name="USB Receiver",
+            category="hid",
+            first_seen=utc_now(),
+            last_seen=utc_now(),
+        )
+    )
+    event_repo.add(
+        DeviceEvent(
+            occurred_at=utc_now(),
+            event_type="connected",
+            device_key="046D:C539",
+            summary="receiver connected",
+            severity="LOW",
+            source="test",
+        )
+    )
+    health_repo.replace_all([HealthStatus("database", "ok", "ready", utc_now())])
+
+    class _Incidents:
+        def list_open(self, demo_mode: bool):
+            return []
+
+    class _Suggestions:
+        def list_pending(self, demo_mode: bool, limit: int = 12):
+            return []
+
+    service = ReportService(
+        exports_dir=workspace_tmp_dir,
+        device_repo=device_repo,
+        event_repo=event_repo,
+        policy_service=policy_service,
+        alert_repo=alert_repo,
+        health_repo=health_repo,
+        ai_analysis_repo=ai_repo,
+        brain_snapshot_repo=brain_repo,
+        incident_service=_Incidents(),
+        recommendation_service=_Suggestions(),
+        report_audit_repo=repositories["report_audit_repo"],
+        settings_getter=lambda: settings,
+    )
+    target = service.export_html(False, str(workspace_tmp_dir / "audit.html"))
+    audit = repositories["report_audit_repo"].latest(False)
+    sidecar = Path(str(target) + ".sha256.txt")
+
+    assert audit is not None
+    assert sidecar.exists()
+    assert audit.file_path == str(target)
+    assert audit.file_sha256
+    assert audit.chain_hash
+    assert audit.config_summary["recommendation_mode"] == settings.recommendation_mode

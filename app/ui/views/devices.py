@@ -6,7 +6,15 @@ from tkinter import ttk
 from app.ui.views.base import BaseView
 from app.ui.widgets.common import LabeledValue, ScrollableDetailText, ScrollableTree, SectionHeader, StatusPill
 from app.utils.datetime import format_for_ui
-from app.utils.ui import category_text, device_status_text, severity_color, shorten_text
+from app.utils.ui import (
+    category_text,
+    decision_text,
+    device_status_text,
+    severity_color,
+    shorten_text,
+    trust_state_text,
+    trust_state_tone,
+)
 
 
 class DevicesView(BaseView):
@@ -39,7 +47,7 @@ class DevicesView(BaseView):
         self.header = SectionHeader(
             self,
             "Peripheriques USB",
-            "Inventaire actif, classification et actions de policy sur les equipements observes.",
+            "Inventaire actif, contexte de confiance et actions de policy sur les equipements observes.",
             "MODE DEMO" if self.controller.demo_mode else "MODE REEL",
             "WARNING" if self.controller.demo_mode else "INFO",
         )
@@ -94,20 +102,20 @@ class DevicesView(BaseView):
         detail_frame.columnconfigure(0, weight=1)
         detail_frame.rowconfigure(3, weight=1)
 
-        self.table = ScrollableTree(tree_frame, ("vidpid", "name", "category", "status", "level", "score"), height=18)
+        self.table = ScrollableTree(tree_frame, ("vidpid", "name", "category", "trust", "status", "score"), height=18)
         self.table.grid(row=0, column=0, sticky="nsew")
         for column, label, width in (
             ("vidpid", "VID:PID", 100),
             ("name", "Peripherique", 280),
             ("category", "Categorie", 120),
+            ("trust", "Habitude", 115),
             ("status", "Etat", 105),
-            ("level", "Niveau", 95),
             ("score", "Score", 70),
         ):
             self.table.tree.heading(column, text=label)
             self.table.tree.column(column, width=width, anchor="w")
         self.table.tree.bind("<<TreeviewSelect>>", lambda _event: self._show_selected())
-        for tone in ("LOW", "MEDIUM", "HIGH", "CRITICAL", "connected", "disconnected"):
+        for tone in ("LOW", "MEDIUM", "HIGH", "CRITICAL", "connected", "disconnected", "KNOWN", "NEW", "RARE", "DEVIATION"):
             self.table.tree.tag_configure(tone, foreground=severity_color(tone))
 
         detail_top = ttk.Frame(detail_frame, style="Card.TFrame", padding=12)
@@ -118,6 +126,8 @@ class DevicesView(BaseView):
         badge_row.grid(row=0, column=1, sticky="e")
         self.status_badge = StatusPill(badge_row, "INCONNU", "INFO")
         self.status_badge.pack(side="left")
+        self.trust_badge = StatusPill(badge_row, "N/A", "INFO")
+        self.trust_badge.pack(side="left", padx=(8, 0))
         self.risk_badge = StatusPill(badge_row, "LOW", "LOW")
         self.risk_badge.pack(side="left", padx=(8, 0))
 
@@ -134,6 +144,10 @@ class DevicesView(BaseView):
             "backend": LabeledValue(metrics, "Backend"),
             "status": LabeledValue(metrics, "Etat"),
             "bus": LabeledValue(metrics, "Bus / Adresse"),
+            "trust": LabeledValue(metrics, "Habitude"),
+            "seen": LabeledValue(metrics, "Occurrences"),
+            "decision": LabeledValue(metrics, "Derniere decision"),
+            "variation": LabeledValue(metrics, "Variation"),
         }
         positions = [
             ("name", 0, 0),
@@ -144,6 +158,10 @@ class DevicesView(BaseView):
             ("backend", 2, 1),
             ("status", 3, 0),
             ("bus", 3, 1),
+            ("trust", 4, 0),
+            ("seen", 4, 1),
+            ("decision", 5, 0),
+            ("variation", 5, 1),
         ]
         for key, row, column in positions:
             self.values[key].grid(row=row, column=column, sticky="ew", padx=(0 if column == 0 else 10, 0), pady=6)
@@ -189,11 +207,11 @@ class DevicesView(BaseView):
                     device.vid_pid,
                     shorten_text(device.display_name, 42),
                     category_text(device.category),
+                    trust_state_text(device.trust_state),
                     device_status_text(device.status),
-                    device.risk_level,
                     device.risk_score,
                 ),
-                tags=(device.risk_level, device.status),
+                tags=(device.risk_level, device.status, device.trust_state),
             )
             self._rows[item_id] = device
             if device.device_key == selected_key:
@@ -220,6 +238,7 @@ class DevicesView(BaseView):
             return
         self._selected_device_key = device.device_key
         self.status_badge.set(device_status_text(device.status), device.status)
+        self.trust_badge.set(trust_state_text(device.trust_state).upper(), trust_state_tone(device.trust_state))
         self.risk_badge.set(device.risk_level, device.risk_level)
         self.values["name"].set(device.display_name)
         self.values["vidpid"].set(device.vid_pid)
@@ -229,19 +248,36 @@ class DevicesView(BaseView):
         self.values["backend"].set(device.source_backend)
         self.values["status"].set(device_status_text(device.status))
         self.values["bus"].set(f"{device.bus or '-'} / {device.address or '-'}")
+        self.values["trust"].set(trust_state_text(device.trust_state))
+        self.values["seen"].set(str(device.seen_count))
+        self.values["decision"].set(decision_text(device.last_decision))
+        self.values["variation"].set(device.recent_variation or "stable")
+        history = (
+            self.controller.get_device_history(device.device_key, limit=8)
+            if hasattr(self.controller, "get_device_history")
+            else []
+        )
+        history_lines = [
+            f"- {format_for_ui(event.occurred_at)} | {event.event_type} | {event.severity} | {event.summary}"
+            for event in history
+        ] or ["- Aucun historique recent disponible."]
         self.detail_text.set_text(
             "Premiere observation : {first_seen}\n"
             "Derniere observation : {last_seen}\n"
             "Classe USB : {usb_class}\n"
             "Source d'identification : {source}\n"
             "Score de risque : {score}\n"
-            "Metadata : {metadata}".format(
+            "Plages d'usage : {usual_hours}\n"
+            "Metadata : {metadata}\n\n"
+            "Historique recent :\n{history}".format(
                 first_seen=format_for_ui(device.first_seen),
                 last_seen=format_for_ui(device.last_seen),
                 usb_class=device.usb_class if device.usb_class is not None else "-",
                 source=device.identification_source,
                 score=f"{device.risk_level} ({device.risk_score})",
+                usual_hours=device.usual_hours or {},
                 metadata=device.metadata,
+                history="\n".join(history_lines),
             )
         )
         self.whitelist_button.configure(state="normal")
@@ -250,10 +286,11 @@ class DevicesView(BaseView):
     def _clear_selection_state(self) -> None:
         self._selected_device_key = None
         self.status_badge.set("AUCUNE SELECTION", "INFO")
+        self.trust_badge.set("N/A", "INFO")
         self.risk_badge.set("N/A", "INFO")
         for value in self.values.values():
             value.set("-")
-        self.detail_text.set_text("Selectionnez un peripherique pour afficher sa fiche technique et ses actions.")
+        self.detail_text.set_text("Selectionnez un peripherique pour afficher sa fiche technique, sa baseline et son historique.")
         self.whitelist_button.configure(state="disabled")
         self.blacklist_button.configure(state="disabled")
 

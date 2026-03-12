@@ -13,29 +13,33 @@
 
 ## Ecrans a connaitre
 
-- `Dashboard` : vue synthese, risque global, sante plateforme, timeline et alertes
-- `Peripheriques` : inventaire actif, details, whitelist et blacklist
-- `Alertes` : alertes persistantes et acquittement
+- `Dashboard` : vue synthese, risque global, incidents ouverts, suggestions supervisees et sante plateforme
+- `Peripheriques` : inventaire actif, baseline locale, details, historique, whitelist et blacklist
+- `Alertes` : alertes persistantes, workflow incident, commentaire analyste et resolution
 - `Historique` : evenements USB, filtres et exports
 - `Regles USB` : gestion de la whitelist et de la blacklist
 - `Controle USB` : lecture et action sur `USBSTOR`
-- `Analyse IA` : analyse locale via Ollama
-- `Parametres` : scan, retention, export, Ollama, profil de securite
+- `Analyse IA` : synthese locale, anomalies probables et recommandations
+- `Parametres` : scan, retention, export, Ollama, profil de securite, demarrage auto et mode suggestions
 - `A propos` : presentation du projet
 
 ## Flux de travail recommande
 
 1. Verifier le `Dashboard` et le panneau de sante.
 2. Brancher ou debrancher un peripherique USB.
-3. Verifier la detection dans `Peripheriques` et `Historique`.
-4. Ajouter si besoin une regle whitelist ou blacklist.
-5. Generer un export `CSV`, `JSON` ou `HTML`.
-6. Lancer l'analyse IA si Ollama est disponible.
-7. Tester `USBSTOR` uniquement en session admin.
+3. Verifier la detection, la baseline et l'historique dans `Peripheriques`.
+4. Ouvrir un incident depuis `Alertes` si une alerte merite un suivi.
+5. Valider ou rejeter les suggestions supervisees depuis le `Dashboard`.
+6. Ajouter si besoin une regle whitelist ou blacklist.
+7. Generer un export `CSV`, `JSON` ou `HTML`.
+8. Lancer l'analyse IA si Ollama est disponible.
+9. Tester `USBSTOR` uniquement en session admin.
 
 ## Feedbacks importants
 
 - En mode demo, l'application l'indique visuellement et la base utilisee est separee.
 - Si Ollama est indisponible, l'ecran IA affiche un diagnostic au lieu d'un faux resultat.
 - Si la session n'est pas admin, les actions `USBSTOR` restent explicites sur cette limite.
+- Les suggestions WireWall ne sont jamais appliquees sans validation utilisateur.
+- Le demarrage automatique avec Windows reste desactive par defaut et s'active depuis `Parametres`.
 - La version installee ajoute aussi des outils `Assistant IA locale` et `Diagnostic prerequis` dans le menu demarrer.

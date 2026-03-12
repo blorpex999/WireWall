@@ -25,24 +25,27 @@
 
 1. Ouvrir `Dashboard` et montrer le risque global, les KPI et la sante.
 2. Brancher un peripherique USB et passer sur `Peripheriques`.
-3. Montrer la classification, le score et le detail.
-4. Ouvrir `Historique` et montrer l'evenement persistant.
-5. Montrer `Alertes` ou basculer en mode demo si vous avez besoin d'un jeu de donnees plus charge.
+3. Montrer la classification, le score, la baseline (`Nouveau`, `Connu`, `Deviation`) et le detail.
+4. Ouvrir `Alertes`, creer un incident et montrer la decision analyste.
+5. Revenir sur le `Dashboard` pour montrer les suggestions supervisees et la synthese du moteur local.
 
 ## Scenario 10 minutes
 
 1. Faire le scenario 5 minutes.
-2. Ajouter une regle whitelist ou blacklist dans `Regles USB`.
-3. Revenir sur `Peripheriques` ou `Historique` pour montrer l'impact sur le scoring.
-4. Generer un export `CSV`, `JSON` ou `HTML`.
-5. Si la session est admin, montrer `Controle USB` avec lecture puis blocage/deblocage `USBSTOR`.
-6. Si Ollama est disponible, lancer `Analyse IA` et commenter les recommandations.
+2. Accepter ou refuser une suggestion supervisee depuis le `Dashboard`.
+3. Ajouter une regle whitelist ou blacklist dans `Regles USB`.
+4. Revenir sur `Peripheriques` ou `Historique` pour montrer l'impact sur le scoring et la memorisation.
+5. Generer un export `CSV`, `JSON` ou `HTML` et mentionner le hash d'audit.
+6. Si la session est admin, montrer `Controle USB` avec lecture puis blocage/deblocage `USBSTOR`.
+7. Si Ollama est disponible, lancer `Analyse IA` et commenter les anomalies et recommandations.
 
 ## Points a mettre en avant
 
 - separation claire entre mode reel et mode demo
 - monitoring utilisateur honnete base sur `PyUSB/libusb1`
 - policies persistantes et auditables
+- baseline locale et suggestions supervisees validables
+- workflow incident simple et credible pour un poste Windows unique
 - blocage reel `USBSTOR` avec verification de lecture/ecriture
 - IA locale sans dependance Internet
 - historique et rapports exploitables pour un poste de travail

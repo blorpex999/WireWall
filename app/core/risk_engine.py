@@ -22,6 +22,7 @@ class RiskEngine:
         reasons: list[str] = []
         recommendations: list[str] = []
         score = 0
+        baseline = policies.get("baseline", {})
 
         if policies.get("is_blacklisted"):
             score += 90
@@ -38,6 +39,24 @@ class RiskEngine:
             reasons.append("Périphérique HID inconnu ou non approuvé.")
             recommendations.append("Valider l'utilisateur et le périphérique avant usage.")
 
+        trust_state = str(baseline.get("trust_state", device.trust_state or "NEW")).upper()
+        seen_count = int(baseline.get("seen_count", device.seen_count or 0))
+        if trust_state == "NEW":
+            score += 15
+            reasons.append("Périphérique nouvellement observé sur ce poste.")
+            recommendations.append("Documenter l'origine du périphérique avant validation durable.")
+        elif trust_state == "RARE":
+            score += 8
+            reasons.append("Périphérique encore peu observé dans la baseline locale.")
+        elif trust_state == "KNOWN" and seen_count >= 4:
+            score -= 10
+            reasons.append("Le périphérique est habituel et stable dans la baseline locale.")
+
+        if baseline.get("outside_habit"):
+            score += 10
+            reasons.append("Connexion en dehors des habitudes horaires du périphérique.")
+            recommendations.append("Confirmer que l'usage est attendu pour ce créneau.")
+
         reconnect_count = self._count_recent_connects(recent_events)
         reconnect_penalty = int(preset["reconnect_penalty"])
         if reconnect_count >= 3:
@@ -53,7 +72,7 @@ class RiskEngine:
         missing_chunks = 0
         if not device.vendor_name or device.vendor_name == "Inconnu":
             missing_chunks += 1
-        if not device.product_name or device.product_name == "Périphérique USB":
+        if not device.product_name or device.product_name in {"Périphérique USB", "PÃ©riphÃ©rique USB"}:
             missing_chunks += 1
         if not device.serial_number:
             missing_chunks += 1
@@ -72,6 +91,10 @@ class RiskEngine:
             score -= 10
             reasons.append("Le périphérique est connu et déjà observé.")
 
+        if device.last_decision in {"trusted", "watch"}:
+            score -= 8
+            reasons.append("Une décision analyste locale réduit le bruit sur ce périphérique connu.")
+
         score = max(0, min(100, score))
         level = self._score_to_level(score)
 
@@ -86,7 +109,11 @@ class RiskEngine:
             reasons=reasons or ["Aucun indicateur de risque majeur détecté."],
             recommendations=recommendations,
             profile_name=profile,
-            metadata={"recent_connects": reconnect_count, "policy_summary": policies},
+            metadata={
+                "recent_connects": reconnect_count,
+                "policy_summary": policies,
+                "baseline": baseline,
+            },
         )
 
     def _count_recent_connects(self, recent_events: list[dict[str, Any]]) -> int:

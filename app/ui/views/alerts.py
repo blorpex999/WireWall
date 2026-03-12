@@ -7,7 +7,13 @@ from app.ui.theme import COLORS
 from app.ui.views.base import BaseView
 from app.ui.widgets.common import LabeledValue, ScrollableDetailText, ScrollableTree, SectionHeader, StatusPill
 from app.utils.datetime import format_for_ui
-from app.utils.ui import severity_color, shorten_text
+from app.utils.ui import (
+    decision_text,
+    incident_status_text,
+    incident_status_tone,
+    severity_color,
+    shorten_text,
+)
 
 
 class AlertsView(BaseView):
@@ -17,6 +23,22 @@ class AlertsView(BaseView):
         "Toutes": "",
         "Non acquittees": "no",
         "Acquittees": "yes",
+    }
+
+    INCIDENT_STATUS_OPTIONS = {
+        "Nouvelle": "new",
+        "En cours": "investigating",
+        "Fausse alerte": "false_positive",
+        "Resolue": "resolved",
+    }
+
+    DECISION_OPTIONS = {
+        "Aucune": "none",
+        "Whitelist": "whitelist",
+        "Blacklist": "blacklist",
+        "Surveiller": "watch",
+        "Connu fiable": "trusted",
+        "Ignorer temporairement": "ignore_temporary",
     }
 
     def __init__(self, master, controller, app) -> None:
@@ -30,7 +52,7 @@ class AlertsView(BaseView):
         self.header = SectionHeader(
             self,
             "Centre d'alertes",
-            "Lecture rapide des alertes critiques, suivi d'acquittement et recommandations.",
+            "Lecture rapide des alertes critiques, suivi d'incident et decisions analyste.",
         )
         self.header.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 16))
 
@@ -71,7 +93,7 @@ class AlertsView(BaseView):
         detail_frame = ttk.LabelFrame(self, text="Detail de l'alerte", style="Section.TLabelframe", padding=12)
         detail_frame.grid(row=2, column=1, sticky="nsew", padx=(8, 0))
         detail_frame.columnconfigure(0, weight=1)
-        detail_frame.rowconfigure(3, weight=1)
+        detail_frame.rowconfigure(4, weight=1)
 
         self.table = ScrollableTree(list_frame, ("date", "severity", "title", "state", "score"), height=18)
         self.table.pack(fill="both", expand=True)
@@ -99,6 +121,8 @@ class AlertsView(BaseView):
         self.severity_badge.pack(side="left")
         self.ack_badge = StatusPill(badge_row, "NON", "WARNING")
         self.ack_badge.pack(side="left", padx=(8, 0))
+        self.case_badge = StatusPill(badge_row, "INCIDENT", "INFO")
+        self.case_badge.pack(side="left", padx=(8, 0))
 
         metrics = ttk.Frame(detail_frame, style="Card.TFrame", padding=12)
         metrics.grid(row=1, column=0, sticky="ew", pady=(12, 12))
@@ -109,19 +133,71 @@ class AlertsView(BaseView):
             "date": LabeledValue(metrics, "Date"),
             "score": LabeledValue(metrics, "Score"),
             "device": LabeledValue(metrics, "Peripherique"),
+            "incident_status": LabeledValue(metrics, "Statut incident"),
+            "decision": LabeledValue(metrics, "Decision"),
         }
         self.values["title"].grid(row=0, column=0, sticky="ew", padx=(0, 10), pady=6)
         self.values["date"].grid(row=0, column=1, sticky="ew", pady=6)
         self.values["score"].grid(row=1, column=0, sticky="ew", padx=(0, 10), pady=6)
         self.values["device"].grid(row=1, column=1, sticky="ew", pady=6)
+        self.values["incident_status"].grid(row=2, column=0, sticky="ew", padx=(0, 10), pady=6)
+        self.values["decision"].grid(row=2, column=1, sticky="ew", pady=6)
 
-        actions = ttk.Frame(detail_frame)
-        actions.grid(row=2, column=0, sticky="ew", pady=(0, 12))
-        self.ack_button = ttk.Button(actions, text="Acquitter l'alerte", style="Accent.TButton", command=self._acknowledge, state="disabled")
+        workflow = ttk.LabelFrame(detail_frame, text="Workflow incident", style="Section.TLabelframe", padding=12)
+        workflow.grid(row=2, column=0, sticky="ew", pady=(0, 12))
+        workflow.columnconfigure(1, weight=1)
+        workflow.columnconfigure(3, weight=1)
+        self.incident_status_var = tk.StringVar(value="Nouvelle")
+        self.decision_var = tk.StringVar(value="Aucune")
+        self.comment_var = tk.StringVar()
+        self.reason_var = tk.StringVar()
+        ttk.Label(workflow, text="Statut").grid(row=0, column=0, sticky="w", padx=(0, 8))
+        ttk.Combobox(
+            workflow,
+            textvariable=self.incident_status_var,
+            values=list(self.INCIDENT_STATUS_OPTIONS.keys()),
+            state="readonly",
+        ).grid(row=0, column=1, sticky="ew", padx=(0, 12))
+        ttk.Label(workflow, text="Decision").grid(row=0, column=2, sticky="w", padx=(0, 8))
+        ttk.Combobox(
+            workflow,
+            textvariable=self.decision_var,
+            values=list(self.DECISION_OPTIONS.keys()),
+            state="readonly",
+        ).grid(row=0, column=3, sticky="ew")
+        ttk.Label(workflow, text="Commentaire").grid(row=1, column=0, sticky="w", padx=(0, 8), pady=(12, 0))
+        ttk.Entry(workflow, textvariable=self.comment_var).grid(row=1, column=1, columnspan=3, sticky="ew", pady=(12, 0))
+        ttk.Label(workflow, text="Motif de cloture").grid(row=2, column=0, sticky="w", padx=(0, 8), pady=(12, 0))
+        ttk.Entry(workflow, textvariable=self.reason_var).grid(row=2, column=1, columnspan=3, sticky="ew", pady=(12, 0))
+        workflow_actions = ttk.Frame(workflow)
+        workflow_actions.grid(row=3, column=0, columnspan=4, sticky="e", pady=(12, 0))
+        self.open_case_button = ttk.Button(
+            workflow_actions,
+            text="Ouvrir un incident",
+            style="Subtle.TButton",
+            command=self._open_case,
+            state="disabled",
+        )
+        self.open_case_button.pack(side="left")
+        self.save_case_button = ttk.Button(
+            workflow_actions,
+            text="Enregistrer le suivi",
+            style="Accent.TButton",
+            command=self._save_case,
+            state="disabled",
+        )
+        self.save_case_button.pack(side="left", padx=8)
+        self.ack_button = ttk.Button(
+            workflow_actions,
+            text="Acquitter l'alerte",
+            style="Accent.TButton",
+            command=self._acknowledge,
+            state="disabled",
+        )
         self.ack_button.pack(side="left")
 
-        self.detail_text = ScrollableDetailText(detail_frame, height=18)
-        self.detail_text.grid(row=3, column=0, sticky="nsew")
+        self.detail_text = ScrollableDetailText(detail_frame, height=14)
+        self.detail_text.grid(row=4, column=0, sticky="nsew")
         self._clear_selection_state()
 
     def refresh_data(self) -> None:
@@ -172,28 +248,51 @@ class AlertsView(BaseView):
             self._clear_selection_state()
             return
         self._selected_alert_key = self._alert_key(alert)
+        case = self.controller.get_alert_case(alert.id) if alert.id is not None else None
         self.severity_badge.set(alert.severity, alert.severity)
         self.ack_badge.set("ACQUITTEE" if alert.acknowledged else "ACTIVE", "OK" if alert.acknowledged else "WARNING")
+        if case is None:
+            self.case_badge.set("A OUVRIR", "INFO")
+        else:
+            self.case_badge.set(incident_status_text(case.status).upper(), incident_status_tone(case.status))
         self.values["title"].set(alert.title)
         self.values["date"].set(format_for_ui(alert.created_at))
         self.values["score"].set(str(alert.score))
         self.values["device"].set(alert.device_key or "Aucun peripherique associe")
+        self.values["incident_status"].set(incident_status_text(case.status) if case else "Aucun incident")
+        self.values["decision"].set(decision_text(case.decision) if case else "Aucune")
+        self.incident_status_var.set(self._incident_label(case.status if case else "new"))
+        self.decision_var.set(self._decision_label(case.decision if case else "none"))
+        self.comment_var.set(case.comment if case else alert.analyst_comment)
+        self.reason_var.set(case.resolution_reason if case else alert.resolution_reason)
         self.detail_text.set_text(
             "Message :\n{message}\n\n"
-            "Recommandations :\n- {recommendations}".format(
+            "Recommandations :\n- {recommendations}\n\n"
+            "Workflow :\n- Commentaire analyste: {comment}\n- Resolution: {resolution}".format(
                 message=alert.message,
                 recommendations="\n- ".join(alert.recommendations or ["Aucune recommandation fournie."]),
+                comment=(case.comment if case else alert.analyst_comment) or "Aucun commentaire",
+                resolution=(case.resolution_reason if case else alert.resolution_reason) or "Non renseigne",
             )
         )
+        self.open_case_button.configure(state="normal" if case is None else "disabled")
+        self.save_case_button.configure(state="normal" if alert.id is not None else "disabled")
         self.ack_button.configure(state="disabled" if alert.acknowledged else "normal")
 
     def _clear_selection_state(self) -> None:
         self._selected_alert_key = None
         self.severity_badge.set("AUCUNE", "INFO")
         self.ack_badge.set("AUCUNE", "INFO")
+        self.case_badge.set("INCIDENT", "INFO")
         for value in self.values.values():
             value.set("-")
-        self.detail_text.set_text("Selectionnez une alerte pour consulter son detail et ses recommandations.")
+        self.incident_status_var.set("Nouvelle")
+        self.decision_var.set("Aucune")
+        self.comment_var.set("")
+        self.reason_var.set("")
+        self.detail_text.set_text("Selectionnez une alerte pour consulter son detail, ouvrir un incident et suivre sa resolution.")
+        self.open_case_button.configure(state="disabled")
+        self.save_case_button.configure(state="disabled")
         self.ack_button.configure(state="disabled")
 
     def _get_selected_alert_key(self) -> str | None:
@@ -207,6 +306,34 @@ class AlertsView(BaseView):
             return f"id:{alert.id}"
         return f"{alert.created_at}|{alert.title}|{alert.severity}"
 
+    def _open_case(self) -> None:
+        alert = self._selected_alert()
+        if alert is None or alert.id is None:
+            self.app.set_status("Selectionnez une alerte pour ouvrir un incident.", "WARNING")
+            return
+        self.run_action(
+            lambda: self.controller.ensure_alert_case(alert.id),
+            success_message="Incident cree et lie a l'alerte.",
+            refresh=True,
+        )
+
+    def _save_case(self) -> None:
+        alert = self._selected_alert()
+        if alert is None or alert.id is None:
+            self.app.set_status("Selectionnez une alerte a mettre a jour.", "WARNING")
+            return
+        self.run_action(
+            lambda: self.controller.update_alert_case(
+                alert_id=alert.id,
+                status=self.INCIDENT_STATUS_OPTIONS[self.incident_status_var.get()],
+                decision=self.DECISION_OPTIONS[self.decision_var.get()],
+                comment=self.comment_var.get(),
+                resolution_reason=self.reason_var.get(),
+            ),
+            success_message="Workflow incident enregistre.",
+            refresh=True,
+        )
+
     def _acknowledge(self) -> None:
         alert = self._selected_alert()
         if alert is None or alert.id is None:
@@ -217,3 +344,15 @@ class AlertsView(BaseView):
             success_message="Alerte acquittee.",
             refresh=True,
         )
+
+    def _incident_label(self, value: str) -> str:
+        for label, raw_value in self.INCIDENT_STATUS_OPTIONS.items():
+            if raw_value == value:
+                return label
+        return "Nouvelle"
+
+    def _decision_label(self, value: str) -> str:
+        for label, raw_value in self.DECISION_OPTIONS.items():
+            if raw_value == value:
+                return label
+        return "Aucune"

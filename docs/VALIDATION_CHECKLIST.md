@@ -24,15 +24,19 @@
 - [ ] Un debranchement USB cree un evenement `disconnected`
 - [ ] Un echec d'enumeration cree un evenement `scan_error` sans faux `disconnected`
 - [ ] Le peripherique apparait dans `Peripheriques` avec categorie, score et niveau
+- [ ] Le peripherique affiche aussi une baseline coherente (`Nouveau`, `Rare`, `Connu`, `Deviation`)
 - [ ] Les policies modifient effectivement l'evaluation de risque
 
 ## Alertes et historique
 
 - [ ] Une alerte est creee quand le seuil est depasse
 - [ ] L'alerte peut etre acquittee
+- [ ] Un incident peut etre ouvert depuis une alerte, commente puis resolu
+- [ ] Une decision (`whitelist`, `blacklist`, `watch`, `trusted`) est memorisee proprement
 - [ ] L'historique reste persistant apres redemarrage
 - [ ] Les exports `CSV`, `JSON`, `HTML` sont generes dans le dossier configure
 - [ ] Le rapport HTML n'injecte pas de contenu HTML brut saisi par l'utilisateur
+- [ ] Le rapport exporte genere un sidecar `.sha256.txt` et un audit chaine local
 
 ## USB Control
 
@@ -48,6 +52,12 @@
 - [ ] Le lancement d'analyse IA ne bloque pas l'interface
 - [ ] Une indisponibilite Ollama remonte un message explicite
 - [ ] Les analyses sont historisees
+
+## Suggestions et exploitation
+
+- [ ] Le `Dashboard` affiche les suggestions supervisees en attente
+- [ ] Une suggestion peut etre acceptee, reportee ou rejetee
+- [ ] L'acceptation applique bien l'action attendue seulement apres validation utilisateur
 
 ## Packaging
 

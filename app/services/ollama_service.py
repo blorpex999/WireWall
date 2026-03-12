@@ -140,13 +140,15 @@ class OllamaService:
             "Analyse le contexte ci-dessous et reponds en francais.\n"
             "Donne exactement quatre sections courtes dans cet ordre :\n"
             "Resume:\n"
-            "Menaces:\n"
+            "Anomalies:\n"
             "Niveau global:\n"
             "Recommandations:\n"
             "Contraintes:\n"
-            "- maximum 140 mots au total\n"
+            "- maximum 130 mots au total\n"
             "- niveau global parmi LOW, MEDIUM, HIGH ou CRITICAL\n"
-            "- recommandations concretes et courtes\n\n"
+            "- deux anomalies maximum\n"
+            "- recommandations concretes, fiables et courtes\n"
+            "- si le contexte est calme, dis-le clairement\n\n"
             f"Contexte JSON compact:\n{json.dumps(context, ensure_ascii=False, separators=(',', ':'))}"
         )
 

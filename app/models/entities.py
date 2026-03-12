@@ -25,6 +25,11 @@ class USBDevice:
     identification_source: str = "unknown"
     source_backend: str = "pyusb"
     metadata: dict[str, Any] = field(default_factory=dict)
+    seen_count: int = 0
+    usual_hours: dict[str, int] = field(default_factory=dict)
+    trust_state: str = "NEW"
+    last_decision: str = ""
+    recent_variation: str = "stable"
     demo_mode: bool = False
 
     @property
@@ -85,10 +90,13 @@ class Alert:
     message: str
     device_key: str | None = None
     event_id: int | None = None
+    case_id: int | None = None
     acknowledged: bool = False
     acknowledged_at: str | None = None
     score: int = 0
     recommendations: list[str] = field(default_factory=list)
+    analyst_comment: str = ""
+    resolution_reason: str = ""
     demo_mode: bool = False
     id: int | None = None
 
@@ -128,6 +136,9 @@ class AppSettings:
     alert_threshold: int
     dedup_window_seconds: int
     dashboard_refresh_ms: int
+    autostart_enabled: bool = False
+    desktop_notifications_enabled: bool = True
+    recommendation_mode: str = "balanced"
     author_name: str = ""
     organization_name: str = ""
 
@@ -162,6 +173,10 @@ class BrainSnapshot:
     incident_count: int = 0
     open_alert_count: int = 0
     monitored_device_count: int = 0
+    open_incident_count: int = 0
+    suggestion_count: int = 0
+    new_device_count: int = 0
+    deviation_count: int = 0
     recommendations: list[str] = field(default_factory=list)
     focus_areas: list[str] = field(default_factory=list)
     metadata: dict[str, Any] = field(default_factory=dict)
@@ -200,6 +215,62 @@ class EnumerationResult:
     devices: list[USBDevice] = field(default_factory=list)
     message: str = ""
     details: dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(slots=True)
+class IncidentCase:
+    created_at: str
+    updated_at: str
+    device_key: str | None
+    alert_id: int | None = None
+    status: str = "new"
+    decision: str = "none"
+    comment: str = ""
+    resolution_reason: str = ""
+    operator_name: str = ""
+    closed_at: str | None = None
+    demo_mode: bool = False
+    id: int | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(slots=True)
+class RecommendationEntry:
+    stable_key: str
+    created_at: str
+    updated_at: str
+    recommendation_type: str
+    priority: str
+    title: str
+    details: str
+    proposed_action: str
+    target_device_key: str | None = None
+    target_alert_id: int | None = None
+    status: str = "pending"
+    operator_comment: str = ""
+    context: dict[str, Any] = field(default_factory=dict)
+    demo_mode: bool = False
+    id: int | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(slots=True)
+class ReportAudit:
+    created_at: str
+    export_format: str
+    file_path: str
+    file_sha256: str
+    chain_hash: str
+    config_summary: dict[str, Any] = field(default_factory=dict)
+    demo_mode: bool = False
+    id: int | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

@@ -22,6 +22,8 @@ class UsbMonitorService:
         alert_repo,
         policy_service,
         risk_engine,
+        baseline_service,
+        incident_service,
         event_bus,
         settings,
     ) -> None:
@@ -32,6 +34,8 @@ class UsbMonitorService:
         self.alert_repo = alert_repo
         self.policy_service = policy_service
         self.risk_engine = risk_engine
+        self.baseline_service = baseline_service
+        self.incident_service = incident_service
         self.event_bus = event_bus
         self.settings = settings
         self._current_snapshot: dict[str, USBDevice] = {}
@@ -96,10 +100,11 @@ class UsbMonitorService:
 
         for device in new_snapshot.values():
             existing = self.device_repo.get(device.device_key)
+            connected_transition = existing is None or existing.status != "connected"
             device.first_seen = existing.first_seen if existing and existing.first_seen else now
             device.last_seen = now
             device.status = "connected"
-            self._device_assessment(device, existing, now)
+            self._device_assessment(device, existing, connected_transition, now)
 
         for key, previous_device in previous_snapshot.items():
             if key not in new_snapshot:
@@ -139,17 +144,24 @@ class UsbMonitorService:
         ):
             device.confidence = candidate.confidence
             device.identification_source = candidate.identification_source
+        if candidate.seen_count:
+            device.seen_count = candidate.seen_count
+            device.usual_hours = dict(candidate.usual_hours)
+            device.trust_state = candidate.trust_state
+            device.last_decision = candidate.last_decision
+            device.recent_variation = candidate.recent_variation
         self.device_repo.delete_disconnected_duplicates(device.device_key, device, self.demo_mode)
         return device
 
-    def _is_generic_vendor(self, value: str | None) -> bool:
-        return (value or "").strip().upper() in GENERIC_VENDOR_NAMES
-
-    def _is_generic_product(self, value: str | None) -> bool:
-        return (value or "").strip().upper() in GENERIC_PRODUCT_NAMES
-
-    def _device_assessment(self, device: USBDevice, existing: USBDevice | None, now: str) -> None:
+    def _device_assessment(self, device: USBDevice, existing: USBDevice | None, connected_transition: bool, now: str) -> None:
+        baseline = self.baseline_service.update_device(
+            device=device,
+            existing=existing,
+            connected_transition=connected_transition,
+            now=now,
+        )
         policies = self.policy_service.evaluate_device(device)
+        policies["baseline"] = baseline
         recent_events = self.event_repo.list_device_events_since(device.device_key, minutes_ago(10), self.demo_mode)
         assessment = self.risk_engine.assess(device, recent_events, policies, self.settings.security_profile, now)
         device.risk_score = assessment.score
@@ -157,7 +169,7 @@ class UsbMonitorService:
         self.device_repo.upsert(device)
         self.assessment_repo.add(assessment)
 
-        if existing is None or existing.status != "connected":
+        if connected_transition:
             event_id = self._create_event(
                 event_type="connected",
                 device=device,
@@ -167,19 +179,31 @@ class UsbMonitorService:
                 reasons=assessment.reasons,
             )
             if assessment.score >= self.settings.alert_threshold:
-                self.alert_repo.add(
-                    Alert(
-                        created_at=now,
-                        severity=assessment.level,
-                        title=f"Alerte USB {assessment.level}",
-                        message=f"{device.display_name} présente un score de risque de {assessment.score}.",
-                        device_key=device.device_key,
-                        event_id=event_id,
-                        score=assessment.score,
-                        recommendations=assessment.recommendations,
-                        demo_mode=self.demo_mode,
-                    )
+                alert = Alert(
+                    created_at=now,
+                    severity=assessment.level,
+                    title=f"Alerte USB {assessment.level}",
+                    message=f"{device.display_name} présente un score de risque de {assessment.score}.",
+                    device_key=device.device_key,
+                    event_id=event_id,
+                    score=assessment.score,
+                    recommendations=assessment.recommendations,
+                    demo_mode=self.demo_mode,
                 )
+                alert.id = self.alert_repo.add(alert)
+                if alert.id is not None:
+                    case = self.incident_service.ensure_for_alert(alert.id, self.demo_mode)
+                    self.alert_repo.attach_case(alert.id, case.id or 0)
+                    self.event_bus.publish(
+                        "alert_created",
+                        {
+                            "alert_id": alert.id,
+                            "severity": alert.severity,
+                            "title": alert.title,
+                            "message": alert.message,
+                            "device_key": alert.device_key,
+                        },
+                    )
 
     def _create_event(
         self,
@@ -204,7 +228,12 @@ class UsbMonitorService:
             level=level,
             reasons=reasons,
             source="monitor",
-            payload={"vid_pid": device.vid_pid, "category": device.category},
+            payload={
+                "vid_pid": device.vid_pid,
+                "category": device.category,
+                "trust_state": device.trust_state,
+                "seen_count": device.seen_count,
+            },
             demo_mode=self.demo_mode,
         )
         event_id = self.event_repo.add(event)
@@ -232,3 +261,9 @@ class UsbMonitorService:
         )
         self.event_bus.publish("device_event", {"event_id": event_id, "device_key": None})
         return event_id
+
+    def _is_generic_vendor(self, value: str | None) -> bool:
+        return (value or "").strip().upper() in GENERIC_VENDOR_NAMES
+
+    def _is_generic_product(self, value: str | None) -> bool:
+        return (value or "").strip().upper() in GENERIC_PRODUCT_NAMES

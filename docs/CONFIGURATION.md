@@ -30,6 +30,9 @@ Le fichier d'exemple fourni est `config.example.json`.
 - `alert_threshold` : seuil d'alerte
 - `dedup_window_seconds` : fenetre anti-doublon des evenements
 - `dashboard_refresh_ms` : cadence de rafraichissement de l'UI
+- `autostart_enabled` : active le lancement WireWall avec Windows via `HKCU\Run`
+- `desktop_notifications_enabled` : active les notifications locales discretes des alertes `HIGH` / `CRITICAL`
+- `recommendation_mode` : `conservative`, `balanced`, `proactive`
 - `author_name` et `organization_name` : metadonnees d'affichage
 
 ## Profils de securite
@@ -40,12 +43,23 @@ Le fichier d'exemple fourni est `config.example.json`.
 
 Les valeurs `scan_interval_seconds`, `alert_threshold` et `dedup_window_seconds` sont recalibrees selon le profil choisi.
 
+## Baseline, incidents et suggestions
+
+- La baseline locale est calculee automatiquement par peripherique a partir des reconnexions et des plages horaires observees.
+- Les etats visibles sont `NEW`, `RARE`, `KNOWN` et `DEVIATION`.
+- Le `recommendation_mode` ajuste l'agressivite des suggestions supervisees :
+  - `conservative` : moins de suggestions, plus de prudence
+  - `balanced` : mode recommande
+  - `proactive` : suggestions plus frequentes
+- Les decisions analyste (`whitelist`, `blacklist`, `watch`, `trusted`) sont memorisees localement.
+
 ## Conseils de configuration demo
 
 - Conserver `mode: "real"` pour les tests terrain
 - Utiliser `scripts\run_demo.bat` pour un scenario demo separe
 - Definir `export_directory` si vous voulez un dossier d'exports visible et stable pendant la soutenance
 - Garder `ollama_timeout_seconds` raisonnable pour eviter une attente trop longue en demo
+- Laisser `autostart_enabled` a `false` pendant la soutenance si tu veux garder un demarrage maitrise a la main
 
 ## Conseils de configuration distribution
 

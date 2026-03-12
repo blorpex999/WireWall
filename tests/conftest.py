@@ -16,7 +16,11 @@ from app.infrastructure.repositories import (
     DeviceRepository,
     EventRepository,
     HealthRepository,
+    IncidentRepository,
     PolicyRepository,
+    RecommendationRepository,
+    ReportAuditRepository,
+    RuntimeStateRepository,
     SettingsRepository,
 )
 
@@ -45,11 +49,15 @@ def repositories(temp_db: DatabaseManager) -> dict[str, object]:
         "event_repo": EventRepository(temp_db),
         "policy_repo": PolicyRepository(temp_db),
         "alert_repo": AlertRepository(temp_db),
+        "incident_repo": IncidentRepository(temp_db),
+        "recommendation_repo": RecommendationRepository(temp_db),
         "assessment_repo": AssessmentRepository(temp_db),
         "settings_repo": SettingsRepository(temp_db),
         "health_repo": HealthRepository(temp_db),
         "ai_repo": AIAnalysisRepository(temp_db),
         "brain_repo": BrainSnapshotRepository(temp_db),
+        "report_audit_repo": ReportAuditRepository(temp_db),
+        "runtime_state_repo": RuntimeStateRepository(temp_db),
     }
 
 
