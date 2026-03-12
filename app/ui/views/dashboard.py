@@ -117,8 +117,6 @@ class DashboardView(BaseView):
         precheck_frame.columnconfigure(0, weight=1)
         precheck_frame.rowconfigure(1, weight=1)
 
-        self._apply_layout("wide")
-
         self.event_table = ScrollableTree(events_frame, ("date", "type", "summary", "severity"), height=9)
         self.event_table.pack(fill="both", expand=True)
         for column, label, width in (
@@ -236,6 +234,9 @@ class DashboardView(BaseView):
             self.precheck_table.tree.column(column, width=width, anchor="w")
         for tone in ("OK", "WARNING", "ERROR"):
             self.precheck_table.tree.tag_configure(tone, foreground=severity_color(tone))
+
+        self._apply_layout("wide")
+        self._update_wrap_lengths()
 
     def refresh_data(self) -> None:
         data = self.controller.get_dashboard_data()
@@ -526,6 +527,8 @@ class DashboardView(BaseView):
         self._update_wrap_lengths()
 
     def _update_wrap_lengths(self) -> None:
+        if not hasattr(self, "brain_summary") or not hasattr(self, "precheck_intro"):
+            return
         if self._dashboard_mode == "compact":
             tile_wrap = 180
             summary_wrap = 360
