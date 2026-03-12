@@ -10,6 +10,7 @@
 - Correction du dashboard pour mieux se recomposer en largeur reduite et limiter les artefacts de repaint au redimensionnement sous Windows.
 - Correction d'une regression de demarrage du dashboard lorsque le layout responsive etait applique trop tot pendant l'initialisation.
 - Ajout d'un scroll vertical de page pour les vues longues et adaptation responsive renforcee de `A propos` afin d'eviter les contenus coupes sur des fenetres plus petites.
+- Retrait du scroll global du shell applicatif au profit d'un scroll local cible, avec allègement du repaint Windows et compactage du dashboard pour retrouver une navigation plus fluide et moins d'artefacts visuels.
 
 ## 1.3.0 - 2026-03-12
 

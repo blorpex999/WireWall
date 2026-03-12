@@ -117,7 +117,7 @@ class DashboardView(BaseView):
         precheck_frame.columnconfigure(0, weight=1)
         precheck_frame.rowconfigure(1, weight=1)
 
-        self.event_table = ScrollableTree(events_frame, ("date", "type", "summary", "severity"), height=9)
+        self.event_table = ScrollableTree(events_frame, ("date", "type", "summary", "severity"), height=6)
         self.event_table.pack(fill="both", expand=True)
         for column, label, width in (
             ("date", "Date", 145),
@@ -128,7 +128,7 @@ class DashboardView(BaseView):
             self.event_table.tree.heading(column, text=label)
             self.event_table.tree.column(column, width=width, anchor="w")
 
-        self.alert_table = ScrollableTree(alerts_frame, ("date", "severity", "title", "score"), height=9)
+        self.alert_table = ScrollableTree(alerts_frame, ("date", "severity", "title", "score"), height=6)
         self.alert_table.pack(fill="both", expand=True)
         for column, label, width in (
             ("date", "Date", 145),
@@ -139,7 +139,7 @@ class DashboardView(BaseView):
             self.alert_table.tree.heading(column, text=label)
             self.alert_table.tree.column(column, width=width, anchor="w")
 
-        self.health_table = ScrollableTree(health_frame, ("component", "status", "details"), height=6)
+        self.health_table = ScrollableTree(health_frame, ("component", "status", "details"), height=4)
         self.health_table.pack(fill="both", expand=True)
         for column, label, width in (
             ("component", "Composant", 180),
@@ -173,7 +173,7 @@ class DashboardView(BaseView):
         self.brain_known = LabeledValue(brain_frame, "Parc habituel", "-")
         self.brain_known.grid(row=2, column=2, sticky="ew", pady=(12, 0))
 
-        self.suggestion_table = ScrollableTree(suggestions_frame, ("priority", "title", "action", "device"), height=6)
+        self.suggestion_table = ScrollableTree(suggestions_frame, ("priority", "title", "action", "device"), height=4)
         self.suggestion_table.grid(row=1, column=0, sticky="nsew")
         for column, label, width in (
             ("priority", "Priorite", 110),
@@ -223,7 +223,7 @@ class DashboardView(BaseView):
         )
         self.precheck_intro.grid(row=0, column=0, sticky="w", pady=(0, 10))
         self._section_wrap_labels.extend([self.brain_summary, self.precheck_intro])
-        self.precheck_table = ScrollableTree(precheck_frame, ("item", "status", "action"), height=6)
+        self.precheck_table = ScrollableTree(precheck_frame, ("item", "status", "action"), height=4)
         self.precheck_table.grid(row=1, column=0, sticky="nsew")
         for column, label, width in (
             ("item", "Point", 170),
@@ -533,19 +533,30 @@ class DashboardView(BaseView):
             tile_wrap = 180
             summary_wrap = 360
             precheck_wrap = 420
+            event_height = 4
+            side_height = 3
         elif self._dashboard_mode == "medium":
             tile_wrap = 220
             summary_wrap = 420
             precheck_wrap = 520
+            event_height = 5
+            side_height = 4
         else:
             tile_wrap = 250
             summary_wrap = 620
             precheck_wrap = 560
+            event_height = 6
+            side_height = 4
 
         for tile in self._status_tiles:
             tile["detail"].configure(wraplength=tile_wrap)
         self.brain_summary.configure(wraplength=summary_wrap)
         self.precheck_intro.configure(wraplength=precheck_wrap)
+        self.event_table.tree.configure(height=event_height)
+        self.alert_table.tree.configure(height=event_height)
+        self.health_table.tree.configure(height=side_height)
+        self.suggestion_table.tree.configure(height=side_height)
+        self.precheck_table.tree.configure(height=side_height)
 
     def _selected_suggestion(self):
         selection = self.suggestion_table.tree.selection()

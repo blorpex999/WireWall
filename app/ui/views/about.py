@@ -4,7 +4,7 @@ from tkinter import ttk
 
 from app.ui.help_content import FLOW_STEPS, GLOSSARY, HONEST_LIMITS, SCREEN_HELP
 from app.ui.views.base import BaseView
-from app.ui.widgets.common import InlineHelpPanel, LabeledValue, ScrollableTree, SectionHeader, StatusPill
+from app.ui.widgets.common import InlineHelpPanel, LabeledValue, ScrollablePage, ScrollableTree, SectionHeader, StatusPill
 from app.version import __version__
 
 
@@ -14,26 +14,31 @@ class AboutView(BaseView):
     def __init__(self, master, controller, app) -> None:
         super().__init__(master, controller, app)
         self.columnconfigure(0, weight=1)
-        self.columnconfigure(1, weight=1)
-        self.rowconfigure(5, weight=1)
+        self.rowconfigure(0, weight=1)
         self._about_mode = ""
         self._wrap_labels: list[ttk.Label] = []
+        self.page = ScrollablePage(self)
+        self.page.grid(row=0, column=0, sticky="nsew")
+        self.content = self.page.body
+        self.content.columnconfigure(0, weight=1)
+        self.content.columnconfigure(1, weight=1)
+        self.content.rowconfigure(5, weight=1)
 
         self.header = SectionHeader(
-            self,
+            self.content,
             "A propos de WireWall",
             "Presentation produit, contexte Ydays et perimetre technique de la demonstration.",
         )
         self.header.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 16))
 
         self.help_panel = InlineHelpPanel(
-            self,
+            self.content,
             button_text=str(SCREEN_HELP["about"]["button"]),
             sections=list(SCREEN_HELP["about"]["sections"]),
         )
         self.help_panel.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(0, 12))
 
-        self.identity_frame = ttk.Frame(self, style="Card.TFrame", padding=18)
+        self.identity_frame = ttk.Frame(self.content, style="Card.TFrame", padding=18)
         self.identity_frame.columnconfigure(0, weight=1)
         ttk.Label(self.identity_frame, text="Identite du projet", style="CardTitle.TLabel").grid(row=0, column=0, sticky="w")
         badge_box = ttk.Frame(self.identity_frame, style="CardInner.TFrame")
@@ -51,7 +56,7 @@ class AboutView(BaseView):
         self.identity_values["team"].grid(row=3, column=0, sticky="ew", pady=(10, 0))
         self.identity_values["org"].grid(row=4, column=0, sticky="ew", pady=(10, 0))
 
-        self.mission_frame = ttk.Frame(self, style="Card.TFrame", padding=18)
+        self.mission_frame = ttk.Frame(self.content, style="Card.TFrame", padding=18)
         self.mission_frame.columnconfigure(0, weight=1)
         ttk.Label(self.mission_frame, text="Mission", style="CardTitle.TLabel").grid(row=0, column=0, sticky="w")
         self.mission_label = ttk.Label(
@@ -76,7 +81,7 @@ class AboutView(BaseView):
         self.flow_label.grid(row=3, column=0, sticky="w", pady=(10, 0))
         self._wrap_labels.extend([self.mission_label, self.flow_label])
 
-        self.stack_frame = ttk.LabelFrame(self, text="Stack technique", style="Section.TLabelframe", padding=16)
+        self.stack_frame = ttk.LabelFrame(self.content, text="Stack technique", style="Section.TLabelframe", padding=16)
         self.stack_text = ttk.Label(
             self.stack_frame,
             text=(
@@ -92,7 +97,7 @@ class AboutView(BaseView):
         )
         self.stack_text.pack(anchor="w")
 
-        self.context_frame = ttk.LabelFrame(self, text="Contexte Ydays", style="Section.TLabelframe", padding=16)
+        self.context_frame = ttk.LabelFrame(self.content, text="Contexte Ydays", style="Section.TLabelframe", padding=16)
         self.context_label = ttk.Label(
             self.context_frame,
             text=(
@@ -106,7 +111,7 @@ class AboutView(BaseView):
         self.context_label.pack(anchor="w")
         self._wrap_labels.append(self.context_label)
 
-        self.flow_frame = ttk.LabelFrame(self, text="Fonctionnement pas a pas", style="Section.TLabelframe", padding=16)
+        self.flow_frame = ttk.LabelFrame(self.content, text="Fonctionnement pas a pas", style="Section.TLabelframe", padding=16)
         self.flow_step_labels: list[ttk.Label] = []
         for index, (title, detail) in enumerate(FLOW_STEPS):
             ttk.Label(self.flow_frame, text=title, style="ValueTitle.TLabel").grid(row=index * 2, column=0, sticky="w")
@@ -120,7 +125,7 @@ class AboutView(BaseView):
             self.flow_step_labels.append(detail_label)
         self._wrap_labels.extend(self.flow_step_labels)
 
-        self.limits_frame = ttk.LabelFrame(self, text="Limites honnetes", style="Section.TLabelframe", padding=16)
+        self.limits_frame = ttk.LabelFrame(self.content, text="Limites honnetes", style="Section.TLabelframe", padding=16)
         self.limit_labels: list[ttk.Label] = []
         for index, item in enumerate(HONEST_LIMITS):
             label = ttk.Label(self.limits_frame, text=f"- {item}", style="Muted.TLabel", wraplength=420, justify="left")
@@ -133,7 +138,7 @@ class AboutView(BaseView):
             self.limit_labels.append(label)
         self._wrap_labels.extend(self.limit_labels)
 
-        self.glossary_frame = ttk.LabelFrame(self, text="Lexique rapide", style="Section.TLabelframe", padding=12)
+        self.glossary_frame = ttk.LabelFrame(self.content, text="Lexique rapide", style="Section.TLabelframe", padding=12)
         self.glossary_frame.rowconfigure(0, weight=1)
         self.glossary_frame.columnconfigure(0, weight=1)
         self.glossary = ScrollableTree(self.glossary_frame, ("term", "definition"), height=8)
@@ -179,7 +184,7 @@ class AboutView(BaseView):
             frame.grid_forget()
 
         for row in range(9):
-            self.rowconfigure(row, weight=0)
+            self.content.rowconfigure(row, weight=0)
 
         if mode == "stacked":
             self.identity_frame.grid(row=2, column=0, columnspan=2, sticky="nsew", pady=(0, 12))
@@ -189,7 +194,7 @@ class AboutView(BaseView):
             self.flow_frame.grid(row=6, column=0, columnspan=2, sticky="nsew", pady=(0, 12))
             self.limits_frame.grid(row=7, column=0, columnspan=2, sticky="nsew")
             self.glossary_frame.grid(row=8, column=0, columnspan=2, sticky="nsew", pady=(12, 0))
-            self.rowconfigure(8, weight=1)
+            self.content.rowconfigure(8, weight=1)
         else:
             self.identity_frame.grid(row=2, column=0, sticky="nsew", padx=(0, 8), pady=(0, 12))
             self.mission_frame.grid(row=2, column=1, sticky="nsew", padx=(8, 0), pady=(0, 12))
@@ -198,7 +203,7 @@ class AboutView(BaseView):
             self.flow_frame.grid(row=4, column=0, sticky="nsew", padx=(0, 8))
             self.limits_frame.grid(row=4, column=1, sticky="nsew", padx=(8, 0))
             self.glossary_frame.grid(row=5, column=0, columnspan=2, sticky="nsew", pady=(12, 0))
-            self.rowconfigure(5, weight=1)
+            self.content.rowconfigure(5, weight=1)
 
     def _update_wraps(self, width: int) -> None:
         if self._about_mode == "stacked":

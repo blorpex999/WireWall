@@ -109,6 +109,50 @@ class EmptyState(ttk.Frame):
         ttk.Label(self, text=detail, style="Muted.TLabel", justify="center").pack(anchor="center", pady=(6, 0))
 
 
+class ScrollablePage(ttk.Frame):
+    def __init__(self, master) -> None:
+        super().__init__(master)
+        self.rowconfigure(0, weight=1)
+        self.columnconfigure(0, weight=1)
+        self.canvas = tk.Canvas(self, bg=COLORS["bg"], highlightthickness=0, bd=0, relief="flat")
+        self.canvas.grid(row=0, column=0, sticky="nsew")
+        self.scrollbar = ttk.Scrollbar(self, orient="vertical", command=self.canvas.yview)
+        self.scrollbar.grid(row=0, column=1, sticky="ns")
+        self.canvas.configure(yscrollcommand=self.scrollbar.set)
+        self.body = ttk.Frame(self.canvas)
+        self.body.columnconfigure(0, weight=1)
+        self._body_window = self.canvas.create_window((0, 0), window=self.body, anchor="nw")
+        self.body.bind("<Configure>", self._on_body_configure)
+        self.canvas.bind("<Configure>", self._on_canvas_configure)
+        self.bind_all("<MouseWheel>", self._on_mousewheel, add="+")
+
+    def _on_body_configure(self, _event: tk.Event) -> None:
+        self.canvas.configure(scrollregion=self.canvas.bbox("all"))
+
+    def _on_canvas_configure(self, event: tk.Event) -> None:
+        try:
+            self.canvas.itemconfigure(self._body_window, width=event.width)
+        except Exception:
+            return
+
+    def _on_mousewheel(self, event: tk.Event) -> None:
+        if not self.winfo_ismapped():
+            return
+        widget = event.widget
+        if widget is None:
+            return
+        widget_path = str(widget)
+        if not widget_path.startswith(str(self)):
+            return
+        if widget.winfo_class() in {"Text", "Treeview", "Listbox"}:
+            return
+        first, last = self.canvas.yview()
+        if first == 0.0 and last == 1.0:
+            return
+        direction = -1 if event.delta > 0 else 1
+        self.canvas.yview_scroll(direction, "units")
+
+
 class InlineHelpPanel(ttk.Frame):
     def __init__(self, master, button_text: str, sections: list[tuple[str, str]]) -> None:
         super().__init__(master)
