@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from tkinter import messagebox, ttk
 
+from app.ui.help_content import SCREEN_HELP
 from app.ui.views.base import BaseView
-from app.ui.widgets.common import KpiCard, ScrollableDetailText, SectionHeader
+from app.ui.widgets.common import InlineHelpPanel, KpiCard, ScrollableDetailText, SectionHeader
 from app.utils.ui import device_status_text, tone_for_status
 
 
@@ -14,7 +15,7 @@ class USBControlView(BaseView):
         super().__init__(master, controller, app)
         for column in range(4):
             self.columnconfigure(column, weight=1)
-        self.rowconfigure(3, weight=1)
+        self.rowconfigure(4, weight=1)
 
         self.header = SectionHeader(
             self,
@@ -23,24 +24,31 @@ class USBControlView(BaseView):
         )
         self.header.grid(row=0, column=0, columnspan=4, sticky="ew", pady=(0, 16))
 
+        self.help_panel = InlineHelpPanel(
+            self,
+            button_text=str(SCREEN_HELP["usb_control"]["button"]),
+            sections=list(SCREEN_HELP["usb_control"]["sections"]),
+        )
+        self.help_panel.grid(row=1, column=0, columnspan=4, sticky="ew", pady=(0, 12))
+
         self.card_status = KpiCard(self, "Etat USBSTOR")
         self.card_session = KpiCard(self, "Session Windows")
         self.card_mode = KpiCard(self, "Mode de fonctionnement")
         self.card_action = KpiCard(self, "Capacite d'action")
-        self.card_status.grid(row=1, column=0, sticky="nsew", padx=(0, 8), pady=(0, 12))
-        self.card_session.grid(row=1, column=1, sticky="nsew", padx=8, pady=(0, 12))
-        self.card_mode.grid(row=1, column=2, sticky="nsew", padx=8, pady=(0, 12))
-        self.card_action.grid(row=1, column=3, sticky="nsew", padx=(8, 0), pady=(0, 12))
+        self.card_status.grid(row=2, column=0, sticky="nsew", padx=(0, 8), pady=(0, 12))
+        self.card_session.grid(row=2, column=1, sticky="nsew", padx=8, pady=(0, 12))
+        self.card_mode.grid(row=2, column=2, sticky="nsew", padx=8, pady=(0, 12))
+        self.card_action.grid(row=2, column=3, sticky="nsew", padx=(8, 0), pady=(0, 12))
 
         actions = ttk.LabelFrame(self, text="Actions reelles", style="Section.TLabelframe", padding=12)
-        actions.grid(row=2, column=0, columnspan=4, sticky="ew", pady=(0, 12))
+        actions.grid(row=3, column=0, columnspan=4, sticky="ew", pady=(0, 12))
         ttk.Button(actions, text="Bloquer le stockage USB", style="Danger.TButton", command=self._block).pack(side="left")
         ttk.Button(actions, text="Debloquer le stockage USB", style="Accent.TButton", command=self._unblock).pack(side="left", padx=8)
         ttk.Button(actions, text="Relire le diagnostic", style="Subtle.TButton", command=self.refresh_data).pack(side="left", padx=8)
         ttk.Button(actions, text="Relancer en admin", style="Subtle.TButton", command=self._relaunch).pack(side="left", padx=8)
 
         diagnostics = ttk.LabelFrame(self, text="Diagnostic detaille", style="Section.TLabelframe", padding=12)
-        diagnostics.grid(row=3, column=0, columnspan=4, sticky="nsew")
+        diagnostics.grid(row=4, column=0, columnspan=4, sticky="nsew")
         diagnostics.columnconfigure(0, weight=1)
         diagnostics.rowconfigure(1, weight=1)
         self.note_label = ttk.Label(
@@ -86,14 +94,19 @@ class USBControlView(BaseView):
             self.card_action.set("Lecture seule", "Le diagnostic reste disponible sans elevation.", tone="WARNING", pill_text="READ")
 
         self.detail_text.set_text(
-            "Message : {message}\n"
-            "Statut : {status_value}\n"
-            "Details : {details}\n\n"
-            "Diagnostic : {diagnostic}\n\n"
-            "Limites reelles :\n"
-            "- Le blocage agit uniquement sur le stockage USB.\n"
-            "- Un support deja monte peut necessiter une reinsertion.\n"
-            "- Certaines situations peuvent demander une nouvelle session Windows.".format(
+            "Lecture courante :\n"
+            "- Message : {message}\n"
+            "- Statut : {status_value}\n"
+            "- Details : {details}\n\n"
+            "Ce que USBSTOR bloque :\n"
+            "- Le stockage USB de type cle, disque externe ou support de masse.\n\n"
+            "Ce que USBSTOR ne bloque pas :\n"
+            "- Les souris, claviers, receivers HID, hubs ou la plupart des peripheriques non stockage.\n\n"
+            "Pourquoi admin est requis :\n"
+            "- WireWall doit modifier une cle registre Windows protegee puis relire le resultat.\n\n"
+            "Pourquoi une reinsertion peut etre necessaire :\n"
+            "- Un support deja monte peut rester present tant qu'il n'est pas rebranche ou que la session n'est pas renouvelee.\n\n"
+            "Diagnostic brut : {diagnostic}".format(
                 message=status.message,
                 status_value=status.status,
                 details=status.details,

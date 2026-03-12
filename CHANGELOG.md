@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.3.1 - 2026-03-12
+
+- Ajout d'une aide integree discrete sur les ecrans cles pour expliquer ce qui est observe, deduit et presentable en soutenance.
+- Ajout d'un bloc `Precheck demo` dans le tableau de bord pour verifier mode, backend USB, DB, logs, exports, admin, USBSTOR, Ollama et modele attendu.
+- Clarification des ecrans `Peripheriques`, `Alertes`, `Controle USB` et `Analyse IA` pour separer donnees brutes, interpretations et dependances externes.
+- Enrichissement de `A propos` avec un flux pas a pas, un lexique rapide et des limites honnetes.
+- Ajout des guides `docs/HOW_WIREWALL_WORKS.md` et `docs/YDAYS_SCRIPT.md` pour la comprehension et la soutenance.
+
 ## 1.3.0 - 2026-03-12
 
 - Ajout d'une baseline locale par peripherique avec etats `NEW`, `RARE`, `KNOWN`, `DEVIATION`.

@@ -4,7 +4,8 @@ import tkinter as tk
 from tkinter import ttk
 
 from app.ui.views.base import BaseView
-from app.ui.widgets.common import LabeledValue, ScrollableDetailText, ScrollableTree, SectionHeader, StatusPill
+from app.ui.help_content import SCREEN_HELP
+from app.ui.widgets.common import InlineHelpPanel, LabeledValue, ScrollableDetailText, ScrollableTree, SectionHeader, StatusPill
 from app.utils.datetime import format_for_ui
 from app.utils.ui import (
     category_text,
@@ -40,7 +41,7 @@ class DevicesView(BaseView):
         super().__init__(master, controller, app)
         self.columnconfigure(0, weight=3)
         self.columnconfigure(1, weight=2)
-        self.rowconfigure(2, weight=1)
+        self.rowconfigure(3, weight=1)
         self._rows: dict[str, object] = {}
         self._selected_device_key: str | None = None
 
@@ -53,8 +54,15 @@ class DevicesView(BaseView):
         )
         self.header.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 16))
 
+        self.help_panel = InlineHelpPanel(
+            self,
+            button_text=str(SCREEN_HELP["devices"]["button"]),
+            sections=list(SCREEN_HELP["devices"]["sections"]),
+        )
+        self.help_panel.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(0, 12))
+
         filters = ttk.LabelFrame(self, text="Filtres et actions", style="Section.TLabelframe", padding=12)
-        filters.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(0, 12))
+        filters.grid(row=2, column=0, columnspan=2, sticky="ew", pady=(0, 12))
         for column in range(6):
             filters.columnconfigure(column, weight=1 if column in {1, 3, 5} else 0)
 
@@ -94,11 +102,11 @@ class DevicesView(BaseView):
         self.status_combo.bind("<<ComboboxSelected>>", lambda _event: self.refresh_data())
 
         tree_frame = ttk.LabelFrame(self, text="Inventaire des peripheriques", style="Section.TLabelframe", padding=12)
-        tree_frame.grid(row=2, column=0, sticky="nsew", padx=(0, 8))
+        tree_frame.grid(row=3, column=0, sticky="nsew", padx=(0, 8))
         tree_frame.rowconfigure(0, weight=1)
         tree_frame.columnconfigure(0, weight=1)
         detail_frame = ttk.LabelFrame(self, text="Fiche peripherique", style="Section.TLabelframe", padding=12)
-        detail_frame.grid(row=2, column=1, sticky="nsew", padx=(8, 0))
+        detail_frame.grid(row=3, column=1, sticky="nsew", padx=(8, 0))
         detail_frame.columnconfigure(0, weight=1)
         detail_frame.rowconfigure(3, weight=1)
 
@@ -144,10 +152,12 @@ class DevicesView(BaseView):
             "backend": LabeledValue(metrics, "Backend"),
             "status": LabeledValue(metrics, "Etat"),
             "bus": LabeledValue(metrics, "Bus / Adresse"),
-            "trust": LabeledValue(metrics, "Habitude"),
+            "trust": LabeledValue(metrics, "Baseline locale"),
             "seen": LabeledValue(metrics, "Occurrences"),
             "decision": LabeledValue(metrics, "Derniere decision"),
             "variation": LabeledValue(metrics, "Variation"),
+            "source": LabeledValue(metrics, "Identification"),
+            "score": LabeledValue(metrics, "Risque"),
         }
         positions = [
             ("name", 0, 0),
@@ -162,6 +172,8 @@ class DevicesView(BaseView):
             ("seen", 4, 1),
             ("decision", 5, 0),
             ("variation", 5, 1),
+            ("source", 6, 0),
+            ("score", 6, 1),
         ]
         for key, row, column in positions:
             self.values[key].grid(row=row, column=column, sticky="ew", padx=(0 if column == 0 else 10, 0), pady=6)
@@ -252,6 +264,8 @@ class DevicesView(BaseView):
         self.values["seen"].set(str(device.seen_count))
         self.values["decision"].set(decision_text(device.last_decision))
         self.values["variation"].set(device.recent_variation or "stable")
+        self.values["source"].set(device.identification_source)
+        self.values["score"].set(f"{device.risk_level} ({device.risk_score})")
         history = (
             self.controller.get_device_history(device.device_key, limit=8)
             if hasattr(self.controller, "get_device_history")
@@ -262,19 +276,29 @@ class DevicesView(BaseView):
             for event in history
         ] or ["- Aucun historique recent disponible."]
         self.detail_text.set_text(
-            "Premiere observation : {first_seen}\n"
-            "Derniere observation : {last_seen}\n"
-            "Classe USB : {usb_class}\n"
-            "Source d'identification : {source}\n"
-            "Score de risque : {score}\n"
-            "Plages d'usage : {usual_hours}\n"
-            "Metadata : {metadata}\n\n"
+            "Donnees observees :\n"
+            "- Premiere observation : {first_seen}\n"
+            "- Derniere observation : {last_seen}\n"
+            "- Classe USB : {usb_class}\n"
+            "- Bus / Adresse : {bus_address}\n"
+            "- Source backend : {backend}\n"
+            "- Metadata brutes : {metadata}\n\n"
+            "Interpretation WireWall :\n"
+            "- Source d'identification : {source}\n"
+            "- Baseline : {trust}\n"
+            "- Score de risque : {score}\n"
+            "- Derniere decision : {decision}\n"
+            "- Plages d'usage : {usual_hours}\n\n"
             "Historique recent :\n{history}".format(
                 first_seen=format_for_ui(device.first_seen),
                 last_seen=format_for_ui(device.last_seen),
                 usb_class=device.usb_class if device.usb_class is not None else "-",
+                bus_address=f"{device.bus or '-'} / {device.address or '-'}",
+                backend=device.source_backend,
                 source=device.identification_source,
+                trust=trust_state_text(device.trust_state),
                 score=f"{device.risk_level} ({device.risk_score})",
+                decision=decision_text(device.last_decision),
                 usual_hours=device.usual_hours or {},
                 metadata=device.metadata,
                 history="\n".join(history_lines),

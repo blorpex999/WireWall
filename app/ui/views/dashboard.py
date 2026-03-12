@@ -3,7 +3,8 @@ from __future__ import annotations
 from tkinter import ttk
 
 from app.ui.views.base import BaseView
-from app.ui.widgets.common import KpiCard, LabeledValue, ScrollableTree, SectionHeader, StatusPill
+from app.ui.help_content import SCREEN_HELP
+from app.ui.widgets.common import InlineHelpPanel, KpiCard, LabeledValue, ScrollableTree, SectionHeader, StatusPill
 from app.utils.datetime import format_for_ui
 from app.utils.ui import (
     decision_text,
@@ -24,9 +25,9 @@ class DashboardView(BaseView):
         super().__init__(master, controller, app)
         for column in range(5):
             self.columnconfigure(column, weight=1)
-        self.rowconfigure(3, weight=2)
-        self.rowconfigure(4, weight=1)
+        self.rowconfigure(4, weight=2)
         self.rowconfigure(5, weight=1)
+        self.rowconfigure(6, weight=1)
         self._suggestion_rows: dict[str, object] = {}
 
         self.header = SectionHeader(
@@ -38,8 +39,15 @@ class DashboardView(BaseView):
         )
         self.header.grid(row=0, column=0, columnspan=5, sticky="ew", pady=(0, 16))
 
+        self.help_panel = InlineHelpPanel(
+            self,
+            button_text=str(SCREEN_HELP["dashboard"]["button"]),
+            sections=list(SCREEN_HELP["dashboard"]["sections"]),
+        )
+        self.help_panel.grid(row=1, column=0, columnspan=5, sticky="ew", pady=(0, 12))
+
         strip = ttk.Frame(self, style="Card.TFrame", padding=16)
-        strip.grid(row=1, column=0, columnspan=5, sticky="ew", pady=(0, 12))
+        strip.grid(row=2, column=0, columnspan=5, sticky="ew", pady=(0, 12))
         for column in range(4):
             strip.columnconfigure(column, weight=1)
         self.usb_tile = self._build_tile(strip, 0, "Stockage USB")
@@ -52,26 +60,30 @@ class DashboardView(BaseView):
         self.card_incidents = KpiCard(self, "Incidents ouverts")
         self.card_alerts = KpiCard(self, "Alertes critiques")
         self.card_suggestions = KpiCard(self, "Suggestions")
-        self.card_score.grid(row=2, column=0, sticky="nsew", padx=(0, 8), pady=(0, 12))
-        self.card_devices.grid(row=2, column=1, sticky="nsew", padx=8, pady=(0, 12))
-        self.card_incidents.grid(row=2, column=2, sticky="nsew", padx=8, pady=(0, 12))
-        self.card_alerts.grid(row=2, column=3, sticky="nsew", padx=8, pady=(0, 12))
-        self.card_suggestions.grid(row=2, column=4, sticky="nsew", padx=(8, 0), pady=(0, 12))
+        self.card_score.grid(row=3, column=0, sticky="nsew", padx=(0, 8), pady=(0, 12))
+        self.card_devices.grid(row=3, column=1, sticky="nsew", padx=8, pady=(0, 12))
+        self.card_incidents.grid(row=3, column=2, sticky="nsew", padx=8, pady=(0, 12))
+        self.card_alerts.grid(row=3, column=3, sticky="nsew", padx=8, pady=(0, 12))
+        self.card_suggestions.grid(row=3, column=4, sticky="nsew", padx=(8, 0), pady=(0, 12))
 
         events_frame = ttk.LabelFrame(self, text="Activite recente", style="Section.TLabelframe", padding=12)
-        events_frame.grid(row=3, column=0, columnspan=3, sticky="nsew", padx=(0, 8), pady=(0, 12))
+        events_frame.grid(row=4, column=0, columnspan=3, sticky="nsew", padx=(0, 8), pady=(0, 12))
         alerts_frame = ttk.LabelFrame(self, text="Alertes prioritaires", style="Section.TLabelframe", padding=12)
-        alerts_frame.grid(row=3, column=3, columnspan=2, sticky="nsew", padx=(8, 0), pady=(0, 12))
+        alerts_frame.grid(row=4, column=3, columnspan=2, sticky="nsew", padx=(8, 0), pady=(0, 12))
         health_frame = ttk.LabelFrame(self, text="Etat des composants", style="Section.TLabelframe", padding=12)
-        health_frame.grid(row=4, column=0, columnspan=3, sticky="nsew", padx=(0, 8))
+        health_frame.grid(row=5, column=0, columnspan=3, sticky="nsew", padx=(0, 8))
         brain_frame = ttk.LabelFrame(self, text="Moteur d'analyse continu", style="Section.TLabelframe", padding=12)
-        brain_frame.grid(row=4, column=3, columnspan=2, sticky="nsew", padx=(8, 0))
+        brain_frame.grid(row=5, column=3, columnspan=2, sticky="nsew", padx=(8, 0))
         suggestions_frame = ttk.LabelFrame(self, text="Suggestions supervisees", style="Section.TLabelframe", padding=12)
-        suggestions_frame.grid(row=5, column=0, columnspan=5, sticky="nsew", pady=(12, 0))
+        suggestions_frame.grid(row=6, column=0, columnspan=3, sticky="nsew", pady=(12, 0), padx=(0, 8))
+        precheck_frame = ttk.LabelFrame(self, text="Precheck demo", style="Section.TLabelframe", padding=12)
+        precheck_frame.grid(row=6, column=3, columnspan=2, sticky="nsew", pady=(12, 0), padx=(8, 0))
         brain_frame.columnconfigure(0, weight=1)
         brain_frame.columnconfigure(1, weight=1)
         suggestions_frame.columnconfigure(0, weight=1)
         suggestions_frame.rowconfigure(1, weight=1)
+        precheck_frame.columnconfigure(0, weight=1)
+        precheck_frame.rowconfigure(1, weight=1)
 
         self.event_table = ScrollableTree(events_frame, ("date", "type", "summary", "severity"), height=9)
         self.event_table.pack(fill="both", expand=True)
@@ -170,6 +182,25 @@ class DashboardView(BaseView):
         )
         self.reject_button.pack(side="left")
 
+        ttk.Label(
+            precheck_frame,
+            text="Lecture seule. Aucun effet de bord. Utilise les checks existants pour preparer la demo.",
+            style="Muted.TLabel",
+            wraplength=520,
+            justify="left",
+        ).grid(row=0, column=0, sticky="w", pady=(0, 10))
+        self.precheck_table = ScrollableTree(precheck_frame, ("item", "status", "action"), height=6)
+        self.precheck_table.grid(row=1, column=0, sticky="nsew")
+        for column, label, width in (
+            ("item", "Point", 170),
+            ("status", "Etat", 110),
+            ("action", "Action conseillee", 340),
+        ):
+            self.precheck_table.tree.heading(column, text=label)
+            self.precheck_table.tree.column(column, width=width, anchor="w")
+        for tone in ("OK", "WARNING", "ERROR"):
+            self.precheck_table.tree.tag_configure(tone, foreground=severity_color(tone))
+
     def refresh_data(self) -> None:
         data = self.controller.get_dashboard_data()
         risk_level = risk_level_from_score(data["global_score"])
@@ -223,6 +254,7 @@ class DashboardView(BaseView):
         self.alert_table.clear()
         self.health_table.clear()
         self.suggestion_table.clear()
+        self.precheck_table.clear()
         self._suggestion_rows.clear()
 
         for event in data["recent_events"]:
@@ -267,6 +299,16 @@ class DashboardView(BaseView):
             self._suggestion_rows[item_id] = suggestion
         self.suggestion_table.set_empty(bool(data["suggestions"]), "Aucune suggestion a valider pour le moment.")
         self._sync_suggestion_actions()
+
+        precheck_rows = self.controller.get_demo_precheck()
+        for row in precheck_rows:
+            self.precheck_table.tree.insert(
+                "",
+                "end",
+                values=(row["label"], row["status"], shorten_text(row["action"], 76)),
+                tags=(row["tone"],),
+            )
+        self.precheck_table.set_empty(bool(precheck_rows), "Aucun precheck disponible.")
 
         brain_snapshot = data.get("brain_snapshot")
         if brain_snapshot is None:

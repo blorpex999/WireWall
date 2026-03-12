@@ -109,6 +109,51 @@ class EmptyState(ttk.Frame):
         ttk.Label(self, text=detail, style="Muted.TLabel", justify="center").pack(anchor="center", pady=(6, 0))
 
 
+class InlineHelpPanel(ttk.Frame):
+    def __init__(self, master, button_text: str, sections: list[tuple[str, str]]) -> None:
+        super().__init__(master)
+        self.columnconfigure(0, weight=1)
+        self._expanded = False
+        self._collapsed_text = button_text
+
+        action_row = ttk.Frame(self)
+        action_row.grid(row=0, column=0, sticky="ew")
+        action_row.columnconfigure(0, weight=1)
+        self.button = ttk.Button(
+            action_row,
+            text=self._collapsed_text,
+            style="Subtle.TButton",
+            command=self.toggle,
+        )
+        self.button.grid(row=0, column=1, sticky="e")
+
+        self.body = ttk.Frame(self, style="Card.TFrame", padding=12)
+        self.body.columnconfigure(0, weight=1)
+        for index, (label, text) in enumerate(sections):
+            row = ttk.Frame(self.body, style="CardInner.TFrame")
+            row.grid(row=index, column=0, sticky="ew", pady=(0, 6 if index < len(sections) - 1 else 0))
+            row.columnconfigure(1, weight=1)
+            ttk.Label(row, text=f"{label} :", style="ValueTitle.TLabel").grid(row=0, column=0, sticky="nw", padx=(0, 8))
+            ttk.Label(
+                row,
+                text=text,
+                style="Muted.TLabel",
+                wraplength=1120,
+                justify="left",
+            ).grid(row=0, column=1, sticky="ew")
+        self.body.grid(row=1, column=0, sticky="ew", pady=(8, 0))
+        self.body.grid_remove()
+
+    def toggle(self) -> None:
+        self._expanded = not self._expanded
+        if self._expanded:
+            self.body.grid()
+            self.button.configure(text="Masquer l'aide")
+        else:
+            self.body.grid_remove()
+            self.button.configure(text=self._collapsed_text)
+
+
 class StatusBar(ttk.Frame):
     def __init__(self, master) -> None:
         super().__init__(master, style="Card.TFrame", padding=(12, 8))

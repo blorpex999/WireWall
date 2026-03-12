@@ -11,6 +11,7 @@
 - Certaines chaines USB peuvent etre absentes, inaccessibles ou incoherentes.
 - WireWall ne fait pas d'interception kernel. La detection repose sur des snapshots utilisateur compares dans le temps.
 - Le hook `WM_DEVICECHANGE` sert uniquement a accelerer le prochain scan.
+- L'aide integree `Comprendre` reste pedagogique: elle n'ajoute aucune preuve technique supplementaire au monitoring.
 
 ## USBSTOR
 
@@ -27,6 +28,7 @@
 - Meme avec l'installateur `full`, seul l'installeur officiel Ollama peut etre embarque proprement, pas le modele lui-meme.
 - L'analyse IA ne fonctionne que si le service local repond sur `localhost`.
 - En cas d'indisponibilite, WireWall retourne un diagnostic et ne fabrique pas de resultat.
+- Le `Precheck demo` peut signaler un probleme Ollama ou modele attendu, mais ne telecharge rien automatiquement.
 
 ## Cerveau local, baseline et suggestions
 

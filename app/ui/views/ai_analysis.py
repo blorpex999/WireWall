@@ -3,7 +3,8 @@ from __future__ import annotations
 from tkinter import ttk
 
 from app.ui.views.base import BaseView
-from app.ui.widgets.common import LabeledValue, ScrollableDetailText, ScrollableTree, SectionHeader, StatusPill
+from app.ui.help_content import SCREEN_HELP
+from app.ui.widgets.common import InlineHelpPanel, LabeledValue, ScrollableDetailText, ScrollableTree, SectionHeader, StatusPill
 from app.utils.datetime import format_for_ui
 from app.utils.ui import health_status_text, severity_color, shorten_text, tone_for_status
 
@@ -15,7 +16,7 @@ class AIAnalysisView(BaseView):
         super().__init__(master, controller, app)
         self.columnconfigure(0, weight=2)
         self.columnconfigure(1, weight=3)
-        self.rowconfigure(2, weight=1)
+        self.rowconfigure(3, weight=1)
         self._rows: dict[str, object] = {}
         self._selected_analysis_key: str | None = None
 
@@ -28,8 +29,15 @@ class AIAnalysisView(BaseView):
         )
         self.header.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 16))
 
+        self.help_panel = InlineHelpPanel(
+            self,
+            button_text=str(SCREEN_HELP["ai_analysis"]["button"]),
+            sections=list(SCREEN_HELP["ai_analysis"]["sections"]),
+        )
+        self.help_panel.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(0, 12))
+
         top = ttk.LabelFrame(self, text="Etat et lancement", style="Section.TLabelframe", padding=12)
-        top.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(0, 12))
+        top.grid(row=2, column=0, columnspan=2, sticky="ew", pady=(0, 12))
         top.columnconfigure(1, weight=1)
         top.columnconfigure(3, weight=1)
         ttk.Label(top, text="Modele").grid(row=0, column=0, sticky="w", padx=(0, 8))
@@ -42,13 +50,21 @@ class AIAnalysisView(BaseView):
         self.ollama_badge.pack(side="left")
         self.ollama_detail = ttk.Label(top, text="", style="Muted.TLabel", wraplength=520, justify="left")
         self.ollama_detail.grid(row=1, column=0, columnspan=4, sticky="w", pady=(10, 0))
+        self.local_note = ttk.Label(
+            top,
+            text="Analyse locale uniquement. Ollama doit etre disponible sur localhost. L'IA propose et n'agit jamais seule.",
+            style="Muted.TLabel",
+            wraplength=760,
+            justify="left",
+        )
+        self.local_note.grid(row=2, column=0, columnspan=4, sticky="w", pady=(10, 0))
         self.run_button = ttk.Button(top, text="Lancer l'analyse locale", style="Accent.TButton", command=self._run_analysis)
-        self.run_button.grid(row=0, column=4, rowspan=2, sticky="e")
+        self.run_button.grid(row=0, column=4, rowspan=3, sticky="e")
 
         list_frame = ttk.LabelFrame(self, text="Analyses recentes", style="Section.TLabelframe", padding=12)
-        list_frame.grid(row=2, column=0, sticky="nsew", padx=(0, 8))
+        list_frame.grid(row=3, column=0, sticky="nsew", padx=(0, 8))
         detail_frame = ttk.LabelFrame(self, text="Lecture analyste", style="Section.TLabelframe", padding=12)
-        detail_frame.grid(row=2, column=1, sticky="nsew", padx=(8, 0))
+        detail_frame.grid(row=3, column=1, sticky="nsew", padx=(8, 0))
         detail_frame.columnconfigure(0, weight=1)
         detail_frame.rowconfigure(4, weight=1)
 

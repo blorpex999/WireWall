@@ -1,4 +1,4 @@
-# WireWall 1.3.0
+# WireWall 1.3.1
 
 WireWall est une application desktop Windows de supervision USB orientee cybersecurite. Le projet combine detection USB reelle via `PyUSB` avec backend `libusb1`, journalisation `SQLite`, scoring de risque, policies whitelist/blacklist, controle reel `USBSTOR`, analyse IA locale via Ollama, moteur de baseline local, workflow incident et exports d'audit `HTML`, `CSV`, `JSON`.
 
@@ -23,7 +23,14 @@ WireWall est une application desktop Windows de supervision USB orientee cyberse
 - Le monitoring USB reste un monitoring utilisateur par snapshots `PyUSB/libusb1`, pas un driver noyau.
 - Le "cerveau" WireWall reste un moteur local d'aide a la decision et de memoire, pas un agent autonome qui modifie son propre code.
 
-## Ce que 1.3.0 ajoute
+## Ce que 1.3.1 ajoute
+
+- aide integree `Comprendre` sur les ecrans cles pour expliquer ce qui est reel, deduit et demonstrable
+- bloc `Precheck demo` dans le tableau de bord pour verifier rapidement si la soutenance peut partir en mode reel, demo, avec ou sans IA
+- ecran `A propos` enrichi avec flux produit, limites honnetes et lexique USB de base
+- documentation pedagogique supplementaire pour expliquer `PyUSB/libusb`, `USBSTOR`, la baseline et l'IA locale
+
+## Ce que 1.3.0 a ajoute
 
 - baseline locale par peripherique : `Nouveau`, `Rare`, `Connu`, `Deviation`
 - historique d'usage et contexte de confiance sur chaque device
@@ -126,6 +133,12 @@ Mode recommande pour un autre poste :
 
 Si `winget` est indisponible ou si le poste est offline, l'assistant bascule en mode guide. Avec la distribution `full demo`, l'installeur officiel Ollama est deja inclus, mais le modele reste a telecharger separement.
 
+## Aides de soutenance integrees
+
+- `Comprendre` : bouton discret sur `Dashboard`, `Peripheriques`, `Alertes`, `Controle USB`, `Analyse IA` et `A propos`
+- `Precheck demo` : bloc lecture seule dans le tableau de bord pour verifier backend USB, DB, logs, exports, admin, USBSTOR, Ollama et modele attendu
+- `A propos` : flux du produit, lexique USB et limites honnetes pour preparer ton discours
+
 ## Scripts principaux
 
 - `scripts\run_dev.bat` : lancement source en mode reel
@@ -165,6 +178,8 @@ Avant chaque release :
 - [Build](docs/BUILD.md)
 - [Release](docs/RELEASE.md)
 - [Guide de demo Ydays](docs/DEMO_GUIDE.md)
+- [Comment WireWall fonctionne](docs/HOW_WIREWALL_WORKS.md)
+- [Script de soutenance Ydays](docs/YDAYS_SCRIPT.md)
 - [Troubleshooting](docs/TROUBLESHOOTING.md)
 - [Checklist de validation](docs/VALIDATION_CHECKLIST.md)
 - [Limites techniques](docs/LIMITATIONS.md)

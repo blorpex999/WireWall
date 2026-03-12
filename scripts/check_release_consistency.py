@@ -64,6 +64,8 @@ def ensure_files(errors: list[str]) -> None:
         "docs/CONFIGURATION.md",
         "docs/USAGE.md",
         "docs/DEMO_GUIDE.md",
+        "docs/HOW_WIREWALL_WORKS.md",
+        "docs/YDAYS_SCRIPT.md",
         "docs/TROUBLESHOOTING.md",
         "docs/VALIDATION_CHECKLIST.md",
         "docs/LIMITATIONS.md",
@@ -124,6 +126,8 @@ def ensure_docs(errors: list[str]) -> None:
         "docs/INSTALL.md",
         "docs/BUILD.md",
         "docs/RELEASE.md",
+        "docs/HOW_WIREWALL_WORKS.md",
+        "docs/YDAYS_SCRIPT.md",
         "release_full.bat",
     ]
     for token in readme_tokens:

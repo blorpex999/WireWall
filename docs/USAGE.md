@@ -13,7 +13,7 @@
 
 ## Ecrans a connaitre
 
-- `Dashboard` : vue synthese, risque global, incidents ouverts, suggestions supervisees et sante plateforme
+- `Dashboard` : vue synthese, risque global, incidents ouverts, suggestions supervisees, sante plateforme et `Precheck demo`
 - `Peripheriques` : inventaire actif, baseline locale, details, historique, whitelist et blacklist
 - `Alertes` : alertes persistantes, workflow incident, commentaire analyste et resolution
 - `Historique` : evenements USB, filtres et exports
@@ -21,13 +21,14 @@
 - `Controle USB` : lecture et action sur `USBSTOR`
 - `Analyse IA` : synthese locale, anomalies probables et recommandations
 - `Parametres` : scan, retention, export, Ollama, profil de securite, demarrage auto et mode suggestions
-- `A propos` : presentation du projet
+- `A propos` : presentation du projet, flux de fonctionnement et lexique
+- `Comprendre` : aide integree discrete sur les ecrans cles
 
 ## Flux de travail recommande
 
-1. Verifier le `Dashboard` et le panneau de sante.
+1. Verifier le `Dashboard`, le `Precheck demo` et le panneau de sante.
 2. Brancher ou debrancher un peripherique USB.
-3. Verifier la detection, la baseline et l'historique dans `Peripheriques`.
+3. Verifier la detection, la baseline, la source d'identification et l'historique dans `Peripheriques`.
 4. Ouvrir un incident depuis `Alertes` si une alerte merite un suivi.
 5. Valider ou rejeter les suggestions supervisees depuis le `Dashboard`.
 6. Ajouter si besoin une regle whitelist ou blacklist.
@@ -38,6 +39,7 @@
 ## Feedbacks importants
 
 - En mode demo, l'application l'indique visuellement et la base utilisee est separee.
+- Le bouton `Comprendre` n'ajoute aucune logique metier: il sert a t'aider a expliquer l'ecran et ses limites.
 - Si Ollama est indisponible, l'ecran IA affiche un diagnostic au lieu d'un faux resultat.
 - Si la session n'est pas admin, les actions `USBSTOR` restent explicites sur cette limite.
 - Les suggestions WireWall ne sont jamais appliquees sans validation utilisateur.

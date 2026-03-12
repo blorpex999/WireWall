@@ -4,8 +4,9 @@ import tkinter as tk
 from tkinter import ttk
 
 from app.ui.theme import COLORS
+from app.ui.help_content import SCREEN_HELP
 from app.ui.views.base import BaseView
-from app.ui.widgets.common import LabeledValue, ScrollableDetailText, ScrollableTree, SectionHeader, StatusPill
+from app.ui.widgets.common import InlineHelpPanel, LabeledValue, ScrollableDetailText, ScrollableTree, SectionHeader, StatusPill
 from app.utils.datetime import format_for_ui
 from app.utils.ui import (
     decision_text,
@@ -45,7 +46,7 @@ class AlertsView(BaseView):
         super().__init__(master, controller, app)
         self.columnconfigure(0, weight=3)
         self.columnconfigure(1, weight=2)
-        self.rowconfigure(2, weight=1)
+        self.rowconfigure(3, weight=1)
         self._rows: dict[str, object] = {}
         self._selected_alert_key: str | None = None
 
@@ -56,8 +57,15 @@ class AlertsView(BaseView):
         )
         self.header.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 16))
 
+        self.help_panel = InlineHelpPanel(
+            self,
+            button_text=str(SCREEN_HELP["alerts"]["button"]),
+            sections=list(SCREEN_HELP["alerts"]["sections"]),
+        )
+        self.help_panel.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(0, 12))
+
         filters = ttk.LabelFrame(self, text="Filtres", style="Section.TLabelframe", padding=12)
-        filters.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(0, 12))
+        filters.grid(row=2, column=0, columnspan=2, sticky="ew", pady=(0, 12))
         for column in range(4):
             filters.columnconfigure(column, weight=1 if column in {1, 3} else 0)
         self.severity_var = tk.StringVar(value="Toutes")
@@ -89,9 +97,9 @@ class AlertsView(BaseView):
         self.ack_combo.bind("<<ComboboxSelected>>", lambda _event: self.refresh_data())
 
         list_frame = ttk.LabelFrame(self, text="Liste des alertes", style="Section.TLabelframe", padding=12)
-        list_frame.grid(row=2, column=0, sticky="nsew", padx=(0, 8))
+        list_frame.grid(row=3, column=0, sticky="nsew", padx=(0, 8))
         detail_frame = ttk.LabelFrame(self, text="Detail de l'alerte", style="Section.TLabelframe", padding=12)
-        detail_frame.grid(row=2, column=1, sticky="nsew", padx=(8, 0))
+        detail_frame.grid(row=3, column=1, sticky="nsew", padx=(8, 0))
         detail_frame.columnconfigure(0, weight=1)
         detail_frame.rowconfigure(4, weight=1)
 
@@ -133,8 +141,8 @@ class AlertsView(BaseView):
             "date": LabeledValue(metrics, "Date"),
             "score": LabeledValue(metrics, "Score"),
             "device": LabeledValue(metrics, "Peripherique"),
-            "incident_status": LabeledValue(metrics, "Statut incident"),
-            "decision": LabeledValue(metrics, "Decision"),
+            "incident_status": LabeledValue(metrics, "Incident lie"),
+            "decision": LabeledValue(metrics, "Decision analyste"),
         }
         self.values["title"].grid(row=0, column=0, sticky="ew", padx=(0, 10), pady=6)
         self.values["date"].grid(row=0, column=1, sticky="ew", pady=6)
@@ -266,10 +274,13 @@ class AlertsView(BaseView):
         self.comment_var.set(case.comment if case else alert.analyst_comment)
         self.reason_var.set(case.resolution_reason if case else alert.resolution_reason)
         self.detail_text.set_text(
-            "Message :\n{message}\n\n"
-            "Recommandations :\n- {recommendations}\n\n"
-            "Workflow :\n- Commentaire analyste: {comment}\n- Resolution: {resolution}".format(
+            "Alerte :\n{message}\n\n"
+            "Decision analyste :\n- Statut incident: {incident}\n- Decision: {decision}\n- Commentaire: {comment}\n- Resolution: {resolution}\n\n"
+            "Suggestions supervisees :\n- Consulte le tableau de bord pour valider, rejeter ou reporter une suggestion.\n\n"
+            "Recommandations de l'alerte :\n- {recommendations}".format(
                 message=alert.message,
+                incident=incident_status_text(case.status) if case else "Aucun incident ouvert",
+                decision=decision_text(case.decision) if case else "Aucune",
                 recommendations="\n- ".join(alert.recommendations or ["Aucune recommandation fournie."]),
                 comment=(case.comment if case else alert.analyst_comment) or "Aucun commentaire",
                 resolution=(case.resolution_reason if case else alert.resolution_reason) or "Non renseigne",

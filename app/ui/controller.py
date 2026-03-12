@@ -243,6 +243,87 @@ class AppController:
             checked_at=utc_now(),
         )
 
+    def get_demo_precheck(self) -> list[dict[str, str]]:
+        health_map = {status.component: status for status in self.get_health_statuses()}
+        ollama_status = self.get_ollama_health_status()
+        configured_model = self.settings.ollama_model
+
+        rows = [
+            self._build_precheck_row(
+                key="mode",
+                label="Mode courant",
+                raw_status="warning" if self.demo_mode else "ok",
+                detail="Mode demo isole." if self.demo_mode else "Mode reel actif.",
+                action="Dire clairement au jury si la base de demonstration est active.",
+            ),
+            self._build_health_precheck(
+                key="usb_backend",
+                label="Backend USB",
+                health_status=health_map.get("usb_backend"),
+                blocking_on=("warning", "error"),
+                fallback_action="Verifier libusb1 avant la demonstration.",
+            ),
+            self._build_health_precheck(
+                key="database",
+                label="Base SQLite",
+                health_status=health_map.get("database"),
+                blocking_on=("error",),
+                fallback_action="Verifier les droits d'ecriture et l'integrite de la base locale.",
+            ),
+            self._build_health_precheck(
+                key="logs",
+                label="Dossier logs",
+                health_status=health_map.get("logs"),
+                fallback_action="Verifier l'acces a %LOCALAPPDATA%\\WireWall\\logs.",
+            ),
+            self._build_health_precheck(
+                key="exports",
+                label="Dossier exports",
+                health_status=health_map.get("exports"),
+                fallback_action="Choisir un dossier d'export accessible avant la demo.",
+            ),
+            self._build_health_precheck(
+                key="admin",
+                label="Session admin",
+                health_status=health_map.get("admin"),
+                fallback_action="Lancer WireWall en admin seulement si tu montres USBSTOR.",
+            ),
+            self._build_health_precheck(
+                key="usbstor",
+                label="Lecture USBSTOR",
+                health_status=health_map.get("usbstor"),
+                fallback_action="Verifier la cle USBSTOR ou basculer la demo sur le monitoring.",
+            ),
+        ]
+
+        rows.append(
+            self._build_precheck_row(
+                key="ollama",
+                label="Service Ollama",
+                raw_status="ok" if ollama_status.status == "ok" else "warning",
+                detail=ollama_status.details,
+                action=(
+                    "Ollama pret pour la demo IA."
+                    if ollama_status.status == "ok"
+                    else "La demo reste faisable sans IA; eviter cet ecran ou lancer l'assistant IA locale."
+                ),
+            )
+        )
+        rows.append(
+            self._build_precheck_row(
+                key="model",
+                label="Modele IA attendu",
+                raw_status="ok" if ollama_status.status == "ok" else "warning",
+                detail=(
+                    f"Modele configure '{configured_model}' present."
+                    if ollama_status.status == "ok"
+                    else f"Modele attendu '{configured_model}' non confirme."
+                ),
+                action="Si le modele manque, changer de modele dans Parametres ou ignorer la partie IA.",
+            )
+        )
+        return rows
+
     def list_suggestions(self, limit: int = 12):
         return self.container.recommendation_service.list_pending(self.demo_mode, limit=limit)
 
@@ -362,3 +443,57 @@ class AppController:
         if device is None:
             raise ValueError("Peripherique introuvable.")
         return device
+
+    def _build_health_precheck(
+        self,
+        *,
+        key: str,
+        label: str,
+        health_status: HealthStatus | None,
+        fallback_action: str,
+        blocking_on: tuple[str, ...] = (),
+    ) -> dict[str, str]:
+        if health_status is None:
+            return self._build_precheck_row(
+                key=key,
+                label=label,
+                raw_status="warning",
+                detail="Aucun controle disponible pour ce composant.",
+                action=fallback_action,
+            )
+        raw_status = "error" if health_status.status in blocking_on else health_status.status
+        return self._build_precheck_row(
+            key=key,
+            label=label,
+            raw_status=raw_status,
+            detail=health_status.details,
+            action="Aucune action requise." if raw_status == "ok" else fallback_action,
+        )
+
+    def _build_precheck_row(
+        self,
+        *,
+        key: str,
+        label: str,
+        raw_status: str,
+        detail: str,
+        action: str,
+    ) -> dict[str, str]:
+        normalized = raw_status.lower().strip()
+        if normalized == "ok":
+            tone = "OK"
+            status = "OK"
+        elif normalized == "error":
+            tone = "ERROR"
+            status = "Bloquant demo"
+        else:
+            tone = "WARNING"
+            status = "A surveiller"
+        return {
+            "key": key,
+            "label": label,
+            "status": status,
+            "tone": tone,
+            "detail": detail,
+            "action": action,
+        }
