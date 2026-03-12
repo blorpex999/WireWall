@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import ctypes
 import tkinter as tk
 from tkinter import ttk
 
@@ -35,7 +34,7 @@ class WireWallApp(tk.Tk):
         self.nav_buttons: dict[str, ttk.Button] = {}
         self._repaint_scheduled = False
         self._force_repaint_running = False
-        self._resize_repaint_id: str | None = None
+        self._resize_refresh_id: str | None = None
         self._window_icon_image: tk.PhotoImage | None = None
         self._header_logo_image: tk.PhotoImage | None = None
         self._toast_windows: list[tk.Toplevel] = []
@@ -132,17 +131,16 @@ class WireWallApp(tk.Tk):
             self.views[self.current_view_key].grid_forget()
         view = self.views[name]
         view.grid(row=0, column=0, sticky="nsew")
+        view.reset_scroll_position()
         view.refresh_data()
         self.current_view_key = name
         self._refresh_nav_state()
         self.title(f"WireWall {__version__} - {self._view_label(name)}")
         self.set_status(f"Vue active : {self._view_label(name)}", "INFO")
         self._notify_view_resize()
-        self.request_repaint()
 
     def set_status(self, message: str, level: str = "INFO") -> None:
         self.status_bar.set_status(message, level)
-        self.request_repaint()
 
     def _attach_hook(self) -> None:
         self.update_idletasks()
@@ -203,8 +201,6 @@ class WireWallApp(tk.Tk):
             self.views["dashboard"].refresh_data()
         if self.current_view_key is not None and self.current_view_key != "dashboard" and self.current_view_key in refresh_views:
             self.views[self.current_view_key].refresh_data()
-        if refresh_views:
-            self.request_repaint()
         self.after(250, self._poll_backend_events)
 
     def _periodic_refresh(self) -> None:
@@ -255,17 +251,16 @@ class WireWallApp(tk.Tk):
     def _on_window_configure(self, event: tk.Event) -> None:
         if event.widget is not self:
             return
-        if self._resize_repaint_id is not None:
+        if self._resize_refresh_id is not None:
             try:
-                self.after_cancel(self._resize_repaint_id)
+                self.after_cancel(self._resize_refresh_id)
             except Exception:
                 pass
-        self._resize_repaint_id = self.after(80, self._after_resize_settle)
+        self._resize_refresh_id = self.after(100, self._after_resize_settle)
 
     def _after_resize_settle(self) -> None:
-        self._resize_repaint_id = None
+        self._resize_refresh_id = None
         self._notify_view_resize()
-        self._native_resize_repaint()
         self.request_repaint()
 
     def _notify_view_resize(self) -> None:
@@ -274,15 +269,6 @@ class WireWallApp(tk.Tk):
         try:
             view = self.views[self.current_view_key]
             view.on_host_resize(self.content.winfo_width(), self.content.winfo_height())
-        except Exception:
-            pass
-
-    def _native_resize_repaint(self) -> None:
-        try:
-            if self.winfo_exists() and self.tk.call("tk", "windowingsystem") == "win32":
-                flags = 0x0001 | 0x0004 | 0x0080 | 0x0100
-                ctypes.windll.user32.RedrawWindow(self.winfo_id(), None, None, flags)
-                ctypes.windll.user32.UpdateWindow(self.winfo_id())
         except Exception:
             pass
 

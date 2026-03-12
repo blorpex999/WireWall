@@ -24,6 +24,9 @@ class BaseView(ttk.Frame):
     def on_host_resize(self, width: int, height: int) -> None:
         """Override in subclasses when the layout needs responsive adjustments."""
 
+    def reset_scroll_position(self) -> None:
+        """Override in scrollable views when switching back to the page should reset its viewport."""
+
     def schedule_refresh(self, delay_ms: int = 250) -> None:
         self.cancel_scheduled_refresh()
         self._scheduled_refresh_id = self.after(delay_ms, self._run_scheduled_refresh)

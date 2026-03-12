@@ -12,6 +12,8 @@
 - Ajout d'un scroll vertical de page pour les vues longues et adaptation responsive renforcee de `A propos` afin d'eviter les contenus coupes sur des fenetres plus petites.
 - Retrait du scroll global du shell applicatif au profit d'un scroll local cible, avec allègement du repaint Windows et compactage du dashboard pour retrouver une navigation plus fluide et moins d'artefacts visuels.
 
+- Rendu `Tableau de bord` et `Parametres` scrollables localement, avec suppression des redraws Win32 forces qui pouvaient laisser des traces visuelles et des fragments d'autres vues.
+
 ## 1.3.0 - 2026-03-12
 
 - Ajout d'une baseline locale par peripherique avec etats `NEW`, `RARE`, `KNOWN`, `DEVIATION`.

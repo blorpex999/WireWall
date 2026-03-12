@@ -4,7 +4,7 @@ from tkinter import ttk
 
 from app.ui.views.base import BaseView
 from app.ui.help_content import SCREEN_HELP
-from app.ui.widgets.common import InlineHelpPanel, KpiCard, LabeledValue, ScrollableTree, SectionHeader, StatusPill
+from app.ui.widgets.common import InlineHelpPanel, KpiCard, LabeledValue, ScrollablePage, ScrollableTree, SectionHeader, StatusPill
 from app.utils.datetime import format_for_ui
 from app.utils.ui import (
     decision_text,
@@ -23,20 +23,20 @@ class DashboardView(BaseView):
 
     def __init__(self, master, controller, app) -> None:
         super().__init__(master, controller, app)
-        for column in range(5):
-            self.columnconfigure(column, weight=1)
-        self.rowconfigure(4, weight=2)
-        self.rowconfigure(5, weight=1)
-        self.rowconfigure(6, weight=1)
-        self.rowconfigure(7, weight=0)
-        self.rowconfigure(8, weight=0)
+        self.columnconfigure(0, weight=1)
+        self.rowconfigure(0, weight=1)
         self._suggestion_rows: dict[str, object] = {}
         self._dashboard_mode = ""
         self._dashboard_width = 1450
         self._section_wrap_labels: list[ttk.Label] = []
+        self.page = ScrollablePage(self)
+        self.page.grid(row=0, column=0, sticky="nsew")
+        self.content = self.page.body
+        for column in range(5):
+            self.content.columnconfigure(column, weight=1)
 
         self.header = SectionHeader(
-            self,
+            self.content,
             "Tableau de bord",
             "Vue de synthese de l'activite USB, des incidents, des suggestions et de l'etat de la plateforme.",
             "MODE DEMO" if self.controller.demo_mode else "MODE REEL",
@@ -45,13 +45,13 @@ class DashboardView(BaseView):
         self.header.grid(row=0, column=0, columnspan=5, sticky="ew", pady=(0, 16))
 
         self.help_panel = InlineHelpPanel(
-            self,
+            self.content,
             button_text=str(SCREEN_HELP["dashboard"]["button"]),
             sections=list(SCREEN_HELP["dashboard"]["sections"]),
         )
         self.help_panel.grid(row=1, column=0, columnspan=5, sticky="ew", pady=(0, 12))
 
-        self.status_strip = ttk.Frame(self, style="Card.TFrame", padding=16)
+        self.status_strip = ttk.Frame(self.content, style="Card.TFrame", padding=16)
         self.status_strip.grid(row=2, column=0, columnspan=5, sticky="ew", pady=(0, 12))
         self.usb_tile = self._build_tile(self.status_strip, "Stockage USB")
         self.ollama_tile = self._build_tile(self.status_strip, "Ollama local")
@@ -59,7 +59,7 @@ class DashboardView(BaseView):
         self.admin_tile = self._build_tile(self.status_strip, "Session")
         self._status_tiles = [self.usb_tile, self.ollama_tile, self.health_tile, self.admin_tile]
 
-        self.kpi_frame = ttk.Frame(self)
+        self.kpi_frame = ttk.Frame(self.content)
         self.kpi_frame.grid(row=3, column=0, columnspan=5, sticky="nsew", pady=(0, 12))
         self.card_score = KpiCard(self.kpi_frame, "Risque global")
         self.card_devices = KpiCard(self.kpi_frame, "Peripheriques actifs")
@@ -74,7 +74,7 @@ class DashboardView(BaseView):
             self.card_suggestions,
         ]
 
-        self.upper_frame = ttk.Frame(self)
+        self.upper_frame = ttk.Frame(self.content)
         self.upper_frame.grid(row=4, column=0, columnspan=5, sticky="nsew", pady=(0, 12))
         self.upper_frame.columnconfigure(0, weight=1)
         self.upper_frame.columnconfigure(1, weight=1)
@@ -83,7 +83,7 @@ class DashboardView(BaseView):
         events_frame = ttk.LabelFrame(self.upper_frame, text="Activite recente", style="Section.TLabelframe", padding=12)
         alerts_frame = ttk.LabelFrame(self.upper_frame, text="Alertes prioritaires", style="Section.TLabelframe", padding=12)
 
-        self.middle_frame = ttk.Frame(self)
+        self.middle_frame = ttk.Frame(self.content)
         self.middle_frame.grid(row=5, column=0, columnspan=5, sticky="nsew")
         self.middle_frame.columnconfigure(0, weight=1)
         self.middle_frame.columnconfigure(1, weight=1)
@@ -92,7 +92,7 @@ class DashboardView(BaseView):
         health_frame = ttk.LabelFrame(self.middle_frame, text="Etat des composants", style="Section.TLabelframe", padding=12)
         brain_frame = ttk.LabelFrame(self.middle_frame, text="Moteur d'analyse continu", style="Section.TLabelframe", padding=12)
 
-        self.bottom_frame = ttk.Frame(self)
+        self.bottom_frame = ttk.Frame(self.content)
         self.bottom_frame.grid(row=6, column=0, columnspan=5, sticky="nsew", pady=(12, 0))
         self.bottom_frame.columnconfigure(0, weight=1)
         self.bottom_frame.columnconfigure(1, weight=1)
@@ -386,6 +386,7 @@ class DashboardView(BaseView):
             mode = "wide"
         self._apply_layout(mode)
         self._update_wrap_lengths()
+        self.after_idle(self.page._on_body_configure, None)
 
     def _build_tile(self, master, title: str) -> dict[str, object]:
         frame = ttk.Frame(master, style="CardInner.TFrame", padding=(8, 4))
@@ -557,6 +558,9 @@ class DashboardView(BaseView):
         self.health_table.tree.configure(height=side_height)
         self.suggestion_table.tree.configure(height=side_height)
         self.precheck_table.tree.configure(height=side_height)
+
+    def reset_scroll_position(self) -> None:
+        self.page.scroll_to_top()
 
     def _selected_suggestion(self):
         selection = self.suggestion_table.tree.selection()

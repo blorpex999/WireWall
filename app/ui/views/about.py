@@ -170,6 +170,7 @@ class AboutView(BaseView):
             self._about_mode = mode
             self._apply_layout(mode)
         self._update_wraps(width)
+        self.after_idle(self.page._on_body_configure, None)
 
     def _apply_layout(self, mode: str) -> None:
         for frame in (
@@ -222,3 +223,6 @@ class AboutView(BaseView):
             label.configure(wraplength=flow_width)
         for label in self.limit_labels:
             label.configure(wraplength=secondary)
+
+    def reset_scroll_position(self) -> None:
+        self.page.scroll_to_top()

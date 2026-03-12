@@ -152,6 +152,9 @@ class ScrollablePage(ttk.Frame):
         direction = -1 if event.delta > 0 else 1
         self.canvas.yview_scroll(direction, "units")
 
+    def scroll_to_top(self) -> None:
+        self.canvas.yview_moveto(0.0)
+
 
 class InlineHelpPanel(ttk.Frame):
     def __init__(self, master, button_text: str, sections: list[tuple[str, str]]) -> None:

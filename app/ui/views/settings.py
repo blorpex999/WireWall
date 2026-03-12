@@ -4,7 +4,7 @@ import tkinter as tk
 from tkinter import ttk
 
 from app.ui.views.base import BaseView
-from app.ui.widgets.common import SectionHeader
+from app.ui.widgets.common import ScrollablePage, SectionHeader
 
 
 class SettingsView(BaseView):
@@ -13,10 +13,15 @@ class SettingsView(BaseView):
     def __init__(self, master, controller, app) -> None:
         super().__init__(master, controller, app)
         self.columnconfigure(0, weight=1)
-        self.columnconfigure(1, weight=1)
+        self.rowconfigure(0, weight=1)
+        self.page = ScrollablePage(self)
+        self.page.grid(row=0, column=0, sticky="nsew")
+        self.content = self.page.body
+        self.content.columnconfigure(0, weight=1)
+        self.content.columnconfigure(1, weight=1)
 
         self.header = SectionHeader(
-            self,
+            self.content,
             "Parametres",
             "Reglage du monitoring, de la retention, du profil de securite, des suggestions et de l'integration Ollama.",
         )
@@ -38,7 +43,7 @@ class SettingsView(BaseView):
             "desktop_notifications_enabled": tk.BooleanVar(value=True),
         }
 
-        monitoring = ttk.LabelFrame(self, text="Monitoring", style="Section.TLabelframe", padding=16)
+        monitoring = ttk.LabelFrame(self.content, text="Monitoring", style="Section.TLabelframe", padding=16)
         monitoring.grid(row=1, column=0, sticky="nsew", padx=(0, 8), pady=(0, 12))
         monitoring.columnconfigure(1, weight=1)
         self._add_entry_field(monitoring, 0, "Frequence de scan (s)", "scan_interval_seconds")
@@ -49,7 +54,7 @@ class SettingsView(BaseView):
             variable=self.bool_vars["autostart_enabled"],
         ).grid(row=2, column=0, columnspan=2, sticky="w", pady=(14, 0))
 
-        audit = ttk.LabelFrame(self, text="Audit, alertes et suggestions", style="Section.TLabelframe", padding=16)
+        audit = ttk.LabelFrame(self.content, text="Audit, alertes et suggestions", style="Section.TLabelframe", padding=16)
         audit.grid(row=1, column=1, sticky="nsew", padx=(8, 0), pady=(0, 12))
         audit.columnconfigure(1, weight=1)
         self._add_entry_field(audit, 0, "Retention historique (jours)", "history_retention_days")
@@ -61,14 +66,14 @@ class SettingsView(BaseView):
             variable=self.bool_vars["desktop_notifications_enabled"],
         ).grid(row=3, column=0, columnspan=2, sticky="w", pady=(14, 0))
 
-        ollama = ttk.LabelFrame(self, text="IA locale Ollama", style="Section.TLabelframe", padding=16)
+        ollama = ttk.LabelFrame(self.content, text="IA locale Ollama", style="Section.TLabelframe", padding=16)
         ollama.grid(row=2, column=0, sticky="nsew", padx=(0, 8), pady=(0, 12))
         ollama.columnconfigure(1, weight=1)
         self._add_entry_field(ollama, 0, "URL locale", "ollama_base_url")
         self._add_entry_field(ollama, 1, "Modele", "ollama_model")
         self._add_entry_field(ollama, 2, "Timeout (s)", "ollama_timeout_seconds")
 
-        paths = ttk.LabelFrame(self, text="Chemins", style="Section.TLabelframe", padding=16)
+        paths = ttk.LabelFrame(self.content, text="Chemins", style="Section.TLabelframe", padding=16)
         paths.grid(row=2, column=1, sticky="nsew", padx=(8, 0), pady=(0, 12))
         paths.columnconfigure(1, weight=1)
         self._add_entry_field(paths, 0, "Dossier des exports", "export_directory")
@@ -81,7 +86,7 @@ class SettingsView(BaseView):
             pady=(12, 0),
         )
 
-        footer = ttk.Frame(self, style="Card.TFrame", padding=16)
+        footer = ttk.Frame(self.content, style="Card.TFrame", padding=16)
         footer.grid(row=3, column=0, columnspan=2, sticky="ew")
         footer.columnconfigure(0, weight=1)
         ttk.Label(
@@ -96,6 +101,12 @@ class SettingsView(BaseView):
             column=1,
             sticky="e",
         )
+
+    def on_host_resize(self, width: int, height: int) -> None:
+        self.after_idle(self.page._on_body_configure, None)
+
+    def reset_scroll_position(self) -> None:
+        self.page.scroll_to_top()
 
     def refresh_data(self) -> None:
         settings = self.controller.settings
