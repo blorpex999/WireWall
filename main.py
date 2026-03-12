@@ -5,6 +5,7 @@ import ctypes
 import logging
 import sys
 
+from app.utils.admin import is_admin, relaunch_as_admin
 from app.utils.single_instance import acquire_single_instance
 from app.utils.windows import hide_console_window
 from app.version import __version__
@@ -27,6 +28,11 @@ def parse_args() -> argparse.Namespace:
         "--version",
         action="version",
         version=f"WireWall {__version__}",
+    )
+    parser.add_argument(
+        "--allow-standard",
+        action="store_true",
+        help=argparse.SUPPRESS,
     )
     return parser.parse_args()
 
@@ -75,6 +81,17 @@ def main() -> int:
     container = None
 
     try:
+        if sys.platform == "win32" and not args.allow_standard and not is_admin():
+            elevated = relaunch_as_admin()
+            if elevated:
+                return 0
+            notify_startup_error(
+                "WireWall doit etre lance avec des privileges administrateur pour exposer toutes les fonctionnalites.\n"
+                "Le lancement eleve a ete refuse ou a echoue.\n"
+                "Relancez WireWall et acceptez l'elevation UAC.",
+            )
+            return 1
+
         try:
             instance_guard = acquire_single_instance("WireWall")
         except Exception as exc:

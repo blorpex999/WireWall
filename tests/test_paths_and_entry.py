@@ -29,7 +29,7 @@ def test_build_app_paths_falls_back_to_portable_dir(monkeypatch, workspace_tmp_d
 
 def test_main_returns_error_and_notifies_when_tk_runtime_is_invalid(monkeypatch) -> None:
     notified: dict[str, str] = {}
-    monkeypatch.setattr(main_module, "parse_args", lambda: SimpleNamespace(demo=False, config=None))
+    monkeypatch.setattr(main_module, "parse_args", lambda: SimpleNamespace(demo=False, config=None, allow_standard=True))
     monkeypatch.setattr(
         main_module,
         "acquire_single_instance",
@@ -63,7 +63,7 @@ def test_main_returns_cleanly_when_another_instance_is_running(monkeypatch) -> N
 
     guard = Guard()
 
-    monkeypatch.setattr(main_module, "parse_args", lambda: SimpleNamespace(demo=False, config=None))
+    monkeypatch.setattr(main_module, "parse_args", lambda: SimpleNamespace(demo=False, config=None, allow_standard=True))
     monkeypatch.setattr(main_module, "acquire_single_instance", lambda app_name="WireWall": guard)
     monkeypatch.setattr(main_module, "notify_user_message", lambda message, title="WireWall", flags=0x10: notifications.append(message))
 
@@ -73,6 +73,34 @@ def test_main_returns_cleanly_when_another_instance_is_running(monkeypatch) -> N
     assert guard.released is True
     assert notifications
     assert "deja lance" in notifications[0]
+
+
+def test_main_relaunches_as_admin_by_default(monkeypatch) -> None:
+    monkeypatch.setattr(main_module, "parse_args", lambda: SimpleNamespace(demo=False, config=None, allow_standard=False))
+    monkeypatch.setattr(main_module.sys, "platform", "win32", raising=False)
+    monkeypatch.setattr(main_module, "is_admin", lambda: False)
+    calls: list[str] = []
+    monkeypatch.setattr(main_module, "relaunch_as_admin", lambda: calls.append("runas") or True)
+
+    exit_code = main_module.main()
+
+    assert exit_code == 0
+    assert calls == ["runas"]
+
+
+def test_main_notifies_when_admin_relaunch_is_refused(monkeypatch) -> None:
+    notifications: list[str] = []
+    monkeypatch.setattr(main_module, "parse_args", lambda: SimpleNamespace(demo=False, config=None, allow_standard=False))
+    monkeypatch.setattr(main_module.sys, "platform", "win32", raising=False)
+    monkeypatch.setattr(main_module, "is_admin", lambda: False)
+    monkeypatch.setattr(main_module, "relaunch_as_admin", lambda: False)
+    monkeypatch.setattr(main_module, "notify_startup_error", lambda message, title="WireWall": notifications.append(message))
+
+    exit_code = main_module.main()
+
+    assert exit_code == 1
+    assert notifications
+    assert "administrateur" in notifications[0]
 
 
 def test_force_demo_does_not_persist_demo_mode_in_config(monkeypatch, workspace_tmp_dir) -> None:

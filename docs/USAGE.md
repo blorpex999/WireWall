@@ -7,6 +7,7 @@
 - Mode admin : `scripts\run_admin.bat`
 - Version installee : `WireWall` via le raccourci menu demarrer
 - Version portable : `WireWall.exe`
+- Par defaut, WireWall demande l'elevation UAC au lancement pour exposer toutes les fonctionnalites
 - Si WireWall est deja ouvert, un second lancement est refuse et la fenetre existante est reactivee si possible
 - En mode source, WireWall masque la console Windows par defaut pour un rendu plus propre
 - Pour garder la console de debug : `set WIREWALL_KEEP_CONSOLE=1`
@@ -34,14 +35,14 @@
 6. Ajouter si besoin une regle whitelist ou blacklist.
 7. Generer un export `CSV`, `JSON` ou `HTML`.
 8. Lancer l'analyse IA si Ollama est disponible.
-9. Tester `USBSTOR` uniquement en session admin.
+9. Verifier la demande UAC, puis tester `USBSTOR`.
 
 ## Feedbacks importants
 
 - En mode demo, l'application l'indique visuellement et la base utilisee est separee.
 - Le bouton `Comprendre` n'ajoute aucune logique metier: il sert a t'aider a expliquer l'ecran et ses limites.
 - Si Ollama est indisponible, l'ecran IA affiche un diagnostic au lieu d'un faux resultat.
-- Si la session n'est pas admin, les actions `USBSTOR` restent explicites sur cette limite.
+- Si l'elevation UAC est refusee, WireWall s'arrete au lieu de lancer une session degradee silencieuse.
 - Les suggestions WireWall ne sont jamais appliquees sans validation utilisateur.
 - Le demarrage automatique avec Windows reste desactive par defaut et s'active depuis `Parametres`.
 - La version installee ajoute aussi des outils `Assistant IA locale` et `Diagnostic prerequis` dans le menu demarrer.

@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.3.2 - 2026-03-12
+
+- WireWall demande des privileges administrateur par defaut au lancement pour exposer directement toutes les fonctionnalites, y compris le controle USBSTOR.
+- Ajout d'une relance automatique en elevation UAC pour le mode source Windows, avec message clair si l'elevation est refusee.
+- Le binaire PyInstaller est maintenant marque pour s'executer en mode administrateur.
+- Mise a jour de la documentation de lancement, d'installation et de demonstration pour refleter ce comportement.
+
 ## 1.3.1 - 2026-03-12
 
 - Ajout d'une aide integree discrete sur les ecrans cles pour expliquer ce qui est observe, deduit et presentable en soutenance.

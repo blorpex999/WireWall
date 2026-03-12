@@ -6,7 +6,7 @@
 - Runtime `Python 3.11 + Tcl/Tk` valide ou build PyInstaller produit sur un tel poste
 - `scripts\check_runtime.py --require-python 3.11 --require-tk` valide si vous demarrez depuis les sources
 - Au moins un peripherique USB reel si vous voulez montrer la detection live
-- Session admin uniquement si vous devez montrer `USBSTOR`
+- Session admin requise par defaut au lancement ; verifier simplement que l'UAC a ete acceptee avant la demo
 - Ollama local disponible uniquement si vous voulez montrer l'analyse IA
 - Pour un autre poste, privilegier l'installateur ou le package portable plutot qu'un lancement source
 
@@ -37,7 +37,7 @@
 3. Ajouter une regle whitelist ou blacklist dans `Regles USB`.
 4. Revenir sur `Peripheriques` ou `Historique` pour montrer l'impact sur le scoring, la memorisation et la baseline.
 5. Generer un export `CSV`, `JSON` ou `HTML` et mentionner le hash d'audit.
-6. Si la session est admin, montrer `Controle USB` avec lecture puis blocage/deblocage `USBSTOR`.
+6. Montrer `Controle USB` avec lecture puis blocage/deblocage `USBSTOR`.
 7. Si Ollama est disponible, lancer `Analyse IA` et commenter les anomalies et recommandations.
 
 ## Points a mettre en avant

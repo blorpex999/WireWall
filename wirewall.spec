@@ -46,6 +46,7 @@ exe = EXE(
     strip=False,
     upx=False,
     console=False,
+    uac_admin=True,
     version=str(version_file) if version_file.exists() else None,
     icon=str(icon_file) if icon_file.exists() else None,
 )

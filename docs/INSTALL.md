@@ -13,10 +13,10 @@
 
 - Windows 10 ou 11 x64
 - droits d'ecriture utilisateur sur `%LOCALAPPDATA%`
+- acceptation de l'elevation UAC au lancement de WireWall
 
 ### Optionnels selon les fonctions
 
-- droits administrateur pour les actions `USBSTOR`
 - Ollama local pour l'analyse IA
 - acces Internet initial si vous voulez installer Ollama ou telecharger un modele via `winget` / `ollama pull`
 - un installeur Ollama officiel offline si le poste cible n'a ni `winget` ni acces Internet
@@ -41,6 +41,7 @@ L'installateur :
 - cree les raccourcis menu demarrer
 - installe les outils d'assistance IA et de diagnostic prerequis dans le dossier `tools\` de l'application
 - laisse l'application creer `%LOCALAPPDATA%\WireWall` au premier lancement
+- lancera ensuite WireWall avec demande d'elevation UAC par defaut
 
 Il n'embarque pas :
 
@@ -79,6 +80,8 @@ Puis lancer :
 WireWall.exe
 ```
 
+Le package portable demandera aussi l'elevation UAC par defaut au lancement.
+
 Le package portable contient aussi :
 
 - `README.md`
@@ -100,6 +103,8 @@ python scripts\check_runtime.py --require-python 3.11 --require-tk
 copy config.example.json %LOCALAPPDATA%\WireWall\config\config.json
 python main.py
 ```
+
+En mode source, WireWall tente automatiquement une relance admin. Si tu refuses l'UAC, l'application s'arrete proprement.
 
 ## Configuration IA locale
 

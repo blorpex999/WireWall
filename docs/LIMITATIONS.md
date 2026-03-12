@@ -18,7 +18,7 @@
 - `USBSTOR` ne bloque que le stockage USB.
 - L'effet peut ne pas etre immediat sur un support deja monte.
 - Selon le contexte Windows, une reinsertion du peripherique ou une nouvelle session peut etre necessaire.
-- Les actions de blocage et de deblocage exigent une session admin.
+- WireWall demande maintenant une session admin au lancement ; si l'UAC est refusee, l'application ne demarre pas.
 
 ## Ollama
 

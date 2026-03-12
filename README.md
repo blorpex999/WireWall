@@ -1,4 +1,4 @@
-# WireWall 1.3.1
+# WireWall 1.3.2
 
 WireWall est une application desktop Windows de supervision USB orientee cybersecurite. Le projet combine detection USB reelle via `PyUSB` avec backend `libusb1`, journalisation `SQLite`, scoring de risque, policies whitelist/blacklist, controle reel `USBSTOR`, analyse IA locale via Ollama, moteur de baseline local, workflow incident et exports d'audit `HTML`, `CSV`, `JSON`.
 
@@ -18,10 +18,18 @@ WireWall est une application desktop Windows de supervision USB orientee cyberse
 - Le modele reste telecharge en seconde phase par l'assistant IA local.
 - Les dossiers runtime `%LOCALAPPDATA%\WireWall` sont crees par l'application au premier lancement.
 - Une seule instance WireWall peut tourner a la fois sur un poste ; un second lancement tente de reactiver la fenetre existante.
+- WireWall demande maintenant des privileges administrateur par defaut au lancement pour exposer directement toutes les fonctionnalites, y compris `USBSTOR`.
 - Le lancement GUI est silencieux par defaut en mode source ; utilisez `WIREWALL_KEEP_CONSOLE=1` si vous voulez garder la console de debug.
 - `USBSTOR` bloque le stockage USB, pas tous les peripheriques USB.
 - Le monitoring USB reste un monitoring utilisateur par snapshots `PyUSB/libusb1`, pas un driver noyau.
 - Le "cerveau" WireWall reste un moteur local d'aide a la decision et de memoire, pas un agent autonome qui modifie son propre code.
+
+## Ce que 1.3.2 ajoute
+
+- elevation administrateur par defaut au lancement
+- relance UAC automatique en mode source Windows si WireWall n'est pas deja admin
+- executable packagé marque pour s'executer directement en admin
+- documentation alignee avec ce choix produit
 
 ## Ce que 1.3.1 ajoute
 
@@ -48,6 +56,7 @@ WireWall est une application desktop Windows de supervision USB orientee cyberse
 - Tcl/Tk fonctionnel pour Tkinter
 - Inno Setup 6 sur le poste builder si vous voulez produire l'installateur
 - Ollama local seulement si l'analyse IA doit etre utilisee
+- acceptation de l'elevation UAC au lancement de l'application
 
 ## Demarrage rapide depuis les sources
 
@@ -60,6 +69,8 @@ python scripts\check_runtime.py --require-python 3.11 --require-tk
 copy config.example.json %LOCALAPPDATA%\WireWall\config\config.json
 python main.py
 ```
+
+WireWall demandera automatiquement l'elevation UAC si vous n'etes pas deja en admin.
 
 ## Build et distribution
 
@@ -144,6 +155,7 @@ Si `winget` est indisponible ou si le poste est offline, l'assistant bascule en 
 - `scripts\run_dev.bat` : lancement source en mode reel
 - `scripts\run_demo.bat` : lancement source en mode demo
 - `scripts\run_admin.bat` : lancement source eleve pour les tests `USBSTOR`
+- en 1.3.2, `scripts\run_dev.bat` et l'executable packagé demandent eux aussi l'elevation par defaut
 - `scripts\test.bat` : suite `pytest`
 - `scripts\build.bat` : build `PyInstaller`
 - `scripts\package_portable.bat` : zip portable versionne

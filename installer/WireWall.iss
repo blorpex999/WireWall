@@ -91,10 +91,11 @@ begin
   MsgBox(
     'WireWall installe l''application locale et ses outils d''assistance.' + #13#10#13#10 +
     'Important :' + #13#10 +
+    '- WireWall se lance desormais en mode administrateur par defaut pour exposer toutes les fonctionnalites' + #13#10 +
     '- l''IA locale depend d''Ollama ; seul son installeur officiel peut etre embarque dans la variante full' + #13#10 +
     '- le modele recommande ({#RecommendedModel}) sera telecharge separement si vous lancez l''assistant' + #13#10 +
     '- les dossiers runtime utilisateur seront crees au premier lancement' + #13#10 +
-    '- les fonctions USBSTOR reelles restent conditionnees aux droits administrateur',
+    '- acceptez l''elevation UAC au lancement de l''application pour acceder au mode complet',
     mbInformation,
     MB_OK
   );
