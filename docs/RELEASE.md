@@ -46,6 +46,12 @@ Variante demo :
 scripts\release_full.bat
 ```
 
+Si `dist\WireWall\` est deja a jour mais que tu veux seulement regenerer le portable et les installateurs sans relancer PyInstaller, utilise :
+
+```bat
+scripts\release_from_dist.bat
+```
+
 ## Artefacts attendus
 
 - `dist\WireWall\`

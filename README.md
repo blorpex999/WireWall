@@ -152,6 +152,7 @@ Si `winget` est indisponible ou si le poste est offline, l'assistant bascule en 
 - `scripts\release_check.bat` : validation tests + coherence release + build bundle
 - `scripts\release.bat` : pipeline de release standard
 - `scripts\release_full.bat` : pipeline de release demo avec installeur Ollama embarque
+- `scripts\release_from_dist.bat` : regenere portable et installateurs a partir d'un `dist\WireWall\` deja construit
 - `scripts\validate_artifacts.bat` : verification des artefacts de release
 - `scripts\check_release_consistency.py` : verification docs/package/version/scripts
 - `scripts\fetch_ollama_installer.ps1` : telechargement ou reutilisation du cache local de l'installeur officiel Ollama pour le builder
