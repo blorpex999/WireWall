@@ -5,7 +5,7 @@ import tkinter as tk
 from tkinter import ttk
 
 from app.ui.controller import AppController
-from app.ui.theme import apply_dark_theme
+from app.ui.theme import COLORS, apply_dark_theme
 from app.ui.views.about import AboutView
 from app.ui.views.ai_analysis import AIAnalysisView
 from app.ui.views.alerts import AlertsView
@@ -68,6 +68,25 @@ class WireWallApp(tk.Tk):
         self.content.rowconfigure(0, weight=1)
         self.content.columnconfigure(0, weight=1)
 
+        self.view_canvas = tk.Canvas(
+            self.content,
+            bg=COLORS["bg"],
+            highlightthickness=0,
+            bd=0,
+            relief="flat",
+        )
+        self.view_canvas.grid(row=0, column=0, sticky="nsew")
+        self.view_scrollbar = ttk.Scrollbar(self.content, orient="vertical", command=self.view_canvas.yview)
+        self.view_scrollbar.grid(row=0, column=1, sticky="ns")
+        self.view_canvas.configure(yscrollcommand=self.view_scrollbar.set)
+        self.viewport = ttk.Frame(self.view_canvas)
+        self.viewport.columnconfigure(0, weight=1)
+        self.viewport.rowconfigure(0, weight=1)
+        self._viewport_window = self.view_canvas.create_window((0, 0), window=self.viewport, anchor="nw")
+        self.view_canvas.bind("<Configure>", self._on_view_canvas_configure)
+        self.viewport.bind("<Configure>", self._on_viewport_configure)
+        self.bind_all("<MouseWheel>", self._on_global_mousewheel, add="+")
+
         self.status_bar = StatusBar(self)
         self.status_bar.grid(row=2, column=0, columnspan=2, sticky="ew", padx=14, pady=(0, 14))
         self.status_bar.set_mode(self.controller.demo_mode)
@@ -83,7 +102,7 @@ class WireWallApp(tk.Tk):
             ("settings", "Parametres", SettingsView),
             ("about", "A propos", AboutView),
         ]
-        self.views = {key: view_class(self.content, self.controller, self) for key, _label, view_class in self.view_specs}
+        self.views = {key: view_class(self.viewport, self.controller, self) for key, _label, view_class in self.view_specs}
         self.current_view_key: str | None = None
 
         for index, (key, label, _view_class) in enumerate(self.view_specs, start=1):
@@ -137,6 +156,8 @@ class WireWallApp(tk.Tk):
         self._refresh_nav_state()
         self.title(f"WireWall {__version__} - {self._view_label(name)}")
         self.set_status(f"Vue active : {self._view_label(name)}", "INFO")
+        self.view_canvas.yview_moveto(0.0)
+        self.after_idle(self._sync_viewport_geometry)
         self._notify_view_resize()
         self.request_repaint()
 
@@ -230,6 +251,10 @@ class WireWallApp(tk.Tk):
     def _on_close(self) -> None:
         self.hook.detach()
         self.controller.stop_services()
+        try:
+            self.unbind_all("<MouseWheel>")
+        except Exception:
+            pass
         for toast in list(self._toast_windows):
             self._dismiss_toast(toast)
         self.destroy()
@@ -249,7 +274,7 @@ class WireWallApp(tk.Tk):
             self.update_idletasks()
             if self.winfo_exists() and self.tk.call("tk", "windowingsystem") == "win32":
                 flags = 0x0001 | 0x0004 | 0x0080 | 0x0100
-                for widget in (self, self.content, self.views.get(self.current_view_key) if self.current_view_key else None):
+                for widget in (self, self.content, self.view_canvas, self.views.get(self.current_view_key) if self.current_view_key else None):
                     if widget is not None and widget.winfo_exists():
                         ctypes.windll.user32.RedrawWindow(widget.winfo_id(), None, None, flags)
                         ctypes.windll.user32.UpdateWindow(widget.winfo_id())
@@ -278,9 +303,44 @@ class WireWallApp(tk.Tk):
             return
         try:
             view = self.views[self.current_view_key]
-            view.on_host_resize(self.content.winfo_width(), self.content.winfo_height())
+            view.on_host_resize(self.view_canvas.winfo_width(), self.view_canvas.winfo_height())
         except Exception:
             pass
+
+    def _on_viewport_configure(self, _event: tk.Event) -> None:
+        self._sync_viewport_geometry()
+
+    def _on_view_canvas_configure(self, event: tk.Event) -> None:
+        try:
+            self.view_canvas.itemconfigure(self._viewport_window, width=event.width)
+        except Exception:
+            return
+        self._sync_viewport_geometry()
+        self._notify_view_resize()
+
+    def _sync_viewport_geometry(self) -> None:
+        try:
+            visible_height = max(1, self.view_canvas.winfo_height())
+            requested_height = max(visible_height, self.viewport.winfo_reqheight())
+            self.view_canvas.itemconfigure(self._viewport_window, height=requested_height)
+            self.view_canvas.configure(scrollregion=self.view_canvas.bbox("all"))
+        except Exception:
+            pass
+
+    def _on_global_mousewheel(self, event: tk.Event) -> None:
+        if self.current_view_key is None:
+            return
+        widget = event.widget
+        if widget is not None and widget is not self.view_canvas and widget.winfo_class() in {"Text", "Treeview", "Listbox", "Canvas"}:
+            return
+        try:
+            first, last = self.view_canvas.yview()
+        except Exception:
+            return
+        if first == 0.0 and last == 1.0:
+            return
+        direction = -1 if event.delta > 0 else 1
+        self.view_canvas.yview_scroll(direction, "units")
 
     def _show_notification_toast(self, title: str, message: str, level: str) -> None:
         try:

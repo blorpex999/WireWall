@@ -16,6 +16,8 @@ class AboutView(BaseView):
         self.columnconfigure(0, weight=1)
         self.columnconfigure(1, weight=1)
         self.rowconfigure(5, weight=1)
+        self._about_mode = ""
+        self._wrap_labels: list[ttk.Label] = []
 
         self.header = SectionHeader(
             self,
@@ -31,31 +33,29 @@ class AboutView(BaseView):
         )
         self.help_panel.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(0, 12))
 
-        identity = ttk.Frame(self, style="Card.TFrame", padding=18)
-        identity.grid(row=2, column=0, sticky="nsew", padx=(0, 8), pady=(0, 12))
-        identity.columnconfigure(0, weight=1)
-        ttk.Label(identity, text="Identite du projet", style="CardTitle.TLabel").grid(row=0, column=0, sticky="w")
-        badge_box = ttk.Frame(identity, style="CardInner.TFrame")
+        self.identity_frame = ttk.Frame(self, style="Card.TFrame", padding=18)
+        self.identity_frame.columnconfigure(0, weight=1)
+        ttk.Label(self.identity_frame, text="Identite du projet", style="CardTitle.TLabel").grid(row=0, column=0, sticky="w")
+        badge_box = ttk.Frame(self.identity_frame, style="CardInner.TFrame")
         badge_box.grid(row=0, column=1, sticky="e")
         self.mode_badge = StatusPill(badge_box, "", "INFO")
         self.mode_badge.pack(side="left")
         self.identity_values = {
-            "name": LabeledValue(identity, "Nom"),
-            "version": LabeledValue(identity, "Version"),
-            "team": LabeledValue(identity, "Auteur / equipe"),
-            "org": LabeledValue(identity, "Organisation"),
+            "name": LabeledValue(self.identity_frame, "Nom"),
+            "version": LabeledValue(self.identity_frame, "Version"),
+            "team": LabeledValue(self.identity_frame, "Auteur / equipe"),
+            "org": LabeledValue(self.identity_frame, "Organisation"),
         }
         self.identity_values["name"].grid(row=1, column=0, sticky="ew", pady=(14, 0))
         self.identity_values["version"].grid(row=2, column=0, sticky="ew", pady=(10, 0))
         self.identity_values["team"].grid(row=3, column=0, sticky="ew", pady=(10, 0))
         self.identity_values["org"].grid(row=4, column=0, sticky="ew", pady=(10, 0))
 
-        mission = ttk.Frame(self, style="Card.TFrame", padding=18)
-        mission.grid(row=2, column=1, sticky="nsew", padx=(8, 0), pady=(0, 12))
-        mission.columnconfigure(0, weight=1)
-        ttk.Label(mission, text="Mission", style="CardTitle.TLabel").grid(row=0, column=0, sticky="w")
-        ttk.Label(
-            mission,
+        self.mission_frame = ttk.Frame(self, style="Card.TFrame", padding=18)
+        self.mission_frame.columnconfigure(0, weight=1)
+        ttk.Label(self.mission_frame, text="Mission", style="CardTitle.TLabel").grid(row=0, column=0, sticky="w")
+        self.mission_label = ttk.Label(
+            self.mission_frame,
             text=(
                 "WireWall surveille les peripheriques USB Windows, journalise les evenements, applique des policies, "
                 "evalue le risque et expose un controle reel USBSTOR avec analyse IA locale."
@@ -63,20 +63,22 @@ class AboutView(BaseView):
             style="Muted.TLabel",
             wraplength=420,
             justify="left",
-        ).grid(row=1, column=0, sticky="w", pady=(10, 0))
-        ttk.Label(mission, text="Flux produit", style="CardTitle.TLabel").grid(row=2, column=0, sticky="w", pady=(18, 0))
-        ttk.Label(
-            mission,
+        )
+        self.mission_label.grid(row=1, column=0, sticky="w", pady=(10, 0))
+        ttk.Label(self.mission_frame, text="Flux produit", style="CardTitle.TLabel").grid(row=2, column=0, sticky="w", pady=(18, 0))
+        self.flow_label = ttk.Label(
+            self.mission_frame,
             text="Je branche un USB -> WireWall observe -> score -> alerte -> incident -> recommandation.",
             style="Muted.TLabel",
             wraplength=420,
             justify="left",
-        ).grid(row=3, column=0, sticky="w", pady=(10, 0))
+        )
+        self.flow_label.grid(row=3, column=0, sticky="w", pady=(10, 0))
+        self._wrap_labels.extend([self.mission_label, self.flow_label])
 
-        stack = ttk.LabelFrame(self, text="Stack technique", style="Section.TLabelframe", padding=16)
-        stack.grid(row=3, column=0, sticky="nsew", padx=(0, 8), pady=(0, 12))
-        ttk.Label(
-            stack,
+        self.stack_frame = ttk.LabelFrame(self, text="Stack technique", style="Section.TLabelframe", padding=16)
+        self.stack_text = ttk.Label(
+            self.stack_frame,
             text=(
                 "- Python 3.11+\n"
                 "- Tkinter / ttk\n"
@@ -87,12 +89,12 @@ class AboutView(BaseView):
                 "- PyInstaller one-folder"
             ),
             justify="left",
-        ).pack(anchor="w")
+        )
+        self.stack_text.pack(anchor="w")
 
-        context = ttk.LabelFrame(self, text="Contexte Ydays", style="Section.TLabelframe", padding=16)
-        context.grid(row=3, column=1, sticky="nsew", padx=(8, 0), pady=(0, 12))
-        ttk.Label(
-            context,
+        self.context_frame = ttk.LabelFrame(self, text="Contexte Ydays", style="Section.TLabelframe", padding=16)
+        self.context_label = ttk.Label(
+            self.context_frame,
             text=(
                 "Demonstrateur de securite poste de travail concu pour une soutenance credible.\n\n"
                 "Points forts a montrer : tableau de bord, inventaire USB, alertes, controle USBSTOR et analyse IA locale.\n\n"
@@ -100,39 +102,47 @@ class AboutView(BaseView):
             ),
             justify="left",
             wraplength=420,
-        ).pack(anchor="w")
+        )
+        self.context_label.pack(anchor="w")
+        self._wrap_labels.append(self.context_label)
 
-        flow = ttk.LabelFrame(self, text="Fonctionnement pas a pas", style="Section.TLabelframe", padding=16)
-        flow.grid(row=4, column=0, sticky="nsew", padx=(0, 8))
+        self.flow_frame = ttk.LabelFrame(self, text="Fonctionnement pas a pas", style="Section.TLabelframe", padding=16)
+        self.flow_step_labels: list[ttk.Label] = []
         for index, (title, detail) in enumerate(FLOW_STEPS):
-            ttk.Label(flow, text=title, style="ValueTitle.TLabel").grid(row=index * 2, column=0, sticky="w")
-            ttk.Label(flow, text=detail, style="Muted.TLabel", wraplength=520, justify="left").grid(
+            ttk.Label(self.flow_frame, text=title, style="ValueTitle.TLabel").grid(row=index * 2, column=0, sticky="w")
+            detail_label = ttk.Label(self.flow_frame, text=detail, style="Muted.TLabel", wraplength=520, justify="left")
+            detail_label.grid(
                 row=index * 2 + 1,
                 column=0,
                 sticky="w",
                 pady=(2, 10 if index < len(FLOW_STEPS) - 1 else 0),
             )
+            self.flow_step_labels.append(detail_label)
+        self._wrap_labels.extend(self.flow_step_labels)
 
-        limits = ttk.LabelFrame(self, text="Limites honnetes", style="Section.TLabelframe", padding=16)
-        limits.grid(row=4, column=1, sticky="nsew", padx=(8, 0))
+        self.limits_frame = ttk.LabelFrame(self, text="Limites honnetes", style="Section.TLabelframe", padding=16)
+        self.limit_labels: list[ttk.Label] = []
         for index, item in enumerate(HONEST_LIMITS):
-            ttk.Label(limits, text=f"- {item}", style="Muted.TLabel", wraplength=420, justify="left").grid(
+            label = ttk.Label(self.limits_frame, text=f"- {item}", style="Muted.TLabel", wraplength=420, justify="left")
+            label.grid(
                 row=index,
                 column=0,
                 sticky="w",
                 pady=(0, 8 if index < len(HONEST_LIMITS) - 1 else 0),
             )
+            self.limit_labels.append(label)
+        self._wrap_labels.extend(self.limit_labels)
 
-        glossary = ttk.LabelFrame(self, text="Lexique rapide", style="Section.TLabelframe", padding=12)
-        glossary.grid(row=5, column=0, columnspan=2, sticky="nsew", pady=(12, 0))
-        glossary.rowconfigure(0, weight=1)
-        glossary.columnconfigure(0, weight=1)
-        self.glossary = ScrollableTree(glossary, ("term", "definition"), height=8)
+        self.glossary_frame = ttk.LabelFrame(self, text="Lexique rapide", style="Section.TLabelframe", padding=12)
+        self.glossary_frame.rowconfigure(0, weight=1)
+        self.glossary_frame.columnconfigure(0, weight=1)
+        self.glossary = ScrollableTree(self.glossary_frame, ("term", "definition"), height=8)
         self.glossary.grid(row=0, column=0, sticky="nsew")
         self.glossary.tree.heading("term", text="Terme")
         self.glossary.tree.heading("definition", text="Definition")
         self.glossary.tree.column("term", width=180, anchor="w")
         self.glossary.tree.column("definition", width=1050, anchor="w")
+        self.on_host_resize(1450, 900)
 
     def refresh_data(self) -> None:
         settings = self.controller.settings
@@ -148,3 +158,62 @@ class AboutView(BaseView):
         for term, definition in GLOSSARY:
             self.glossary.tree.insert("", "end", values=(term, definition))
         self.glossary.set_empty(bool(GLOSSARY), "Aucun terme a afficher.")
+
+    def on_host_resize(self, width: int, height: int) -> None:
+        mode = "stacked" if width < 1260 else "wide"
+        if mode != self._about_mode:
+            self._about_mode = mode
+            self._apply_layout(mode)
+        self._update_wraps(width)
+
+    def _apply_layout(self, mode: str) -> None:
+        for frame in (
+            self.identity_frame,
+            self.mission_frame,
+            self.stack_frame,
+            self.context_frame,
+            self.flow_frame,
+            self.limits_frame,
+            self.glossary_frame,
+        ):
+            frame.grid_forget()
+
+        for row in range(9):
+            self.rowconfigure(row, weight=0)
+
+        if mode == "stacked":
+            self.identity_frame.grid(row=2, column=0, columnspan=2, sticky="nsew", pady=(0, 12))
+            self.mission_frame.grid(row=3, column=0, columnspan=2, sticky="nsew", pady=(0, 12))
+            self.stack_frame.grid(row=4, column=0, columnspan=2, sticky="nsew", pady=(0, 12))
+            self.context_frame.grid(row=5, column=0, columnspan=2, sticky="nsew", pady=(0, 12))
+            self.flow_frame.grid(row=6, column=0, columnspan=2, sticky="nsew", pady=(0, 12))
+            self.limits_frame.grid(row=7, column=0, columnspan=2, sticky="nsew")
+            self.glossary_frame.grid(row=8, column=0, columnspan=2, sticky="nsew", pady=(12, 0))
+            self.rowconfigure(8, weight=1)
+        else:
+            self.identity_frame.grid(row=2, column=0, sticky="nsew", padx=(0, 8), pady=(0, 12))
+            self.mission_frame.grid(row=2, column=1, sticky="nsew", padx=(8, 0), pady=(0, 12))
+            self.stack_frame.grid(row=3, column=0, sticky="nsew", padx=(0, 8), pady=(0, 12))
+            self.context_frame.grid(row=3, column=1, sticky="nsew", padx=(8, 0), pady=(0, 12))
+            self.flow_frame.grid(row=4, column=0, sticky="nsew", padx=(0, 8))
+            self.limits_frame.grid(row=4, column=1, sticky="nsew", padx=(8, 0))
+            self.glossary_frame.grid(row=5, column=0, columnspan=2, sticky="nsew", pady=(12, 0))
+            self.rowconfigure(5, weight=1)
+
+    def _update_wraps(self, width: int) -> None:
+        if self._about_mode == "stacked":
+            primary = max(520, width - 180)
+            secondary = max(520, width - 180)
+            flow_width = max(600, width - 180)
+        else:
+            primary = 420
+            secondary = 420
+            flow_width = 520
+
+        self.mission_label.configure(wraplength=primary)
+        self.flow_label.configure(wraplength=primary)
+        self.context_label.configure(wraplength=secondary)
+        for label in self.flow_step_labels:
+            label.configure(wraplength=flow_width)
+        for label in self.limit_labels:
+            label.configure(wraplength=secondary)

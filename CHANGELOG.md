@@ -9,6 +9,7 @@
 - Ajout des guides `docs/HOW_WIREWALL_WORKS.md` et `docs/YDAYS_SCRIPT.md` pour la comprehension et la soutenance.
 - Correction du dashboard pour mieux se recomposer en largeur reduite et limiter les artefacts de repaint au redimensionnement sous Windows.
 - Correction d'une regression de demarrage du dashboard lorsque le layout responsive etait applique trop tot pendant l'initialisation.
+- Ajout d'un scroll vertical de page pour les vues longues et adaptation responsive renforcee de `A propos` afin d'eviter les contenus coupes sur des fenetres plus petites.
 
 ## 1.3.0 - 2026-03-12
 
