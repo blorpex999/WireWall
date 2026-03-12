@@ -34,6 +34,8 @@ class WireWallApp(tk.Tk):
         self.hook = WindowsDeviceNotificationHook()
         self.nav_buttons: dict[str, ttk.Button] = {}
         self._repaint_scheduled = False
+        self._force_repaint_running = False
+        self._resize_repaint_id: str | None = None
         self._window_icon_image: tk.PhotoImage | None = None
         self._header_logo_image: tk.PhotoImage | None = None
         self._toast_windows: list[tk.Toplevel] = []
@@ -95,6 +97,7 @@ class WireWallApp(tk.Tk):
             self.nav_buttons[key] = button
 
         self.protocol("WM_DELETE_WINDOW", self._on_close)
+        self.bind("<Configure>", self._on_window_configure)
         self.after(150, self._attach_hook)
         self.after(250, self._poll_backend_events)
         self.after(max(1500, self.controller.settings.dashboard_refresh_ms), self._periodic_refresh)
@@ -104,6 +107,7 @@ class WireWallApp(tk.Tk):
         self.controller.request_health_refresh()
         self.controller.request_brain_refresh()
         self.set_status("WireWall initialise.", "OK")
+        self.after(200, lambda: self._notify_view_resize())
 
     def _configure_window_icon(self) -> None:
         try:
@@ -133,6 +137,7 @@ class WireWallApp(tk.Tk):
         self._refresh_nav_state()
         self.title(f"WireWall {__version__} - {self._view_label(name)}")
         self.set_status(f"Vue active : {self._view_label(name)}", "INFO")
+        self._notify_view_resize()
         self.request_repaint()
 
     def set_status(self, message: str, level: str = "INFO") -> None:
@@ -230,18 +235,50 @@ class WireWallApp(tk.Tk):
         self.destroy()
 
     def request_repaint(self) -> None:
-        if self._repaint_scheduled:
+        if self._repaint_scheduled or self._force_repaint_running:
             return
         self._repaint_scheduled = True
         self.after_idle(self._force_repaint)
 
     def _force_repaint(self) -> None:
+        if self._force_repaint_running:
+            return
         self._repaint_scheduled = False
+        self._force_repaint_running = True
         try:
             self.update_idletasks()
             if self.winfo_exists() and self.tk.call("tk", "windowingsystem") == "win32":
                 flags = 0x0001 | 0x0004 | 0x0080 | 0x0100
-                ctypes.windll.user32.RedrawWindow(self.winfo_id(), None, None, flags)
+                for widget in (self, self.content, self.views.get(self.current_view_key) if self.current_view_key else None):
+                    if widget is not None and widget.winfo_exists():
+                        ctypes.windll.user32.RedrawWindow(widget.winfo_id(), None, None, flags)
+                        ctypes.windll.user32.UpdateWindow(widget.winfo_id())
+        except Exception:
+            pass
+        finally:
+            self._force_repaint_running = False
+
+    def _on_window_configure(self, event: tk.Event) -> None:
+        if event.widget is not self:
+            return
+        if self._resize_repaint_id is not None:
+            try:
+                self.after_cancel(self._resize_repaint_id)
+            except Exception:
+                pass
+        self._resize_repaint_id = self.after(80, self._after_resize_settle)
+
+    def _after_resize_settle(self) -> None:
+        self._resize_repaint_id = None
+        self._notify_view_resize()
+        self.request_repaint()
+
+    def _notify_view_resize(self) -> None:
+        if self.current_view_key is None:
+            return
+        try:
+            view = self.views[self.current_view_key]
+            view.on_host_resize(self.content.winfo_width(), self.content.winfo_height())
         except Exception:
             pass
 

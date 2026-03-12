@@ -7,6 +7,7 @@
 - Clarification des ecrans `Peripheriques`, `Alertes`, `Controle USB` et `Analyse IA` pour separer donnees brutes, interpretations et dependances externes.
 - Enrichissement de `A propos` avec un flux pas a pas, un lexique rapide et des limites honnetes.
 - Ajout des guides `docs/HOW_WIREWALL_WORKS.md` et `docs/YDAYS_SCRIPT.md` pour la comprehension et la soutenance.
+- Correction du dashboard pour mieux se recomposer en largeur reduite et limiter les artefacts de repaint au redimensionnement sous Windows.
 
 ## 1.3.0 - 2026-03-12
 

@@ -28,7 +28,12 @@ class DashboardView(BaseView):
         self.rowconfigure(4, weight=2)
         self.rowconfigure(5, weight=1)
         self.rowconfigure(6, weight=1)
+        self.rowconfigure(7, weight=0)
+        self.rowconfigure(8, weight=0)
         self._suggestion_rows: dict[str, object] = {}
+        self._dashboard_mode = ""
+        self._dashboard_width = 1450
+        self._section_wrap_labels: list[ttk.Label] = []
 
         self.header = SectionHeader(
             self,
@@ -46,44 +51,73 @@ class DashboardView(BaseView):
         )
         self.help_panel.grid(row=1, column=0, columnspan=5, sticky="ew", pady=(0, 12))
 
-        strip = ttk.Frame(self, style="Card.TFrame", padding=16)
-        strip.grid(row=2, column=0, columnspan=5, sticky="ew", pady=(0, 12))
-        for column in range(4):
-            strip.columnconfigure(column, weight=1)
-        self.usb_tile = self._build_tile(strip, 0, "Stockage USB")
-        self.ollama_tile = self._build_tile(strip, 1, "Ollama local")
-        self.health_tile = self._build_tile(strip, 2, "Sante plateforme")
-        self.admin_tile = self._build_tile(strip, 3, "Session")
+        self.status_strip = ttk.Frame(self, style="Card.TFrame", padding=16)
+        self.status_strip.grid(row=2, column=0, columnspan=5, sticky="ew", pady=(0, 12))
+        self.usb_tile = self._build_tile(self.status_strip, "Stockage USB")
+        self.ollama_tile = self._build_tile(self.status_strip, "Ollama local")
+        self.health_tile = self._build_tile(self.status_strip, "Sante plateforme")
+        self.admin_tile = self._build_tile(self.status_strip, "Session")
+        self._status_tiles = [self.usb_tile, self.ollama_tile, self.health_tile, self.admin_tile]
 
-        self.card_score = KpiCard(self, "Risque global")
-        self.card_devices = KpiCard(self, "Peripheriques actifs")
-        self.card_incidents = KpiCard(self, "Incidents ouverts")
-        self.card_alerts = KpiCard(self, "Alertes critiques")
-        self.card_suggestions = KpiCard(self, "Suggestions")
-        self.card_score.grid(row=3, column=0, sticky="nsew", padx=(0, 8), pady=(0, 12))
-        self.card_devices.grid(row=3, column=1, sticky="nsew", padx=8, pady=(0, 12))
-        self.card_incidents.grid(row=3, column=2, sticky="nsew", padx=8, pady=(0, 12))
-        self.card_alerts.grid(row=3, column=3, sticky="nsew", padx=8, pady=(0, 12))
-        self.card_suggestions.grid(row=3, column=4, sticky="nsew", padx=(8, 0), pady=(0, 12))
+        self.kpi_frame = ttk.Frame(self)
+        self.kpi_frame.grid(row=3, column=0, columnspan=5, sticky="nsew", pady=(0, 12))
+        self.card_score = KpiCard(self.kpi_frame, "Risque global")
+        self.card_devices = KpiCard(self.kpi_frame, "Peripheriques actifs")
+        self.card_incidents = KpiCard(self.kpi_frame, "Incidents ouverts")
+        self.card_alerts = KpiCard(self.kpi_frame, "Alertes critiques")
+        self.card_suggestions = KpiCard(self.kpi_frame, "Suggestions")
+        self._kpi_cards = [
+            self.card_score,
+            self.card_devices,
+            self.card_incidents,
+            self.card_alerts,
+            self.card_suggestions,
+        ]
 
-        events_frame = ttk.LabelFrame(self, text="Activite recente", style="Section.TLabelframe", padding=12)
-        events_frame.grid(row=4, column=0, columnspan=3, sticky="nsew", padx=(0, 8), pady=(0, 12))
-        alerts_frame = ttk.LabelFrame(self, text="Alertes prioritaires", style="Section.TLabelframe", padding=12)
-        alerts_frame.grid(row=4, column=3, columnspan=2, sticky="nsew", padx=(8, 0), pady=(0, 12))
-        health_frame = ttk.LabelFrame(self, text="Etat des composants", style="Section.TLabelframe", padding=12)
-        health_frame.grid(row=5, column=0, columnspan=3, sticky="nsew", padx=(0, 8))
-        brain_frame = ttk.LabelFrame(self, text="Moteur d'analyse continu", style="Section.TLabelframe", padding=12)
-        brain_frame.grid(row=5, column=3, columnspan=2, sticky="nsew", padx=(8, 0))
-        suggestions_frame = ttk.LabelFrame(self, text="Suggestions supervisees", style="Section.TLabelframe", padding=12)
-        suggestions_frame.grid(row=6, column=0, columnspan=3, sticky="nsew", pady=(12, 0), padx=(0, 8))
-        precheck_frame = ttk.LabelFrame(self, text="Precheck demo", style="Section.TLabelframe", padding=12)
-        precheck_frame.grid(row=6, column=3, columnspan=2, sticky="nsew", pady=(12, 0), padx=(8, 0))
+        self.upper_frame = ttk.Frame(self)
+        self.upper_frame.grid(row=4, column=0, columnspan=5, sticky="nsew", pady=(0, 12))
+        self.upper_frame.columnconfigure(0, weight=1)
+        self.upper_frame.columnconfigure(1, weight=1)
+        self.upper_frame.rowconfigure(0, weight=1)
+        self.upper_frame.rowconfigure(1, weight=1)
+        events_frame = ttk.LabelFrame(self.upper_frame, text="Activite recente", style="Section.TLabelframe", padding=12)
+        alerts_frame = ttk.LabelFrame(self.upper_frame, text="Alertes prioritaires", style="Section.TLabelframe", padding=12)
+
+        self.middle_frame = ttk.Frame(self)
+        self.middle_frame.grid(row=5, column=0, columnspan=5, sticky="nsew")
+        self.middle_frame.columnconfigure(0, weight=1)
+        self.middle_frame.columnconfigure(1, weight=1)
+        self.middle_frame.rowconfigure(0, weight=1)
+        self.middle_frame.rowconfigure(1, weight=1)
+        health_frame = ttk.LabelFrame(self.middle_frame, text="Etat des composants", style="Section.TLabelframe", padding=12)
+        brain_frame = ttk.LabelFrame(self.middle_frame, text="Moteur d'analyse continu", style="Section.TLabelframe", padding=12)
+
+        self.bottom_frame = ttk.Frame(self)
+        self.bottom_frame.grid(row=6, column=0, columnspan=5, sticky="nsew", pady=(12, 0))
+        self.bottom_frame.columnconfigure(0, weight=1)
+        self.bottom_frame.columnconfigure(1, weight=1)
+        self.bottom_frame.rowconfigure(0, weight=1)
+        self.bottom_frame.rowconfigure(1, weight=1)
+        suggestions_frame = ttk.LabelFrame(self.bottom_frame, text="Suggestions supervisees", style="Section.TLabelframe", padding=12)
+        precheck_frame = ttk.LabelFrame(self.bottom_frame, text="Precheck demo", style="Section.TLabelframe", padding=12)
+
+        self._section_frames = {
+            "events": events_frame,
+            "alerts": alerts_frame,
+            "health": health_frame,
+            "brain": brain_frame,
+            "suggestions": suggestions_frame,
+            "precheck": precheck_frame,
+        }
         brain_frame.columnconfigure(0, weight=1)
         brain_frame.columnconfigure(1, weight=1)
+        brain_frame.columnconfigure(2, weight=1)
         suggestions_frame.columnconfigure(0, weight=1)
         suggestions_frame.rowconfigure(1, weight=1)
         precheck_frame.columnconfigure(0, weight=1)
         precheck_frame.rowconfigure(1, weight=1)
+
+        self._apply_layout("wide")
 
         self.event_table = ScrollableTree(events_frame, ("date", "type", "summary", "severity"), height=9)
         self.event_table.pack(fill="both", expand=True)
@@ -182,13 +216,15 @@ class DashboardView(BaseView):
         )
         self.reject_button.pack(side="left")
 
-        ttk.Label(
+        self.precheck_intro = ttk.Label(
             precheck_frame,
             text="Lecture seule. Aucun effet de bord. Utilise les checks existants pour preparer la demo.",
             style="Muted.TLabel",
             wraplength=520,
             justify="left",
-        ).grid(row=0, column=0, sticky="w", pady=(0, 10))
+        )
+        self.precheck_intro.grid(row=0, column=0, sticky="w", pady=(0, 10))
+        self._section_wrap_labels.extend([self.brain_summary, self.precheck_intro])
         self.precheck_table = ScrollableTree(precheck_frame, ("item", "status", "action"), height=6)
         self.precheck_table.grid(row=1, column=0, sticky="nsew")
         for column, label, width in (
@@ -339,9 +375,19 @@ class DashboardView(BaseView):
         self.brain_deviations.set(str(brain_snapshot.deviation_count))
         self.brain_known.set(str(data["known_count"]))
 
-    def _build_tile(self, master, column: int, title: str) -> dict[str, object]:
+    def on_host_resize(self, width: int, height: int) -> None:
+        self._dashboard_width = max(width, 960)
+        if width < 1080:
+            mode = "compact"
+        elif width < 1320:
+            mode = "medium"
+        else:
+            mode = "wide"
+        self._apply_layout(mode)
+        self._update_wrap_lengths()
+
+    def _build_tile(self, master, title: str) -> dict[str, object]:
         frame = ttk.Frame(master, style="CardInner.TFrame", padding=(8, 4))
-        frame.grid(row=0, column=column, sticky="ew", padx=(0 if column == 0 else 8, 0))
         frame.columnconfigure(0, weight=1)
         ttk.Label(frame, text=title, style="CardMuted.TLabel").grid(row=0, column=0, sticky="w")
         pill = StatusPill(frame, "", "INFO")
@@ -350,12 +396,153 @@ class DashboardView(BaseView):
         value.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(8, 0))
         detail = ttk.Label(frame, text="", style="Muted.TLabel", wraplength=250, justify="left")
         detail.grid(row=2, column=0, columnspan=2, sticky="w", pady=(8, 0))
-        return {"value": value, "detail": detail, "pill": pill}
+        self._section_wrap_labels.append(detail)
+        return {"frame": frame, "value": value, "detail": detail, "pill": pill}
 
     def _set_tile(self, tile: dict[str, object], value: str, detail: str, tone: str) -> None:
         tile["value"].set(value)
         tile["detail"].configure(text=detail)
         tile["pill"].set(tone.upper(), tone)
+
+    def _apply_layout(self, mode: str) -> None:
+        if mode == self._dashboard_mode:
+            return
+        self._dashboard_mode = mode
+
+        for column in range(5):
+            self.kpi_frame.columnconfigure(column, weight=0)
+        for column in range(4):
+            self.status_strip.columnconfigure(column, weight=0)
+        for row in range(4):
+            self.status_strip.rowconfigure(row, weight=0)
+        for row in range(6):
+            self.kpi_frame.rowconfigure(row, weight=0)
+        for widget in self._kpi_cards:
+            widget.grid_forget()
+        for tile in self._status_tiles:
+            tile["frame"].grid_forget()
+        for frame in self._section_frames.values():
+            frame.grid_forget()
+
+        if mode == "compact":
+            for column in range(2):
+                self.status_strip.columnconfigure(column, weight=1)
+            for index, tile in enumerate(self._status_tiles):
+                row = index // 2
+                column = index % 2
+                tile["frame"].grid(row=row, column=column, sticky="nsew", padx=(0 if column == 0 else 8, 0), pady=(0, 8))
+            for row in range(2):
+                self.status_strip.rowconfigure(row, weight=1)
+
+            for column in range(2):
+                self.kpi_frame.columnconfigure(column, weight=1)
+            for index, widget in enumerate(self._kpi_cards):
+                row = index // 2
+                column = index % 2
+                if index == 4:
+                    row = 2
+                    column = 0
+                    widget.grid(row=row, column=column, columnspan=2, sticky="nsew", padx=0, pady=(0, 12))
+                    continue
+                widget.grid(row=row, column=column, sticky="nsew", padx=(0 if column == 0 else 8, 0), pady=(0, 12))
+            for row in range(3):
+                self.kpi_frame.rowconfigure(row, weight=1)
+
+            self._section_frames["events"].grid(row=0, column=0, sticky="nsew", pady=(0, 12))
+            self._section_frames["alerts"].grid(row=1, column=0, sticky="nsew", pady=(0, 12))
+            self._section_frames["health"].grid(row=0, column=0, sticky="nsew", pady=(0, 12))
+            self._section_frames["brain"].grid(row=1, column=0, sticky="nsew")
+            self._section_frames["suggestions"].grid(row=0, column=0, sticky="nsew", pady=(0, 12))
+            self._section_frames["precheck"].grid(row=1, column=0, sticky="nsew")
+            self.upper_frame.columnconfigure(0, weight=1)
+            self.upper_frame.columnconfigure(1, weight=0)
+            self.middle_frame.columnconfigure(0, weight=1)
+            self.middle_frame.columnconfigure(1, weight=0)
+            self.bottom_frame.columnconfigure(0, weight=1)
+            self.bottom_frame.columnconfigure(1, weight=0)
+        elif mode == "medium":
+            for column in range(2):
+                self.status_strip.columnconfigure(column, weight=1)
+            for index, tile in enumerate(self._status_tiles):
+                row = index // 2
+                column = index % 2
+                tile["frame"].grid(row=row, column=column, sticky="nsew", padx=(0 if column == 0 else 8, 0), pady=(0, 8))
+            for row in range(2):
+                self.status_strip.rowconfigure(row, weight=1)
+
+            for column in range(3):
+                self.kpi_frame.columnconfigure(column, weight=1)
+            for index, widget in enumerate(self._kpi_cards):
+                row = index // 3
+                column = index % 3
+                widget.grid(row=row, column=column, sticky="nsew", padx=(0 if column == 0 else 8, 0), pady=(0, 12))
+            for row in range(2):
+                self.kpi_frame.rowconfigure(row, weight=1)
+
+            self._section_frames["events"].grid(row=0, column=0, sticky="nsew", padx=(0, 8), pady=(0, 12))
+            self._section_frames["alerts"].grid(row=0, column=1, sticky="nsew", padx=(8, 0), pady=(0, 12))
+            self._section_frames["health"].grid(row=0, column=0, sticky="nsew", padx=(0, 8))
+            self._section_frames["brain"].grid(row=0, column=1, sticky="nsew", padx=(8, 0))
+            self._section_frames["suggestions"].grid(row=0, column=0, sticky="nsew", pady=(0, 12))
+            self._section_frames["precheck"].grid(row=1, column=0, columnspan=2, sticky="nsew")
+            self.upper_frame.columnconfigure(0, weight=1)
+            self.upper_frame.columnconfigure(1, weight=1)
+            self.middle_frame.columnconfigure(0, weight=1)
+            self.middle_frame.columnconfigure(1, weight=1)
+            self.bottom_frame.columnconfigure(0, weight=1)
+            self.bottom_frame.columnconfigure(1, weight=1)
+        else:
+            for column in range(4):
+                self.status_strip.columnconfigure(column, weight=1)
+            for index, tile in enumerate(self._status_tiles):
+                tile["frame"].grid(row=0, column=index, sticky="nsew", padx=(0 if index == 0 else 8, 0))
+            self.status_strip.rowconfigure(0, weight=1)
+
+            for column in range(5):
+                self.kpi_frame.columnconfigure(column, weight=1)
+            for index, widget in enumerate(self._kpi_cards):
+                widget.grid(
+                    row=0,
+                    column=index,
+                    sticky="nsew",
+                    padx=(0 if index == 0 else 8, 0),
+                    pady=(0, 12),
+                )
+            self.kpi_frame.rowconfigure(0, weight=1)
+
+            self._section_frames["events"].grid(row=0, column=0, sticky="nsew", padx=(0, 8), pady=(0, 12))
+            self._section_frames["alerts"].grid(row=0, column=1, sticky="nsew", padx=(8, 0), pady=(0, 12))
+            self._section_frames["health"].grid(row=0, column=0, sticky="nsew", padx=(0, 8))
+            self._section_frames["brain"].grid(row=0, column=1, sticky="nsew", padx=(8, 0))
+            self._section_frames["suggestions"].grid(row=0, column=0, sticky="nsew", padx=(0, 8))
+            self._section_frames["precheck"].grid(row=0, column=1, sticky="nsew", padx=(8, 0))
+            self.upper_frame.columnconfigure(0, weight=1)
+            self.upper_frame.columnconfigure(1, weight=1)
+            self.middle_frame.columnconfigure(0, weight=1)
+            self.middle_frame.columnconfigure(1, weight=1)
+            self.bottom_frame.columnconfigure(0, weight=1)
+            self.bottom_frame.columnconfigure(1, weight=1)
+
+        self._update_wrap_lengths()
+
+    def _update_wrap_lengths(self) -> None:
+        if self._dashboard_mode == "compact":
+            tile_wrap = 180
+            summary_wrap = 360
+            precheck_wrap = 420
+        elif self._dashboard_mode == "medium":
+            tile_wrap = 220
+            summary_wrap = 420
+            precheck_wrap = 520
+        else:
+            tile_wrap = 250
+            summary_wrap = 620
+            precheck_wrap = 560
+
+        for tile in self._status_tiles:
+            tile["detail"].configure(wraplength=tile_wrap)
+        self.brain_summary.configure(wraplength=summary_wrap)
+        self.precheck_intro.configure(wraplength=precheck_wrap)
 
     def _selected_suggestion(self):
         selection = self.suggestion_table.tree.selection()

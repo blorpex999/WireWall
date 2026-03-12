@@ -21,6 +21,9 @@ class BaseView(ttk.Frame):
     def refresh_data(self) -> None:
         """Override in subclasses."""
 
+    def on_host_resize(self, width: int, height: int) -> None:
+        """Override in subclasses when the layout needs responsive adjustments."""
+
     def schedule_refresh(self, delay_ms: int = 250) -> None:
         self.cancel_scheduled_refresh()
         self._scheduled_refresh_id = self.after(delay_ms, self._run_scheduled_refresh)
