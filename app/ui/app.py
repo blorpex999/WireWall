@@ -129,6 +129,7 @@ class WireWallApp(tk.Tk):
     def show_view(self, name: str) -> None:
         if self.current_view_key is not None:
             self.views[self.current_view_key].grid_forget()
+        self.update_idletasks()
         view = self.views[name]
         view.grid(row=0, column=0, sticky="nsew")
         view.reset_scroll_position()
@@ -141,6 +142,13 @@ class WireWallApp(tk.Tk):
 
     def set_status(self, message: str, level: str = "INFO") -> None:
         self.status_bar.set_status(message, level)
+
+    def show_investigation(self, device_key: str) -> None:
+        """Ouvre une fenetre Toplevel avec la timeline complete du device."""
+        from app.ui.views.investigation import InvestigationWindow
+
+        win = InvestigationWindow(self, self.controller, device_key)
+        win.focus()
 
     def _attach_hook(self) -> None:
         self.update_idletasks()
@@ -243,6 +251,7 @@ class WireWallApp(tk.Tk):
         self._force_repaint_running = True
         try:
             self.update_idletasks()
+            self.update()
         except Exception:
             pass
         finally:

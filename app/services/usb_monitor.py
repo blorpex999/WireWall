@@ -9,7 +9,13 @@ from app.utils.datetime import minutes_ago, seconds_ago, utc_now
 LOGGER = logging.getLogger(__name__)
 
 GENERIC_VENDOR_NAMES = {"", "INCONNU", "UNKNOWN"}
-GENERIC_PRODUCT_NAMES = {"", "PÉRIPHÉRIQUE USB", "PERIPHERIQUE USB", "USB DEVICE", "UNKNOWN"}
+GENERIC_PRODUCT_NAMES = {
+    "",
+    "P\u00c9RIPH\u00c9RIQUE USB",
+    "PERIPHERIQUE USB",
+    "USB DEVICE",
+    "UNKNOWN",
+}
 
 
 class UsbMonitorService:
@@ -68,11 +74,19 @@ class UsbMonitorService:
         self.refresh_now()
 
     def _run(self) -> None:
+        import time
+
+        _last_scan: float = 0.0
+        _MIN_SCAN_INTERVAL = 0.5
+
         while not self._stop_event.is_set():
             try:
-                self.scan_once()
+                now = time.monotonic()
+                if now - _last_scan >= _MIN_SCAN_INTERVAL:
+                    self.scan_once()
+                    _last_scan = time.monotonic()
             except Exception as exc:
-                LOGGER.exception("Erreur non gérée dans la boucle de monitoring USB.")
+                LOGGER.exception("Erreur non g\u00e9r\u00e9e dans la boucle de monitoring USB.")
                 self.event_bus.publish("monitor_error", {"message": f"Erreur de monitoring USB: {exc}"})
             self._refresh_event.wait(timeout=max(1, self.settings.scan_interval_seconds))
             self._refresh_event.clear()
@@ -80,7 +94,7 @@ class UsbMonitorService:
     def scan_once(self) -> bool:
         enumeration = self.enumerator.enumerate()
         if not enumeration.success:
-            LOGGER.warning("Scan USB ignoré: %s", enumeration.message)
+            LOGGER.warning("Scan USB ignor\u00e9: %s", enumeration.message)
             self._create_system_event(
                 event_type="scan_error",
                 summary=enumeration.message,
@@ -115,10 +129,10 @@ class UsbMonitorService:
                 self._create_event(
                     event_type="disconnected",
                     device=disconnected,
-                    summary=f"{disconnected.display_name} déconnecté.",
+                    summary=f"{disconnected.display_name} d\u00e9connect\u00e9.",
                     level=disconnected.risk_level,
                     score=disconnected.risk_score,
-                    reasons=["Le périphérique n'est plus détecté dans le snapshot courant."],
+                    reasons=["Le p\u00e9riph\u00e9rique n'est plus d\u00e9tect\u00e9 dans le snapshot courant."],
                 )
 
         self._current_snapshot = new_snapshot
@@ -173,7 +187,7 @@ class UsbMonitorService:
             event_id = self._create_event(
                 event_type="connected",
                 device=device,
-                summary=f"{device.display_name} connecté.",
+                summary=f"{device.display_name} connect\u00e9.",
                 level=assessment.level,
                 score=assessment.score,
                 reasons=assessment.reasons,
@@ -183,7 +197,7 @@ class UsbMonitorService:
                     created_at=now,
                     severity=assessment.level,
                     title=f"Alerte USB {assessment.level}",
-                    message=f"{device.display_name} présente un score de risque de {assessment.score}.",
+                    message=f"{device.display_name} pr\u00e9sente un score de risque de {assessment.score}.",
                     device_key=device.device_key,
                     event_id=event_id,
                     score=assessment.score,

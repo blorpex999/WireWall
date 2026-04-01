@@ -277,7 +277,7 @@ class StatusBar(tk.Frame):
         )
         self.columnconfigure(1, weight=1)
         self.message_var = tk.StringVar(value="Pret.")
-        self.indicator = tk.Canvas(self, width=12, height=12, bg=COLORS["panel"], highlightthickness=0)
+        self.indicator = tk.Canvas(self, width=12, height=12, bg=COLORS["panel"], highlightthickness=0, bd=0)
         self.indicator.grid(row=0, column=0, sticky="w")
         self.level_pill = StatusPill(self, "INFO", "INFO")
         self.level_pill.grid(row=0, column=2, sticky="e", padx=(12, 8))

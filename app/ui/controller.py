@@ -144,6 +144,13 @@ class AppController:
     def get_alert_case(self, alert_id: int):
         return self.container.incident_service.get_by_alert(alert_id)
 
+    def get_assessment_for_alert(self, alert_id: int):
+        """Retourne le dernier RiskAssessment lie a l'alerte, ou None."""
+        alert = self.container.alert_repo.get(alert_id)
+        if alert is None or alert.device_key is None:
+            return None
+        return self.container.assessment_repo.latest(alert.device_key)
+
     def ensure_alert_case(self, alert_id: int):
         case = self.container.incident_service.ensure_for_alert(alert_id, self.demo_mode)
         self.request_brain_refresh()

@@ -17,6 +17,7 @@ COLORS = {
     "success": "#67C587",
     "warning": "#F0BE52",
     "danger": "#FF657D",
+    "danger_soft": "#E85060",
     "info": "#4AB0FF",
     "selection": "#263344",
     "disabled": "#6D7785",
@@ -193,3 +194,7 @@ def apply_dark_theme(root: tk.Tk) -> None:
     root.option_add("*Text.insertBackground", COLORS["text"])
     root.option_add("*Text.highlightBackground", COLORS["panel_border"])
     root.option_add("*Text.highlightColor", COLORS["accent"])
+    root.option_add("*Canvas.background", COLORS["bg"])
+    root.option_add("*Canvas.highlightThickness", "0")
+    root.option_add("*Canvas.borderWidth", "0")
+    root.option_add("*Toplevel.background", COLORS["bg"])
