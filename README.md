@@ -1,4 +1,4 @@
-# WireWall 1.3.2
+# WireWall 1.3.3
 
 WireWall est une application desktop Windows de supervision USB orientee cybersecurite. Le projet combine detection USB reelle via `PyUSB` avec backend `libusb1`, journalisation `SQLite`, scoring de risque, policies whitelist/blacklist, controle reel `USBSTOR`, analyse IA locale via Ollama, moteur de baseline local, workflow incident et exports d'audit `HTML`, `CSV`, `JSON`.
 
@@ -23,6 +23,13 @@ WireWall est une application desktop Windows de supervision USB orientee cyberse
 - `USBSTOR` bloque le stockage USB, pas tous les peripheriques USB.
 - Le monitoring USB reste un monitoring utilisateur par snapshots `PyUSB/libusb1`, pas un driver noyau.
 - Le "cerveau" WireWall reste un moteur local d'aide a la decision et de memoire, pas un agent autonome qui modifie son propre code.
+
+## Ce que 1.3.3 ajoute
+
+- correction des artefacts visuels noirs sur certaines zones de l'interface Windows
+- harmonisation du rendu des cartes, des indicateurs et du `Dashboard`
+- ajout d'un kit Ydays dans `docs/` pour preparer la soutenance, le script oral et la demo live
+- alignement du depot pour preparer une release GitHub coherente avec la version de l'application
 
 ## Ce que 1.3.2 ajoute
 

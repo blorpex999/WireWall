@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.3.3 - 2026-04-01
+
+- Correction de plusieurs artefacts visuels noirs dans l'interface Windows en clarifiant les surfaces UI, les cartes, la barre de statut et le rendu `Treeview`.
+- Harmonisation du rendu du `Dashboard`, des cartes KPI et des panneaux d'information pour une demonstration plus stable et lisible.
+- Ajout d'un kit de soutenance Ydays avec plan de presentation Canva, notes orateur et runbook de demo.
+- Alignement de la version projet pour preparer une release GitHub coherente avec la version affichee dans l'application.
+
 ## 1.3.2 - 2026-03-12
 
 - WireWall demande des privileges administrateur par defaut au lancement pour exposer directement toutes les fonctionnalites, y compris le controle USBSTOR.
