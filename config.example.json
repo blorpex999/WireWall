@@ -6,7 +6,7 @@
   "log_level": "INFO",
   "ollama_base_url": "http://127.0.0.1:11434",
   "ollama_model": "qwen2.5:14b",
-  "ollama_timeout_seconds": 60,
+  "ollama_timeout_seconds": 210,
   "security_profile": "Normal",
   "theme": "dark",
   "export_directory": "",

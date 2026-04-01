@@ -58,7 +58,8 @@ Les valeurs `scan_interval_seconds`, `alert_threshold` et `dedup_window_seconds`
 - Conserver `mode: "real"` pour les tests terrain
 - Utiliser `scripts\run_demo.bat` pour un scenario demo separe
 - Definir `export_directory` si vous voulez un dossier d'exports visible et stable pendant la soutenance
-- Garder `ollama_timeout_seconds` raisonnable pour eviter une attente trop longue en demo
+- Pour `qwen2.5:14b`, un timeout de `180` a `210` secondes est plus realiste sur un laptop milieu de gamme
+- La valeur projet recommandee est `210` secondes
 - Laisser `autostart_enabled` a `false` pendant la soutenance si tu veux garder un demarrage maitrise a la main
 
 ## Conseils de configuration distribution
