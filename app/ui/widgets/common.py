@@ -76,9 +76,17 @@ class SectionHeader(tk.Frame):
         self.tag.set(text, level)
 
 
-class KpiCard(ttk.Frame):
+class KpiCard(tk.Frame):
     def __init__(self, master, title: str, value: str = "-", subtitle: str = "") -> None:
-        super().__init__(master, style="Card.TFrame", padding=0)
+        super().__init__(
+            master,
+            bg=COLORS["panel"],
+            bd=0,
+            highlightthickness=1,
+            highlightbackground=COLORS["panel_border"],
+            padx=0,
+            pady=0,
+        )
         self.columnconfigure(0, weight=1)
         self.columnconfigure(1, weight=0)
         self.top_bar = tk.Frame(self, bg=severity_color("INFO"), height=4, bd=0, highlightthickness=0)
@@ -175,9 +183,9 @@ class EmptyState(tk.Frame):
         ).pack(anchor="center", pady=(6, 0))
 
 
-class ScrollablePage(ttk.Frame):
+class ScrollablePage(tk.Frame):
     def __init__(self, master) -> None:
-        super().__init__(master)
+        super().__init__(master, bg=COLORS["bg"], bd=0, highlightthickness=0)
         self.rowconfigure(0, weight=1)
         self.columnconfigure(0, weight=1)
         self.canvas = tk.Canvas(self, bg=COLORS["bg"], highlightthickness=0, bd=0, relief="flat")
@@ -185,36 +193,35 @@ class ScrollablePage(ttk.Frame):
         self.scrollbar = ttk.Scrollbar(self, orient="vertical", command=self.canvas.yview)
         self.scrollbar.grid(row=0, column=1, sticky="ns")
         self.canvas.configure(yscrollcommand=self.scrollbar.set)
-        self.body = ttk.Frame(self.canvas)
+        self.body = tk.Frame(self.canvas, bg=COLORS["bg"], bd=0, highlightthickness=0)
         self.body.columnconfigure(0, weight=1)
+        self._background_item = self.canvas.create_rectangle(0, 0, 0, 0, fill=COLORS["bg"], outline="", tags=("bg_fill",))
         self._body_window = self.canvas.create_window((0, 0), window=self.body, anchor="nw")
+        self.canvas.tag_lower(self._background_item)
         self.body.bind("<Configure>", self._on_body_configure)
         self.canvas.bind("<Configure>", self._on_canvas_configure)
         self.bind_all("<MouseWheel>", self._on_mousewheel, add="+")
 
     def _on_body_configure(self, _event: tk.Event | None = None) -> None:
-        self.canvas.configure(scrollregion=self.canvas.bbox("all"))
-        try:
-            canvas_width = self.canvas.winfo_width()
-            if canvas_width > 1:
-                self.canvas.itemconfigure(self._body_window, width=canvas_width)
-        except Exception:
-            pass
+        self._sync_canvas_layout()
 
     def _on_canvas_configure(self, event: tk.Event) -> None:
-        try:
-            self.canvas.itemconfigure(self._body_window, width=event.width)
-        except Exception:
-            return
+        self._sync_canvas_layout(event.width)
 
     def force_layout(self) -> None:
         """Forcer le recalcul complet du layout du canvas. Appeler apres refresh_data()."""
         self.update_idletasks()
-        self.canvas.configure(scrollregion=self.canvas.bbox("all"))
+        self._sync_canvas_layout()
+
+    def _sync_canvas_layout(self, width: int | None = None) -> None:
         try:
-            w = self.canvas.winfo_width()
-            if w > 1:
-                self.canvas.itemconfigure(self._body_window, width=w)
+            canvas_width = width if width is not None else self.canvas.winfo_width()
+            canvas_height = self.canvas.winfo_height()
+            body_height = max(self.body.winfo_reqheight(), self.body.winfo_height())
+            if canvas_width > 1:
+                self.canvas.itemconfigure(self._body_window, width=canvas_width)
+                self.canvas.coords(self._background_item, 0, 0, canvas_width, max(body_height, canvas_height, 1))
+            self.canvas.configure(scrollregion=(0, 0, max(canvas_width, 1), max(body_height, 1)))
         except Exception:
             pass
 
@@ -390,9 +397,9 @@ class ScrollableDetailText(ttk.Frame):
         self.text.set_text(content)
 
 
-class ScrollableTree(ttk.Frame):
+class ScrollableTree(tk.Frame):
     def __init__(self, master, columns: tuple[str, ...], height: int = 12) -> None:
-        super().__init__(master)
+        super().__init__(master, bg=COLORS["panel"], bd=0, highlightthickness=0)
         self.rowconfigure(0, weight=1)
         self.columnconfigure(0, weight=1)
         self.tree = ttk.Treeview(self, columns=columns, show="headings", height=height)
@@ -403,7 +410,13 @@ class ScrollableTree(ttk.Frame):
         x_scroll.grid(row=1, column=0, sticky="ew")
         self.tree.configure(yscrollcommand=y_scroll.set, xscrollcommand=x_scroll.set)
         self.empty_var = tk.StringVar(value="")
-        self.empty_label = ttk.Label(self, textvariable=self.empty_var, style="Muted.TLabel")
+        self.empty_label = tk.Label(
+            self,
+            textvariable=self.empty_var,
+            bg=COLORS["panel"],
+            fg=COLORS["muted"],
+            font=("Segoe UI", 9),
+        )
         self.empty_label.grid(row=2, column=0, sticky="w", pady=(8, 0))
         self.empty_label.grid_remove()
 

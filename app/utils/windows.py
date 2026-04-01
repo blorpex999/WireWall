@@ -5,10 +5,77 @@ import logging
 import os
 import platform
 import sys
+from contextlib import contextmanager
 from ctypes import wintypes
-from typing import Callable
+from typing import Callable, Iterator
 
 LOGGER = logging.getLogger(__name__)
+
+
+WM_SETREDRAW = 0x000B
+RDW_INVALIDATE = 0x0001
+RDW_ERASE = 0x0004
+RDW_ALLCHILDREN = 0x0080
+RDW_FRAME = 0x0400
+
+
+def _user32():
+    return ctypes.windll.user32
+
+
+def redraw_widget(widget) -> None:
+    if platform.system() != "Windows":
+        return
+    try:
+        hwnd = widget.winfo_id()
+        user32 = _user32()
+        user32.RedrawWindow.argtypes = [wintypes.HWND, ctypes.c_void_p, ctypes.c_void_p, wintypes.UINT]
+        user32.RedrawWindow.restype = wintypes.BOOL
+        user32.RedrawWindow(hwnd, None, None, RDW_INVALIDATE | RDW_ERASE | RDW_ALLCHILDREN | RDW_FRAME)
+    except Exception:
+        LOGGER.exception("Impossible de forcer le redraw Win32 du widget.")
+
+
+@contextmanager
+def freeze_redraw(*widgets) -> Iterator[None]:
+    if platform.system() != "Windows":
+        yield
+        return
+
+    try:
+        user32 = _user32()
+        user32.SendMessageW.argtypes = [wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM]
+        user32.SendMessageW.restype = wintypes.LPARAM
+        user32.RedrawWindow.argtypes = [wintypes.HWND, ctypes.c_void_p, ctypes.c_void_p, wintypes.UINT]
+        user32.RedrawWindow.restype = wintypes.BOOL
+    except Exception:
+        LOGGER.exception("Impossible d'initialiser les appels Win32 de redraw.")
+        yield
+        return
+
+    hwnds: list[int] = []
+    try:
+        for widget in widgets:
+            if widget is None:
+                continue
+            try:
+                if not widget.winfo_exists():
+                    continue
+                hwnd = int(widget.winfo_id())
+            except Exception:
+                continue
+            if hwnd in hwnds:
+                continue
+            user32.SendMessageW(hwnd, WM_SETREDRAW, 0, 0)
+            hwnds.append(hwnd)
+        yield
+    finally:
+        for hwnd in reversed(hwnds):
+            try:
+                user32.SendMessageW(hwnd, WM_SETREDRAW, 1, 0)
+                user32.RedrawWindow(hwnd, None, None, RDW_INVALIDATE | RDW_ERASE | RDW_ALLCHILDREN | RDW_FRAME)
+            except Exception:
+                LOGGER.exception("Impossible de retablir le redraw Win32.")
 
 
 class WindowsDeviceNotificationHook:

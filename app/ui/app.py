@@ -16,7 +16,7 @@ from app.ui.views.settings import SettingsView
 from app.ui.views.usb_control import USBControlView
 from app.ui.widgets.common import DemoBanner, StatusBar, StatusPill
 from app.utils.resources import asset_path
-from app.utils.windows import WindowsDeviceNotificationHook, set_app_user_model_id
+from app.utils.windows import WindowsDeviceNotificationHook, freeze_redraw, redraw_widget, set_app_user_model_id
 from app.version import __version__
 
 
@@ -127,19 +127,23 @@ class WireWallApp(tk.Tk):
             self._header_logo_image = None
 
     def show_view(self, name: str) -> None:
-        if self.current_view_key is not None:
-            self.views[self.current_view_key].grid_forget()
-            self.update_idletasks()
         view = self.views[name]
-        view.grid(row=0, column=0, sticky="nsew")
-        self.update_idletasks()
-        view.reset_scroll_position()
-        view.refresh_data()
+        with freeze_redraw(self):
+            for current in self.views.values():
+                if current.winfo_manager() == "grid":
+                    current.grid_forget()
+            self.update_idletasks()
+            view.grid(row=0, column=0, sticky="nsew")
+            view.lift()
+            self.update_idletasks()
+            view.reset_scroll_position()
+            view.refresh_data()
         self.current_view_key = name
         self._refresh_nav_state()
         self.title(f"WireWall {__version__} - {self._view_label(name)}")
         self.set_status(f"Vue active : {self._view_label(name)}", "INFO")
         self.after(50, self._notify_view_resize)
+        self.after(80, self.request_repaint)
 
     def set_status(self, message: str, level: str = "INFO") -> None:
         self.status_bar.set_status(message, level)
@@ -206,10 +210,13 @@ class WireWallApp(tk.Tk):
                 elif task_name == "brain_refresh":
                     refresh_views.add("dashboard")
 
-        if "dashboard" in refresh_views:
-            self.views["dashboard"].refresh_data()
-        if self.current_view_key is not None and self.current_view_key != "dashboard" and self.current_view_key in refresh_views:
-            self.views[self.current_view_key].refresh_data()
+        if refresh_views:
+            with freeze_redraw(self):
+                if "dashboard" in refresh_views:
+                    self.views["dashboard"].refresh_data()
+                if self.current_view_key is not None and self.current_view_key != "dashboard" and self.current_view_key in refresh_views:
+                    self.views[self.current_view_key].refresh_data()
+            self.after(10, self.request_repaint)
         self.after(250, self._poll_backend_events)
 
     def _periodic_refresh(self) -> None:
@@ -252,7 +259,7 @@ class WireWallApp(tk.Tk):
         self._force_repaint_running = True
         try:
             self.update_idletasks()
-            self.update()
+            redraw_widget(self)
         except Exception:
             pass
         finally:
@@ -270,7 +277,8 @@ class WireWallApp(tk.Tk):
 
     def _after_resize_settle(self) -> None:
         self._resize_refresh_id = None
-        self._notify_view_resize()
+        with freeze_redraw(self):
+            self._notify_view_resize()
         self.request_repaint()
 
     def _notify_view_resize(self) -> None:
