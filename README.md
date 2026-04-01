@@ -13,7 +13,7 @@ WireWall est une application desktop Windows de supervision USB orientee cyberse
 ## Verites importantes
 
 - WireWall fonctionne sans Ollama. L'analyse IA est optionnelle et strictement locale.
-- Ollama et le modele recommande `qwen2.5:3b` ne sont pas embarques dans l'executable.
+- Ollama et le modele recommande `qwen2.5:14b` ne sont pas embarques dans l'executable.
 - La distribution `full demo` peut embarquer l'installeur officiel Ollama, mais pas le modele lui-meme.
 - Le modele reste telecharge en seconde phase par l'assistant IA local.
 - Les dossiers runtime `%LOCALAPPDATA%\WireWall` sont crees par l'application au premier lancement.
@@ -26,7 +26,7 @@ WireWall est une application desktop Windows de supervision USB orientee cyberse
 
 ## Ce que 1.3.3 ajoute
 
-- correction des artefacts visuels noirs sur certaines zones de l'interface Windows
+- migration complete de l'interface vers PyQt6 pour eliminer les artefacts visuels noirs de Tkinter/Win32
 - harmonisation du rendu des cartes, des indicateurs et du `Dashboard`
 - ajout d'un kit Ydays dans `docs/` pour preparer la soutenance, le script oral et la demo live
 - alignement du depot pour preparer une release GitHub coherente avec la version de l'application
@@ -60,7 +60,7 @@ WireWall est une application desktop Windows de supervision USB orientee cyberse
 
 - Windows 10 ou 11 x64
 - Python 3.11 x64 pour les usages source et build
-- Tcl/Tk fonctionnel pour Tkinter
+- PyQt6 fonctionnel
 - Inno Setup 6 sur le poste builder si vous voulez produire l'installateur
 - Ollama local seulement si l'analyse IA doit etre utilisee
 - acceptation de l'elevation UAC au lancement de l'application
@@ -72,7 +72,7 @@ py -3.11 -m venv .venv
 .venv\Scripts\activate
 python -m pip install --upgrade pip
 python -m pip install -r requirements-dev.txt
-python scripts\check_runtime.py --require-python 3.11 --require-tk
+python scripts\check_runtime.py --require-python 3.11 --require-qt
 copy config.example.json %LOCALAPPDATA%\WireWall\config\config.json
 python main.py
 ```
@@ -85,7 +85,7 @@ WireWall demandera automatiquement l'elevation UAC si vous n'etes pas deja en ad
 
 ```bat
 python -m pytest -q tests
-python scripts\check_runtime.py --require-python 3.11 --require-tk
+python scripts\check_runtime.py --require-python 3.11 --require-qt
 python scripts\check_release_consistency.py
 ```
 
@@ -113,7 +113,7 @@ scripts\build_installer.bat
 scripts\build_full_installer.bat
 ```
 
-Ce mode telecharge l'installeur officiel Ollama et l'embarque dans l'installateur WireWall. Si `build\third_party\OllamaSetup.exe` est deja present, le cache local est reutilise. Le modele `qwen2.5:3b` n'est toujours pas embarque.
+Ce mode telecharge l'installeur officiel Ollama et l'embarque dans l'installateur WireWall. Si `build\third_party\OllamaSetup.exe` est deja present, le cache local est reutilise. Le modele `qwen2.5:14b` n'est toujours pas embarque.
 
 ### Release complete standard
 
@@ -147,7 +147,7 @@ Mode recommande pour un autre poste :
    - detecter Ollama
    - reutiliser l'installeur Ollama embarque si present
    - sinon installer Ollama via `winget` si possible
-   - telecharger `qwen2.5:3b`
+   - telecharger `qwen2.5:14b`
 
 Si `winget` est indisponible ou si le poste est offline, l'assistant bascule en mode guide. Avec la distribution `full demo`, l'installeur officiel Ollama est deja inclus, mais le modele reste a telecharger separement.
 
@@ -186,7 +186,7 @@ Avant chaque release :
 1. mettre a jour `VERSION` si la distribution ou le comportement changent
 2. mettre a jour `CHANGELOG.md`
 3. mettre a jour `README.md` et les guides impactes
-4. executer `scripts\release.bat` ou `scripts\release_full.bat` sur un builder Windows 10/11 avec Python 3.11 et Tcl/Tk valide
+4. executer `scripts\release.bat` ou `scripts\release_full.bat` sur un builder Windows 10/11 avec Python 3.11 et PyQt6 valide
 5. verifier les artefacts et les hashes
 
 ## Documentation

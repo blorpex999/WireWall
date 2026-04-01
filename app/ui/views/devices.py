@@ -1,10 +1,19 @@
 from __future__ import annotations
 
-import tkinter as tk
-from tkinter import ttk
+from PyQt6.QtWidgets import (
+    QComboBox,
+    QGridLayout,
+    QGroupBox,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QPushButton,
+    QVBoxLayout,
+    QWidget,
+)
 
-from app.ui.views.base import BaseView
 from app.ui.help_content import SCREEN_HELP
+from app.ui.views.base import BaseView
 from app.ui.widgets.common import InlineHelpPanel, LabeledValue, ScrollableDetailText, ScrollableTree, SectionHeader, StatusPill
 from app.utils.datetime import format_for_ui
 from app.utils.ui import (
@@ -37,13 +46,18 @@ class DevicesView(BaseView):
         "Deconnecte": "disconnected",
     }
 
-    def __init__(self, master, controller, app) -> None:
-        super().__init__(master, controller, app)
-        self.columnconfigure(0, weight=3)
-        self.columnconfigure(1, weight=2)
-        self.rowconfigure(3, weight=1)
+    def __init__(self, parent, controller, app) -> None:
+        super().__init__(parent, controller, app)
         self._rows: dict[str, object] = {}
         self._selected_device_key: str | None = None
+
+        layout = QGridLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setHorizontalSpacing(16)
+        layout.setVerticalSpacing(12)
+        layout.setColumnStretch(0, 3)
+        layout.setColumnStretch(1, 2)
+        layout.setRowStretch(3, 1)
 
         self.header = SectionHeader(
             self,
@@ -52,66 +66,61 @@ class DevicesView(BaseView):
             "MODE DEMO" if self.controller.demo_mode else "MODE REEL",
             "WARNING" if self.controller.demo_mode else "INFO",
         )
-        self.header.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 16))
+        layout.addWidget(self.header, 0, 0, 1, 2)
 
         self.help_panel = InlineHelpPanel(
             self,
             button_text=str(SCREEN_HELP["devices"]["button"]),
             sections=list(SCREEN_HELP["devices"]["sections"]),
         )
-        self.help_panel.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(0, 12))
+        layout.addWidget(self.help_panel, 1, 0, 1, 2)
 
-        filters = ttk.LabelFrame(self, text="Filtres et actions", style="Section.TLabelframe", padding=12)
-        filters.grid(row=2, column=0, columnspan=2, sticky="ew", pady=(0, 12))
-        for column in range(6):
-            filters.columnconfigure(column, weight=1 if column in {1, 3, 5} else 0)
+        filters = QGroupBox("Filtres et actions", self)
+        filters_layout = QGridLayout(filters)
+        filters_layout.setHorizontalSpacing(12)
+        filters_layout.setVerticalSpacing(12)
+        filters_layout.setColumnStretch(1, 1)
+        filters_layout.setColumnStretch(3, 1)
+        filters_layout.setColumnStretch(5, 1)
+        layout.addWidget(filters, 2, 0, 1, 2)
 
-        self.search_var = tk.StringVar()
-        self.category_var = tk.StringVar(value="Toutes les categories")
-        self.status_var = tk.StringVar(value="Tous les statuts")
+        filters_layout.addWidget(QLabel("Recherche", filters), 0, 0)
+        self.search_entry = QLineEdit(filters)
+        filters_layout.addWidget(self.search_entry, 0, 1)
 
-        ttk.Label(filters, text="Recherche").grid(row=0, column=0, sticky="w", padx=(0, 8))
-        self.search_entry = ttk.Entry(filters, textvariable=self.search_var)
-        self.search_entry.grid(row=0, column=1, sticky="ew", padx=(0, 12))
-        ttk.Label(filters, text="Categorie").grid(row=0, column=2, sticky="w", padx=(0, 8))
-        self.category_combo = ttk.Combobox(
-            filters,
-            textvariable=self.category_var,
-            values=list(self.CATEGORY_OPTIONS.keys()),
-            state="readonly",
-        )
-        self.category_combo.grid(row=0, column=3, sticky="ew", padx=(0, 12))
-        ttk.Label(filters, text="Statut").grid(row=0, column=4, sticky="w", padx=(0, 8))
-        self.status_combo = ttk.Combobox(
-            filters,
-            textvariable=self.status_var,
-            values=list(self.STATUS_OPTIONS.keys()),
-            state="readonly",
-        )
-        self.status_combo.grid(row=0, column=5, sticky="ew")
-        ttk.Button(filters, text="Appliquer les filtres", command=self.refresh_data).grid(row=1, column=4, sticky="e", pady=(12, 0))
-        ttk.Button(filters, text="Rafraichir l'USB", style="Accent.TButton", command=self._refresh_monitor).grid(
-            row=1,
-            column=5,
-            sticky="e",
-            pady=(12, 0),
-        )
-        self.search_var.trace_add("write", lambda *_args: self.schedule_refresh(250))
-        self.search_entry.bind("<Return>", lambda _event: self.refresh_data())
-        self.category_combo.bind("<<ComboboxSelected>>", lambda _event: self.refresh_data())
-        self.status_combo.bind("<<ComboboxSelected>>", lambda _event: self.refresh_data())
+        filters_layout.addWidget(QLabel("Categorie", filters), 0, 2)
+        self.category_combo = QComboBox(filters)
+        self.category_combo.addItems(list(self.CATEGORY_OPTIONS.keys()))
+        filters_layout.addWidget(self.category_combo, 0, 3)
 
-        tree_frame = ttk.LabelFrame(self, text="Inventaire des peripheriques", style="Section.TLabelframe", padding=12)
-        tree_frame.grid(row=3, column=0, sticky="nsew", padx=(0, 8))
-        tree_frame.rowconfigure(0, weight=1)
-        tree_frame.columnconfigure(0, weight=1)
-        detail_frame = ttk.LabelFrame(self, text="Fiche peripherique", style="Section.TLabelframe", padding=12)
-        detail_frame.grid(row=3, column=1, sticky="nsew", padx=(8, 0))
-        detail_frame.columnconfigure(0, weight=1)
-        detail_frame.rowconfigure(3, weight=1)
+        filters_layout.addWidget(QLabel("Statut", filters), 0, 4)
+        self.status_combo = QComboBox(filters)
+        self.status_combo.addItems(list(self.STATUS_OPTIONS.keys()))
+        filters_layout.addWidget(self.status_combo, 0, 5)
+
+        apply_button = QPushButton("Appliquer les filtres", filters)
+        apply_button.clicked.connect(self.refresh_data)
+        filters_layout.addWidget(apply_button, 1, 4)
+
+        refresh_button = QPushButton("Rafraichir l'USB", filters)
+        refresh_button.clicked.connect(self._refresh_monitor)
+        filters_layout.addWidget(refresh_button, 1, 5)
+
+        self.search_entry.textChanged.connect(lambda _text: self.schedule_refresh(250))
+        self.search_entry.returnPressed.connect(self.refresh_data)
+        self.category_combo.currentTextChanged.connect(lambda _text: self.refresh_data())
+        self.status_combo.currentTextChanged.connect(lambda _text: self.refresh_data())
+
+        tree_frame = QGroupBox("Inventaire des peripheriques", self)
+        tree_layout = QVBoxLayout(tree_frame)
+        detail_frame = QGroupBox("Fiche peripherique", self)
+        detail_layout = QVBoxLayout(detail_frame)
+        detail_layout.setSpacing(12)
+        layout.addWidget(tree_frame, 3, 0)
+        layout.addWidget(detail_frame, 3, 1)
 
         self.table = ScrollableTree(tree_frame, ("vidpid", "name", "category", "trust", "status", "score"), height=18)
-        self.table.grid(row=0, column=0, sticky="nsew")
+        tree_layout.addWidget(self.table)
         for column, label, width in (
             ("vidpid", "VID:PID", 100),
             ("name", "Peripherique", 280),
@@ -126,23 +135,31 @@ class DevicesView(BaseView):
         for tone in ("LOW", "MEDIUM", "HIGH", "CRITICAL", "connected", "disconnected", "KNOWN", "NEW", "RARE", "DEVIATION"):
             self.table.tree.tag_configure(tone, foreground=severity_color(tone))
 
-        detail_top = ttk.Frame(detail_frame, style="Card.TFrame", padding=12)
-        detail_top.grid(row=0, column=0, sticky="ew")
-        detail_top.columnconfigure(0, weight=1)
-        ttk.Label(detail_top, text="Selection actuelle", style="CardMuted.TLabel").grid(row=0, column=0, sticky="w")
-        badge_row = ttk.Frame(detail_top, style="CardInner.TFrame")
-        badge_row.grid(row=0, column=1, sticky="e")
+        detail_top = QWidget(detail_frame)
+        detail_top.setObjectName("card")
+        detail_top_layout = QHBoxLayout(detail_top)
+        detail_top_layout.setContentsMargins(12, 12, 12, 12)
+        detail_top_layout.addWidget(QLabel("Selection actuelle", detail_top), 1)
+        badge_row = QWidget(detail_top)
+        badge_row_layout = QHBoxLayout(badge_row)
+        badge_row_layout.setContentsMargins(0, 0, 0, 0)
+        badge_row_layout.setSpacing(8)
         self.status_badge = StatusPill(badge_row, "INCONNU", "INFO")
-        self.status_badge.pack(side="left")
         self.trust_badge = StatusPill(badge_row, "N/A", "INFO")
-        self.trust_badge.pack(side="left", padx=(8, 0))
         self.risk_badge = StatusPill(badge_row, "LOW", "LOW")
-        self.risk_badge.pack(side="left", padx=(8, 0))
+        badge_row_layout.addWidget(self.status_badge)
+        badge_row_layout.addWidget(self.trust_badge)
+        badge_row_layout.addWidget(self.risk_badge)
+        detail_top_layout.addWidget(badge_row, 0)
+        detail_layout.addWidget(detail_top)
 
-        metrics = ttk.Frame(detail_frame, style="Card.TFrame", padding=12)
-        metrics.grid(row=1, column=0, sticky="ew", pady=(12, 12))
-        for column in range(2):
-            metrics.columnconfigure(column, weight=1)
+        metrics = QWidget(detail_frame)
+        metrics.setObjectName("card")
+        metrics_layout = QGridLayout(metrics)
+        metrics_layout.setContentsMargins(12, 12, 12, 12)
+        metrics_layout.setHorizontalSpacing(10)
+        metrics_layout.setVerticalSpacing(8)
+        detail_layout.addWidget(metrics)
         self.values = {
             "name": LabeledValue(metrics, "Nom"),
             "vidpid": LabeledValue(metrics, "VID:PID"),
@@ -176,37 +193,34 @@ class DevicesView(BaseView):
             ("score", 6, 1),
         ]
         for key, row, column in positions:
-            self.values[key].grid(row=row, column=column, sticky="ew", padx=(0 if column == 0 else 10, 0), pady=6)
+            metrics_layout.addWidget(self.values[key], row, column)
 
-        actions = ttk.Frame(detail_frame)
-        actions.grid(row=2, column=0, sticky="ew", pady=(0, 12))
-        self.whitelist_button = ttk.Button(
-            actions,
-            text="Ajouter a la liste blanche",
-            style="Accent.TButton",
-            command=self._whitelist,
-            state="disabled",
-        )
-        self.whitelist_button.pack(side="left")
-        self.blacklist_button = ttk.Button(
-            actions,
-            text="Ajouter a la liste noire",
-            style="Danger.TButton",
-            command=self._blacklist,
-            state="disabled",
-        )
-        self.blacklist_button.pack(side="left", padx=8)
+        actions = QWidget(detail_frame)
+        actions_layout = QHBoxLayout(actions)
+        actions_layout.setContentsMargins(0, 0, 0, 0)
+        actions_layout.setSpacing(8)
+        self.whitelist_button = QPushButton("Ajouter a la liste blanche", actions)
+        self.blacklist_button = QPushButton("Ajouter a la liste noire", actions)
+        self.blacklist_button.setObjectName("danger")
+        self.whitelist_button.setEnabled(False)
+        self.blacklist_button.setEnabled(False)
+        self.whitelist_button.clicked.connect(self._whitelist)
+        self.blacklist_button.clicked.connect(self._blacklist)
+        actions_layout.addWidget(self.whitelist_button)
+        actions_layout.addWidget(self.blacklist_button)
+        actions_layout.addStretch(1)
+        detail_layout.addWidget(actions)
 
         self.detail_text = ScrollableDetailText(detail_frame, height=16)
-        self.detail_text.grid(row=3, column=0, sticky="nsew")
+        detail_layout.addWidget(self.detail_text, 1)
         self._clear_selection_state()
 
     def refresh_data(self) -> None:
         selected_key = self._get_selected_device_key() or self._selected_device_key
         devices = self.controller.list_devices(
-            search=self.search_var.get().strip(),
-            category=self.CATEGORY_OPTIONS[self.category_var.get()],
-            status=self.STATUS_OPTIONS[self.status_var.get()],
+            search=self.search_entry.text().strip(),
+            category=self.CATEGORY_OPTIONS[self.category_combo.currentText()],
+            status=self.STATUS_OPTIONS[self.status_combo.currentText()],
         )
         self._rows.clear()
         self.table.clear()
@@ -304,8 +318,8 @@ class DevicesView(BaseView):
                 history="\n".join(history_lines),
             )
         )
-        self.whitelist_button.configure(state="normal")
-        self.blacklist_button.configure(state="normal")
+        self.whitelist_button.setEnabled(True)
+        self.blacklist_button.setEnabled(True)
 
     def _clear_selection_state(self) -> None:
         self._selected_device_key = None
@@ -315,8 +329,8 @@ class DevicesView(BaseView):
         for value in self.values.values():
             value.set("-")
         self.detail_text.set_text("Selectionnez un peripherique pour afficher sa fiche technique, sa baseline et son historique.")
-        self.whitelist_button.configure(state="disabled")
-        self.blacklist_button.configure(state="disabled")
+        self.whitelist_button.setEnabled(False)
+        self.blacklist_button.setEnabled(False)
 
     def _get_selected_device_key(self) -> str | None:
         device = self._selected_device()

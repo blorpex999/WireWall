@@ -17,7 +17,7 @@
 #define AppName "WireWall"
 #define AppPublisher "Ynov Campus"
 #define AppExeName "WireWall.exe"
-#define RecommendedModel "qwen2.5:3b"
+#define RecommendedModel "qwen2.5:14b"
 
 [Setup]
 AppId={{5A4E5F3D-6928-4A8C-95AB-B8C22FE367E2}

@@ -1,13 +1,29 @@
 from __future__ import annotations
 
-import tkinter as tk
-from tkinter import ttk
+import logging
+import platform
+
+from PyQt6.QtCore import QTimer, Qt
+from PyQt6.QtGui import QCloseEvent, QIcon, QPixmap, QResizeEvent
+from PyQt6.QtWidgets import (
+    QApplication,
+    QFrame,
+    QHBoxLayout,
+    QLabel,
+    QMainWindow,
+    QPushButton,
+    QStackedWidget,
+    QSystemTrayIcon,
+    QVBoxLayout,
+    QWidget,
+)
 
 from app.ui.controller import AppController
-from app.ui.theme import apply_dark_theme
+from app.ui.theme import COLORS, get_stylesheet
 from app.ui.views.about import AboutView
 from app.ui.views.ai_analysis import AIAnalysisView
 from app.ui.views.alerts import AlertsView
+from app.ui.views.base import BaseView
 from app.ui.views.dashboard import DashboardView
 from app.ui.views.devices import DevicesView
 from app.ui.views.history import HistoryView
@@ -16,60 +32,27 @@ from app.ui.views.settings import SettingsView
 from app.ui.views.usb_control import USBControlView
 from app.ui.widgets.common import DemoBanner, StatusBar, StatusPill
 from app.utils.resources import asset_path
-from app.utils.windows import WindowsDeviceNotificationHook, freeze_redraw, redraw_widget, set_app_user_model_id
+from app.utils.windows import WindowsDeviceNotificationFilter
 from app.version import __version__
 
+LOGGER = logging.getLogger(__name__)
 
-class WireWallApp(tk.Tk):
+
+class WireWallMainWindow(QMainWindow):
     def __init__(self, container) -> None:
         super().__init__()
-        self.title(f"WireWall {__version__}")
-        self.geometry("1450x920")
-        self.minsize(1180, 780)
-        apply_dark_theme(self)
-
         self.container = container
         self.controller = AppController(container)
-        self.hook = WindowsDeviceNotificationHook()
-        self.nav_buttons: dict[str, ttk.Button] = {}
+        self.nav_buttons: dict[str, QPushButton] = {}
+        self.views: dict[str, BaseView] = {}
+        self.current_view_key: str | None = None
+        self._investigation_windows: list[QWidget] = []
+        self._usb_filter: WindowsDeviceNotificationFilter | None = None
+        self._tray_icon: QSystemTrayIcon | None = None
         self._repaint_scheduled = False
         self._force_repaint_running = False
-        self._resize_refresh_id: str | None = None
-        self._window_icon_image: tk.PhotoImage | None = None
-        self._header_logo_image: tk.PhotoImage | None = None
-        self._toast_windows: list[tk.Toplevel] = []
-        self._configure_window_icon()
-
-        self.columnconfigure(1, weight=1)
-        self.rowconfigure(1, weight=1)
-
-        self.banner = DemoBanner(self, visible=self.controller.demo_mode)
-        if self.controller.demo_mode:
-            self.banner.grid(row=0, column=0, columnspan=2, sticky="ew", padx=14, pady=(14, 0))
-
-        self.sidebar = ttk.Frame(self, style="Sidebar.TFrame", padding=16)
-        self.sidebar.grid(row=1, column=0, sticky="nsw", padx=(14, 8), pady=14)
-        self.sidebar.columnconfigure(0, weight=1)
-
-        header = ttk.Frame(self.sidebar, style="SidebarHeader.TFrame", padding=(4, 2, 4, 16))
-        header.grid(row=0, column=0, sticky="ew")
-        if self._header_logo_image is not None:
-            ttk.Label(header, image=self._header_logo_image, style="SidebarLogo.TLabel").grid(row=0, column=0, rowspan=2, sticky="w", padx=(0, 10))
-        ttk.Label(header, text="WireWall", style="NavTitle.TLabel").grid(row=0, column=1, sticky="w")
-        ttk.Label(header, text="Surveillance USB Windows", style="NavSubTitle.TLabel").grid(row=1, column=1, sticky="w", pady=(4, 6))
-        self.sidebar_mode = StatusPill(header, "", "INFO")
-        self.sidebar_mode.grid(row=0, column=2, rowspan=2, sticky="e")
-        header.columnconfigure(1, weight=1)
-        self._refresh_mode_badges()
-
-        self.content = ttk.Frame(self, padding=(0, 14, 14, 0))
-        self.content.grid(row=1, column=1, sticky="nsew")
-        self.content.rowconfigure(0, weight=1)
-        self.content.columnconfigure(0, weight=1)
-
-        self.status_bar = StatusBar(self)
-        self.status_bar.grid(row=2, column=0, columnspan=2, sticky="ew", padx=14, pady=(0, 14))
-        self.status_bar.set_mode(self.controller.demo_mode)
+        self._is_closing = False
+        self._window_icon = QIcon()
 
         self.view_specs = [
             ("dashboard", "Tableau de bord", DashboardView),
@@ -82,84 +65,212 @@ class WireWallApp(tk.Tk):
             ("settings", "Parametres", SettingsView),
             ("about", "A propos", AboutView),
         ]
-        self.views = {key: view_class(self.content, self.controller, self) for key, _label, view_class in self.view_specs}
-        self.current_view_key: str | None = None
 
-        for index, (key, label, _view_class) in enumerate(self.view_specs, start=1):
-            button = ttk.Button(
-                self.sidebar,
-                text=label,
-                style="Sidebar.TButton",
-                command=lambda value=key: self.show_view(value),
-            )
-            button.grid(row=index, column=0, sticky="ew", pady=4)
-            self.nav_buttons[key] = button
+        self.setWindowTitle(f"WireWall {__version__}")
+        self.resize(1450, 920)
+        self.setMinimumSize(1180, 780)
+        self.setStyleSheet(get_stylesheet())
+        self._configure_window_icon()
 
-        self.protocol("WM_DELETE_WINDOW", self._on_close)
-        self.bind("<Configure>", self._on_window_configure)
-        self.after(150, self._attach_hook)
-        self.after(250, self._poll_backend_events)
-        self.after(max(1500, self.controller.settings.dashboard_refresh_ms), self._periodic_refresh)
+        root = QWidget(self)
+        self.setCentralWidget(root)
+        root_layout = QVBoxLayout(root)
+        root_layout.setContentsMargins(14, 14, 14, 14)
+        root_layout.setSpacing(8)
+
+        self.banner = DemoBanner(root, visible=self.controller.demo_mode)
+        root_layout.addWidget(self.banner)
+
+        shell = QWidget(root)
+        shell_layout = QHBoxLayout(shell)
+        shell_layout.setContentsMargins(0, 0, 0, 0)
+        shell_layout.setSpacing(8)
+        root_layout.addWidget(shell, 1)
+
+        self.sidebar = self._build_sidebar(shell)
+        shell_layout.addWidget(self.sidebar)
+
+        self.stack = QStackedWidget(shell)
+        shell_layout.addWidget(self.stack, 1)
+
+        for key, _label, view_class in self.view_specs:
+            view = view_class(self.stack, self.controller, self)
+            self.views[key] = view
+            self.stack.addWidget(view)
+
+        self.status_bar_widget = StatusBar(self)
+        self.status_bar_widget.set_mode(self.controller.demo_mode)
+        self.setStatusBar(self.status_bar_widget)
+
+        self._poll_timer = QTimer(self)
+        self._poll_timer.timeout.connect(self._poll_backend_events)
+        self._poll_timer.start(250)
+
+        self._periodic_timer = QTimer(self)
+        self._periodic_timer.setSingleShot(True)
+        self._periodic_timer.timeout.connect(self._periodic_refresh)
+
+        self._resize_timer = QTimer(self)
+        self._resize_timer.setSingleShot(True)
+        self._resize_timer.timeout.connect(self._handle_resize_settle)
+
+        self._setup_tray_icon()
+        self._install_native_usb_filter()
+        self._refresh_mode_badges()
+        self._schedule_periodic_refresh()
 
         self.controller.start_services()
         self.show_view("dashboard")
         self.controller.request_health_refresh()
         self.controller.request_brain_refresh()
         self.set_status("WireWall initialise.", "OK")
-        self.after(200, lambda: self._notify_view_resize())
+        QTimer.singleShot(150, self._notify_view_resize)
+
+    def _build_sidebar(self, parent: QWidget) -> QFrame:
+        sidebar = QFrame(parent)
+        sidebar.setObjectName("sidebar")
+        sidebar.setFixedWidth(220)
+
+        layout = QVBoxLayout(sidebar)
+        layout.setContentsMargins(16, 16, 16, 16)
+        layout.setSpacing(8)
+
+        header = QWidget(sidebar)
+        header_layout = QHBoxLayout(header)
+        header_layout.setContentsMargins(4, 2, 4, 16)
+        header_layout.setSpacing(10)
+        layout.addWidget(header)
+
+        logo_label = QLabel(header)
+        logo_label.setAlignment(Qt.AlignmentFlag.AlignTop)
+        logo_pixmap = self._load_logo_pixmap()
+        if logo_pixmap is not None:
+            logo_label.setPixmap(logo_pixmap)
+            header_layout.addWidget(logo_label, 0, Qt.AlignmentFlag.AlignTop)
+
+        title_box = QWidget(header)
+        title_layout = QVBoxLayout(title_box)
+        title_layout.setContentsMargins(0, 0, 0, 0)
+        title_layout.setSpacing(4)
+        header_layout.addWidget(title_box, 1)
+
+        title = QLabel("WireWall", title_box)
+        title.setStyleSheet("font-size: 22pt; font-weight: 600;")
+        title_layout.addWidget(title)
+
+        subtitle = QLabel("Surveillance USB Windows", title_box)
+        subtitle.setObjectName("muted")
+        subtitle.setWordWrap(True)
+        title_layout.addWidget(subtitle)
+
+        self.sidebar_mode = StatusPill(header, "", "INFO")
+        header_layout.addWidget(self.sidebar_mode, 0, Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignRight)
+
+        for key, label, _view_class in self.view_specs:
+            button = QPushButton(label, sidebar)
+            button.setObjectName("nav_button")
+            button.setProperty("active", False)
+            button.clicked.connect(lambda _checked=False, value=key: self.show_view(value))
+            button.setCursor(Qt.CursorShape.PointingHandCursor)
+            button.setMinimumHeight(38)
+            layout.addWidget(button)
+            self.nav_buttons[key] = button
+
+        layout.addStretch(1)
+        return sidebar
+
+    def _load_logo_pixmap(self) -> QPixmap | None:
+        for path in (
+            asset_path("assets", "wirewall_logo_128.png"),
+            asset_path("assets", "wirewall_logo.png"),
+        ):
+            if not path.exists():
+                continue
+            pixmap = QPixmap(str(path))
+            if not pixmap.isNull():
+                return pixmap.scaled(
+                    52,
+                    52,
+                    Qt.AspectRatioMode.KeepAspectRatio,
+                    Qt.TransformationMode.SmoothTransformation,
+                )
+        return None
 
     def _configure_window_icon(self) -> None:
-        try:
-            set_app_user_model_id("WireWall.Desktop")
-            logo_ico = asset_path("assets", "wirewall.ico")
-            logo_png = asset_path("assets", "wirewall_logo_128.png")
-            if logo_png.exists():
-                self._window_icon_image = tk.PhotoImage(file=str(logo_png))
-                self._header_logo_image = self._window_icon_image.subsample(2, 2)
-                self.iconphoto(True, self._window_icon_image)
-            if logo_ico.exists():
-                try:
-                    self.iconbitmap(str(logo_ico))
-                except Exception:
-                    pass
-        except Exception:
-            self._window_icon_image = None
-            self._header_logo_image = None
+        for path in (
+            asset_path("assets", "wirewall.ico"),
+            asset_path("assets", "wirewall_logo_128.png"),
+            asset_path("assets", "wirewall_logo.png"),
+        ):
+            if not path.exists():
+                continue
+            icon = QIcon(str(path))
+            if icon.isNull():
+                continue
+            self._window_icon = icon
+            self.setWindowIcon(icon)
+            app = QApplication.instance()
+            if app is not None:
+                app.setWindowIcon(icon)
+            return
+
+    def _setup_tray_icon(self) -> None:
+        if not QSystemTrayIcon.isSystemTrayAvailable():
+            return
+        icon = self._window_icon
+        if icon.isNull():
+            return
+        tray = QSystemTrayIcon(icon, self)
+        tray.setToolTip("WireWall")
+        tray.show()
+        self._tray_icon = tray
+
+    def _install_native_usb_filter(self) -> None:
+        if platform.system() != "Windows":
+            return
+        app = QApplication.instance()
+        if app is None:
+            return
+
+        self._usb_filter = WindowsDeviceNotificationFilter(
+            lambda _reason, _code: QTimer.singleShot(0, self.controller.refresh_monitor)
+        )
+        app.installNativeEventFilter(self._usb_filter)
 
     def show_view(self, name: str) -> None:
         view = self.views[name]
-        with freeze_redraw(self):
-            for current in self.views.values():
-                if current.winfo_manager() == "grid":
-                    current.grid_forget()
-            self.update_idletasks()
-            view.grid(row=0, column=0, sticky="nsew")
-            view.lift()
-            self.update_idletasks()
-            view.reset_scroll_position()
-            view.refresh_data()
+        self.stack.setCurrentWidget(view)
         self.current_view_key = name
-        self._refresh_nav_state()
-        self.title(f"WireWall {__version__} - {self._view_label(name)}")
+        self._refresh_nav_state(name)
+        try:
+            view.refresh_data()
+            view.reset_scroll_position()
+        except Exception:
+            LOGGER.exception("Erreur lors du chargement de la vue %s.", name)
+            self.set_status(f"Erreur de chargement de la vue : {self._view_label(name)}", "ERROR")
+        self.setWindowTitle(f"WireWall {__version__} - {self._view_label(name)}")
         self.set_status(f"Vue active : {self._view_label(name)}", "INFO")
-        self.after(50, self._notify_view_resize)
-        self.after(80, self.request_repaint)
-
-    def set_status(self, message: str, level: str = "INFO") -> None:
-        self.status_bar.set_status(message, level)
+        QTimer.singleShot(0, self._notify_view_resize)
+        QTimer.singleShot(0, self.request_repaint)
 
     def show_investigation(self, device_key: str) -> None:
-        """Ouvre une fenetre Toplevel avec la timeline complete du device."""
         from app.ui.views.investigation import InvestigationWindow
 
-        win = InvestigationWindow(self, self.controller, device_key)
-        win.focus()
+        window = InvestigationWindow(self, self.controller, device_key)
+        self._investigation_windows.append(window)
+        window.finished.connect(lambda _code, current=window: self._forget_investigation_window(current))
+        window.show()
+        window.raise_()
+        window.activateWindow()
 
-    def _attach_hook(self) -> None:
-        self.update_idletasks()
-        attached = self.hook.attach(self, lambda _reason, _code: self.after_idle(self.controller.refresh_monitor))
-        if attached:
-            self.set_status("Hook Windows USB attache.", "INFO")
+    def _forget_investigation_window(self, window: QWidget) -> None:
+        try:
+            self._investigation_windows.remove(window)
+        except ValueError:
+            pass
+
+    def set_status(self, message: str, level: str = "INFO") -> None:
+        self.status_bar_widget.set_status(message, level)
 
     def _poll_backend_events(self) -> None:
         refresh_views: set[str] = set()
@@ -188,7 +299,10 @@ class WireWallApp(tk.Tk):
                 self.controller.request_brain_refresh()
                 self.set_status(payload.get("message", "Nouvelle alerte."), payload.get("severity", "WARNING"))
                 refresh_views.update({"dashboard", "alerts"})
-                if self.controller.settings.desktop_notifications_enabled and payload.get("severity") in {"HIGH", "CRITICAL"}:
+                if (
+                    self.controller.settings.desktop_notifications_enabled
+                    and payload.get("severity") in {"HIGH", "CRITICAL"}
+                ):
                     self._show_notification_toast(
                         payload.get("title", "Alerte WireWall"),
                         payload.get("message", "Nouvelle alerte."),
@@ -211,21 +325,72 @@ class WireWallApp(tk.Tk):
                     refresh_views.add("dashboard")
 
         if refresh_views:
-            with freeze_redraw(self):
-                if "dashboard" in refresh_views:
-                    self.views["dashboard"].refresh_data()
-                if self.current_view_key is not None and self.current_view_key != "dashboard" and self.current_view_key in refresh_views:
-                    self.views[self.current_view_key].refresh_data()
-            self.after(10, self.request_repaint)
-        self.after(250, self._poll_backend_events)
+            if "dashboard" in refresh_views:
+                self._refresh_view("dashboard")
+            if self.current_view_key is not None and self.current_view_key != "dashboard" and self.current_view_key in refresh_views:
+                self._refresh_view(self.current_view_key)
+            self.request_repaint()
+
+    def _refresh_view(self, key: str) -> None:
+        try:
+            self.views[key].refresh_data()
+        except Exception:
+            LOGGER.exception("Erreur pendant le refresh de la vue %s.", key)
+
+    def _schedule_periodic_refresh(self) -> None:
+        interval = max(1500, int(self.controller.settings.dashboard_refresh_ms))
+        self._periodic_timer.start(interval)
 
     def _periodic_refresh(self) -> None:
         self.controller.request_health_refresh()
-        self.after(max(1500, self.controller.settings.dashboard_refresh_ms), self._periodic_refresh)
+        self._schedule_periodic_refresh()
 
-    def _refresh_nav_state(self) -> None:
+    def request_repaint(self) -> None:
+        if self._repaint_scheduled or self._force_repaint_running:
+            return
+        self._repaint_scheduled = True
+        QTimer.singleShot(0, self._force_repaint)
+
+    def _force_repaint(self) -> None:
+        if self._force_repaint_running:
+            return
+        self._repaint_scheduled = False
+        self._force_repaint_running = True
+        try:
+            self.repaint()
+            QApplication.processEvents()
+        except Exception:  # pragma: no cover - UI safety net
+            LOGGER.exception("Erreur pendant le repaint force.")
+        finally:
+            self._force_repaint_running = False
+
+    def resizeEvent(self, event: QResizeEvent) -> None:  # noqa: N802
+        super().resizeEvent(event)
+        if not self._is_closing:
+            self._resize_timer.start(100)
+
+    def _handle_resize_settle(self) -> None:
+        self._notify_view_resize()
+        self.request_repaint()
+
+    def _notify_view_resize(self) -> None:
+        if self.current_view_key is None:
+            return
+        view = self.views.get(self.current_view_key)
+        if view is None:
+            return
+        try:
+            view.on_host_resize(self.stack.width(), self.stack.height())
+        except Exception:  # pragma: no cover - UI safety net
+            LOGGER.exception("Erreur pendant le resize de la vue %s.", self.current_view_key)
+
+    def _refresh_nav_state(self, active_key: str | None = None) -> None:
+        target = active_key or self.current_view_key
         for key, button in self.nav_buttons.items():
-            button.configure(style="SidebarActive.TButton" if key == self.current_view_key else "Sidebar.TButton")
+            button.setProperty("active", key == target)
+            button.style().unpolish(button)
+            button.style().polish(button)
+            button.update()
 
     def _refresh_mode_badges(self) -> None:
         if self.controller.demo_mode:
@@ -239,91 +404,43 @@ class WireWallApp(tk.Tk):
                 return label
         return key
 
-    def _on_close(self) -> None:
-        self.hook.detach()
-        self.controller.stop_services()
-        for toast in list(self._toast_windows):
-            self._dismiss_toast(toast)
-        self.destroy()
-
-    def request_repaint(self) -> None:
-        if self._repaint_scheduled or self._force_repaint_running:
+    def _show_notification_toast(self, title: str, message: str, severity: str) -> None:
+        if self._tray_icon is None:
             return
-        self._repaint_scheduled = True
-        self.after_idle(self._force_repaint)
+        icon_type = {
+            "HIGH": QSystemTrayIcon.MessageIcon.Warning,
+            "CRITICAL": QSystemTrayIcon.MessageIcon.Critical,
+        }.get(severity, QSystemTrayIcon.MessageIcon.Information)
+        self._tray_icon.showMessage(title, message, icon_type, 4000)
 
-    def _force_repaint(self) -> None:
-        if self._force_repaint_running:
+    def closeEvent(self, event: QCloseEvent) -> None:  # noqa: N802
+        if self._is_closing:
+            event.accept()
             return
-        self._repaint_scheduled = False
-        self._force_repaint_running = True
+
+        self._is_closing = True
+        self._poll_timer.stop()
+        self._periodic_timer.stop()
+        self._resize_timer.stop()
+
+        app = QApplication.instance()
+        if app is not None and self._usb_filter is not None:
+            app.removeNativeEventFilter(self._usb_filter)
+            self._usb_filter = None
+
+        if self._tray_icon is not None:
+            self._tray_icon.hide()
+
+        for window in list(self._investigation_windows):
+            window.close()
+        self._investigation_windows.clear()
+
         try:
-            self.update_idletasks()
-            redraw_widget(self)
+            self.controller.stop_services()
         except Exception:
-            pass
-        finally:
-            self._force_repaint_running = False
+            LOGGER.exception("Erreur pendant l'arret des services WireWall.")
 
-    def _on_window_configure(self, event: tk.Event) -> None:
-        if event.widget is not self:
-            return
-        if self._resize_refresh_id is not None:
-            try:
-                self.after_cancel(self._resize_refresh_id)
-            except Exception:
-                pass
-        self._resize_refresh_id = self.after(100, self._after_resize_settle)
+        event.accept()
 
-    def _after_resize_settle(self) -> None:
-        self._resize_refresh_id = None
-        with freeze_redraw(self):
-            self._notify_view_resize()
-        self.request_repaint()
 
-    def _notify_view_resize(self) -> None:
-        if self.current_view_key is None:
-            return
-        try:
-            view = self.views[self.current_view_key]
-            view.on_host_resize(self.content.winfo_width(), self.content.winfo_height())
-        except Exception:
-            pass
-
-    def _show_notification_toast(self, title: str, message: str, level: str) -> None:
-        try:
-            toast = tk.Toplevel(self)
-            toast.overrideredirect(True)
-            toast.attributes("-topmost", True)
-            toast.configure(bg="#18212b")
-            frame = tk.Frame(toast, bg="#18212b", highlightbackground="#263241", highlightthickness=1, padx=12, pady=10)
-            frame.pack(fill="both", expand=True)
-            indicator = tk.Canvas(frame, width=10, height=10, bg="#18212b", highlightthickness=0)
-            indicator.grid(row=0, column=0, rowspan=2, sticky="nw", padx=(0, 10))
-            indicator.create_oval(0, 0, 10, 10, fill={"HIGH": "#FF944D", "CRITICAL": "#FF5D73"}.get(level, "#4AB0FF"), outline="")
-            tk.Label(frame, text=title, bg="#18212b", fg="#FFFFFF", font=("Segoe UI Semibold", 10)).grid(row=0, column=1, sticky="w")
-            tk.Label(frame, text=message, bg="#18212b", fg="#C7D2DE", font=("Segoe UI", 9), justify="left", wraplength=320).grid(
-                row=1,
-                column=1,
-                sticky="w",
-                pady=(4, 0),
-            )
-            toast.update_idletasks()
-            width = toast.winfo_width()
-            height = toast.winfo_height()
-            x = self.winfo_screenwidth() - width - 24
-            y = self.winfo_screenheight() - height - 80 - (len(self._toast_windows) * (height + 8))
-            toast.geometry(f"+{max(20, x)}+{max(20, y)}")
-            self._toast_windows.append(toast)
-            toast.after(4200, lambda current=toast: self._dismiss_toast(current))
-        except Exception:
-            pass
-
-    def _dismiss_toast(self, toast: tk.Toplevel) -> None:
-        try:
-            if toast in self._toast_windows:
-                self._toast_windows.remove(toast)
-            if toast.winfo_exists():
-                toast.destroy()
-        except Exception:
-            pass
+WireWallApp = WireWallMainWindow

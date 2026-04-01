@@ -1,7 +1,17 @@
 from __future__ import annotations
 
-import tkinter as tk
-from tkinter import ttk
+from PyQt6.QtWidgets import (
+    QComboBox,
+    QFrame,
+    QGridLayout,
+    QGroupBox,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QPushButton,
+    QVBoxLayout,
+    QWidget,
+)
 
 from app.ui.help_content import SCREEN_HELP
 from app.ui.theme import COLORS
@@ -37,70 +47,70 @@ class AlertsView(BaseView):
         "Ignorer temporairement": "ignore_temporary",
     }
 
-    def __init__(self, master, controller, app) -> None:
-        super().__init__(master, controller, app)
-        self.columnconfigure(0, weight=3)
-        self.columnconfigure(1, weight=2)
-        self.rowconfigure(3, weight=1)
+    def __init__(self, parent, controller, app) -> None:
+        super().__init__(parent, controller, app)
         self._rows: dict[str, object] = {}
         self._selected_alert_key: str | None = None
         self._quick_action_busy = False
+
+        layout = QGridLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setHorizontalSpacing(16)
+        layout.setVerticalSpacing(12)
+        layout.setColumnStretch(0, 3)
+        layout.setColumnStretch(1, 2)
+        layout.setRowStretch(3, 1)
 
         self.header = SectionHeader(
             self,
             "Centre d'alertes",
             "Lecture rapide des alertes critiques, suivi d'incident et decisions analyste.",
         )
-        self.header.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 16))
+        layout.addWidget(self.header, 0, 0, 1, 2)
 
         self.help_panel = InlineHelpPanel(
             self,
             button_text=str(SCREEN_HELP["alerts"]["button"]),
             sections=list(SCREEN_HELP["alerts"]["sections"]),
         )
-        self.help_panel.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(0, 12))
+        layout.addWidget(self.help_panel, 1, 0, 1, 2)
 
-        filters = ttk.LabelFrame(self, text="Filtres", style="Section.TLabelframe", padding=12)
-        filters.grid(row=2, column=0, columnspan=2, sticky="ew", pady=(0, 12))
-        for column in range(4):
-            filters.columnconfigure(column, weight=1 if column in {1, 3} else 0)
-        self.severity_var = tk.StringVar(value="Toutes")
-        self.ack_var = tk.StringVar(value="Toutes")
-        ttk.Label(filters, text="Gravite").grid(row=0, column=0, sticky="w", padx=(0, 8))
-        self.severity_combo = ttk.Combobox(
-            filters,
-            textvariable=self.severity_var,
-            values=["Toutes", "LOW", "MEDIUM", "HIGH", "CRITICAL"],
-            state="readonly",
-        )
-        self.severity_combo.grid(row=0, column=1, sticky="ew", padx=(0, 12))
-        ttk.Label(filters, text="Etat").grid(row=0, column=2, sticky="w", padx=(0, 8))
-        self.ack_combo = ttk.Combobox(
-            filters,
-            textvariable=self.ack_var,
-            values=list(self.ACK_OPTIONS.keys()),
-            state="readonly",
-        )
-        self.ack_combo.grid(row=0, column=3, sticky="ew")
-        ttk.Button(filters, text="Appliquer", command=self.refresh_data).grid(row=1, column=2, sticky="e", pady=(12, 0))
-        ttk.Button(filters, text="Rafraichir", style="Accent.TButton", command=self.refresh_data).grid(
-            row=1,
-            column=3,
-            sticky="e",
-            pady=(12, 0),
-        )
-        self.severity_combo.bind("<<ComboboxSelected>>", lambda _event: self.refresh_data())
-        self.ack_combo.bind("<<ComboboxSelected>>", lambda _event: self.refresh_data())
+        filters = QGroupBox("Filtres", self)
+        filters_layout = QGridLayout(filters)
+        filters_layout.setHorizontalSpacing(12)
+        filters_layout.setVerticalSpacing(12)
+        filters_layout.setColumnStretch(1, 1)
+        filters_layout.setColumnStretch(3, 1)
+        layout.addWidget(filters, 2, 0, 1, 2)
 
-        list_frame = ttk.LabelFrame(self, text="Liste des alertes", style="Section.TLabelframe", padding=12)
-        list_frame.grid(row=3, column=0, sticky="nsew", padx=(0, 8))
-        detail_frame = ttk.LabelFrame(self, text="Detail de l'alerte", style="Section.TLabelframe", padding=12)
-        detail_frame.grid(row=3, column=1, sticky="nsew", padx=(8, 0))
-        detail_frame.columnconfigure(0, weight=1)
-        detail_frame.rowconfigure(6, weight=1)
+        filters_layout.addWidget(QLabel("Gravite", filters), 0, 0)
+        self.severity_combo = QComboBox(filters)
+        self.severity_combo.addItems(["Toutes", "LOW", "MEDIUM", "HIGH", "CRITICAL"])
+        filters_layout.addWidget(self.severity_combo, 0, 1)
+        filters_layout.addWidget(QLabel("Etat", filters), 0, 2)
+        self.ack_combo = QComboBox(filters)
+        self.ack_combo.addItems(list(self.ACK_OPTIONS.keys()))
+        filters_layout.addWidget(self.ack_combo, 0, 3)
+
+        apply_button = QPushButton("Appliquer", filters)
+        refresh_button = QPushButton("Rafraichir", filters)
+        apply_button.clicked.connect(self.refresh_data)
+        refresh_button.clicked.connect(self.refresh_data)
+        filters_layout.addWidget(apply_button, 1, 2)
+        filters_layout.addWidget(refresh_button, 1, 3)
+        self.severity_combo.currentTextChanged.connect(lambda _text: self.refresh_data())
+        self.ack_combo.currentTextChanged.connect(lambda _text: self.refresh_data())
+
+        list_frame = QGroupBox("Liste des alertes", self)
+        list_layout = QVBoxLayout(list_frame)
+        detail_frame = QGroupBox("Detail de l'alerte", self)
+        detail_layout = QVBoxLayout(detail_frame)
+        detail_layout.setSpacing(12)
+        layout.addWidget(list_frame, 3, 0)
+        layout.addWidget(detail_frame, 3, 1)
 
         self.table = ScrollableTree(list_frame, ("date", "severity", "title", "state", "score"), height=18)
-        self.table.pack(fill="both", expand=True)
+        list_layout.addWidget(self.table)
         for column, label, width in (
             ("date", "Date", 145),
             ("severity", "Gravite", 90),
@@ -115,23 +125,31 @@ class AlertsView(BaseView):
             self.table.tree.tag_configure(level, foreground=severity_color(level))
         self.table.tree.tag_configure("ACK", foreground=COLORS["muted"])
 
-        top = ttk.Frame(detail_frame, style="Card.TFrame", padding=12)
-        top.grid(row=0, column=0, sticky="ew")
-        top.columnconfigure(0, weight=1)
-        ttk.Label(top, text="Statut", style="CardMuted.TLabel").grid(row=0, column=0, sticky="w")
-        badge_row = ttk.Frame(top, style="CardInner.TFrame")
-        badge_row.grid(row=0, column=1, sticky="e")
+        top = QWidget(detail_frame)
+        top.setObjectName("card")
+        top_layout = QHBoxLayout(top)
+        top_layout.setContentsMargins(12, 12, 12, 12)
+        top_layout.addWidget(QLabel("Statut", top), 1)
+        badge_row = QWidget(top)
+        badge_row_layout = QHBoxLayout(badge_row)
+        badge_row_layout.setContentsMargins(0, 0, 0, 0)
+        badge_row_layout.setSpacing(8)
         self.severity_badge = StatusPill(badge_row, "AUCUNE", "INFO")
-        self.severity_badge.pack(side="left")
         self.ack_badge = StatusPill(badge_row, "NON", "WARNING")
-        self.ack_badge.pack(side="left", padx=(8, 0))
         self.case_badge = StatusPill(badge_row, "INCIDENT", "INFO")
-        self.case_badge.pack(side="left", padx=(8, 0))
+        badge_row_layout.addWidget(self.severity_badge)
+        badge_row_layout.addWidget(self.ack_badge)
+        badge_row_layout.addWidget(self.case_badge)
+        top_layout.addWidget(badge_row)
+        detail_layout.addWidget(top)
 
-        metrics = ttk.Frame(detail_frame, style="Card.TFrame", padding=12)
-        metrics.grid(row=1, column=0, sticky="ew", pady=(12, 12))
-        for column in range(2):
-            metrics.columnconfigure(column, weight=1)
+        metrics = QWidget(detail_frame)
+        metrics.setObjectName("card")
+        metrics_layout = QGridLayout(metrics)
+        metrics_layout.setContentsMargins(12, 12, 12, 12)
+        metrics_layout.setHorizontalSpacing(10)
+        metrics_layout.setVerticalSpacing(8)
+        detail_layout.addWidget(metrics)
         self.values = {
             "title": LabeledValue(metrics, "Titre"),
             "date": LabeledValue(metrics, "Date"),
@@ -140,142 +158,103 @@ class AlertsView(BaseView):
             "incident_status": LabeledValue(metrics, "Incident lie"),
             "decision": LabeledValue(metrics, "Decision analyste"),
         }
-        self.values["title"].grid(row=0, column=0, sticky="ew", padx=(0, 10), pady=6)
-        self.values["date"].grid(row=0, column=1, sticky="ew", pady=6)
-        self.values["score"].grid(row=1, column=0, sticky="ew", padx=(0, 10), pady=6)
-        self.values["device"].grid(row=1, column=1, sticky="ew", pady=6)
-        self.values["incident_status"].grid(row=2, column=0, sticky="ew", padx=(0, 10), pady=6)
-        self.values["decision"].grid(row=2, column=1, sticky="ew", pady=6)
+        self.values["title"].set("-")
+        metrics_layout.addWidget(self.values["title"], 0, 0)
+        metrics_layout.addWidget(self.values["date"], 0, 1)
+        metrics_layout.addWidget(self.values["score"], 1, 0)
+        metrics_layout.addWidget(self.values["device"], 1, 1)
+        metrics_layout.addWidget(self.values["incident_status"], 2, 0)
+        metrics_layout.addWidget(self.values["decision"], 2, 1)
 
-        self.quick_action_bar = tk.Frame(
-            detail_frame,
-            bg=COLORS["panel_alt"],
-            bd=0,
-            highlightthickness=1,
-            highlightbackground=COLORS["panel_border"],
-            padx=12,
-            pady=10,
-        )
-        self.quick_action_bar.grid(row=2, column=0, sticky="ew", pady=(0, 12))
-        self.quick_action_bar.columnconfigure(5, weight=1)
-        tk.Label(
-            self.quick_action_bar,
-            text="\u26A1 Reponse rapide :",
-            bg=COLORS["panel_alt"],
-            fg=COLORS["warning"],
-            font=("Segoe UI Semibold", 10),
-        ).grid(row=0, column=0, sticky="w", padx=(0, 10))
-        self.quick_blacklist_button = ttk.Button(
-            self.quick_action_bar,
-            text="\U0001F6AB Blacklister",
-            style="Danger.TButton",
-            command=self._quick_blacklist,
-        )
-        self.quick_blacklist_button.grid(row=0, column=1, sticky="w")
-        self.quick_watch_button = ttk.Button(
-            self.quick_action_bar,
-            text="\U0001F441 Surveiller",
-            style="Accent.TButton",
-            command=self._quick_watch,
-        )
-        self.quick_watch_button.grid(row=0, column=2, sticky="w", padx=(8, 0))
-        self.quick_false_positive_button = ttk.Button(
-            self.quick_action_bar,
-            text="\u2713 Fausse alerte",
-            style="Subtle.TButton",
-            command=self._quick_false_positive,
-        )
-        self.quick_false_positive_button.grid(row=0, column=3, sticky="w", padx=(8, 0))
-        self.quick_ai_button = ttk.Button(
-            self.quick_action_bar,
-            text="\U0001F916 Analyser avec l'IA",
-            style="Accent.TButton",
-            command=self._quick_ai_analysis,
-        )
-        self.quick_ai_button.grid(row=0, column=4, sticky="w", padx=(8, 0))
+        self.quick_action_bar = QFrame(detail_frame)
+        self.quick_action_bar.setObjectName("card")
+        quick_layout = QHBoxLayout(self.quick_action_bar)
+        quick_layout.setContentsMargins(12, 10, 12, 10)
+        quick_layout.setSpacing(8)
+        quick_label = QLabel("Reponse rapide :", self.quick_action_bar)
+        quick_label.setStyleSheet(f"color: {COLORS['warning']}; font-weight: 600;")
+        quick_layout.addWidget(quick_label)
+        self.quick_blacklist_button = QPushButton("Blacklister", self.quick_action_bar)
+        self.quick_blacklist_button.setObjectName("danger")
+        self.quick_watch_button = QPushButton("Surveiller", self.quick_action_bar)
+        self.quick_false_positive_button = QPushButton("Fausse alerte", self.quick_action_bar)
+        self.quick_false_positive_button.setObjectName("subtle")
+        self.quick_ai_button = QPushButton("Analyser avec l'IA", self.quick_action_bar)
+        self.quick_blacklist_button.clicked.connect(self._quick_blacklist)
+        self.quick_watch_button.clicked.connect(self._quick_watch)
+        self.quick_false_positive_button.clicked.connect(self._quick_false_positive)
+        self.quick_ai_button.clicked.connect(self._quick_ai_analysis)
+        quick_layout.addWidget(self.quick_blacklist_button)
+        quick_layout.addWidget(self.quick_watch_button)
+        quick_layout.addWidget(self.quick_false_positive_button)
+        quick_layout.addWidget(self.quick_ai_button)
+        quick_layout.addStretch(1)
         self.quick_action_buttons = [
             self.quick_blacklist_button,
             self.quick_watch_button,
             self.quick_false_positive_button,
             self.quick_ai_button,
         ]
-        self.quick_action_bar.grid_remove()
+        detail_layout.addWidget(self.quick_action_bar)
+        self.quick_action_bar.hide()
 
-        workflow = ttk.LabelFrame(detail_frame, text="Workflow incident", style="Section.TLabelframe", padding=12)
-        workflow.grid(row=3, column=0, sticky="ew", pady=(0, 12))
-        workflow.columnconfigure(1, weight=1)
-        workflow.columnconfigure(3, weight=1)
-        self.incident_status_var = tk.StringVar(value="Nouvelle")
-        self.decision_var = tk.StringVar(value="Aucune")
-        self.comment_var = tk.StringVar()
-        self.reason_var = tk.StringVar()
-        ttk.Label(workflow, text="Statut").grid(row=0, column=0, sticky="w", padx=(0, 8))
-        ttk.Combobox(
-            workflow,
-            textvariable=self.incident_status_var,
-            values=list(self.INCIDENT_STATUS_OPTIONS.keys()),
-            state="readonly",
-        ).grid(row=0, column=1, sticky="ew", padx=(0, 12))
-        ttk.Label(workflow, text="Decision").grid(row=0, column=2, sticky="w", padx=(0, 8))
-        ttk.Combobox(
-            workflow,
-            textvariable=self.decision_var,
-            values=list(self.DECISION_OPTIONS.keys()),
-            state="readonly",
-        ).grid(row=0, column=3, sticky="ew")
-        ttk.Label(workflow, text="Commentaire").grid(row=1, column=0, sticky="w", padx=(0, 8), pady=(12, 0))
-        ttk.Entry(workflow, textvariable=self.comment_var).grid(row=1, column=1, columnspan=3, sticky="ew", pady=(12, 0))
-        ttk.Label(workflow, text="Motif de cloture").grid(row=2, column=0, sticky="w", padx=(0, 8), pady=(12, 0))
-        ttk.Entry(workflow, textvariable=self.reason_var).grid(row=2, column=1, columnspan=3, sticky="ew", pady=(12, 0))
-        workflow_actions = ttk.Frame(workflow)
-        workflow_actions.grid(row=3, column=0, columnspan=4, sticky="e", pady=(12, 0))
-        self.open_case_button = ttk.Button(
-            workflow_actions,
-            text="Ouvrir un incident",
-            style="Subtle.TButton",
-            command=self._open_case,
-            state="disabled",
-        )
-        self.open_case_button.pack(side="left")
-        self.save_case_button = ttk.Button(
-            workflow_actions,
-            text="Enregistrer le suivi",
-            style="Accent.TButton",
-            command=self._save_case,
-            state="disabled",
-        )
-        self.save_case_button.pack(side="left", padx=8)
-        self.ack_button = ttk.Button(
-            workflow_actions,
-            text="Acquitter l'alerte",
-            style="Accent.TButton",
-            command=self._acknowledge,
-            state="disabled",
-        )
-        self.ack_button.pack(side="left")
+        workflow = QGroupBox("Workflow incident", detail_frame)
+        workflow_layout = QGridLayout(workflow)
+        workflow_layout.setHorizontalSpacing(12)
+        workflow_layout.setVerticalSpacing(12)
+        workflow_layout.setColumnStretch(1, 1)
+        workflow_layout.setColumnStretch(3, 1)
+        detail_layout.addWidget(workflow)
+        workflow_layout.addWidget(QLabel("Statut", workflow), 0, 0)
+        self.incident_status_combo = QComboBox(workflow)
+        self.incident_status_combo.addItems(list(self.INCIDENT_STATUS_OPTIONS.keys()))
+        workflow_layout.addWidget(self.incident_status_combo, 0, 1)
+        workflow_layout.addWidget(QLabel("Decision", workflow), 0, 2)
+        self.decision_combo = QComboBox(workflow)
+        self.decision_combo.addItems(list(self.DECISION_OPTIONS.keys()))
+        workflow_layout.addWidget(self.decision_combo, 0, 3)
+        workflow_layout.addWidget(QLabel("Commentaire", workflow), 1, 0)
+        self.comment_entry = QLineEdit(workflow)
+        workflow_layout.addWidget(self.comment_entry, 1, 1, 1, 3)
+        workflow_layout.addWidget(QLabel("Motif de cloture", workflow), 2, 0)
+        self.reason_entry = QLineEdit(workflow)
+        workflow_layout.addWidget(self.reason_entry, 2, 1, 1, 3)
+        workflow_actions = QWidget(workflow)
+        workflow_actions_layout = QHBoxLayout(workflow_actions)
+        workflow_actions_layout.setContentsMargins(0, 0, 0, 0)
+        workflow_actions_layout.setSpacing(8)
+        self.open_case_button = QPushButton("Ouvrir un incident", workflow_actions)
+        self.open_case_button.setObjectName("subtle")
+        self.save_case_button = QPushButton("Enregistrer le suivi", workflow_actions)
+        self.ack_button = QPushButton("Acquitter l'alerte", workflow_actions)
+        self.open_case_button.clicked.connect(self._open_case)
+        self.save_case_button.clicked.connect(self._save_case)
+        self.ack_button.clicked.connect(self._acknowledge)
+        workflow_actions_layout.addWidget(self.open_case_button)
+        workflow_actions_layout.addWidget(self.save_case_button)
+        workflow_actions_layout.addWidget(self.ack_button)
+        workflow_actions_layout.addStretch(1)
+        workflow_layout.addWidget(workflow_actions, 3, 0, 1, 4)
 
-        risk_frame = ttk.LabelFrame(detail_frame, text="Decomposition du score", style="Section.TLabelframe", padding=12)
-        risk_frame.grid(row=4, column=0, sticky="ew", pady=(0, 12))
-        risk_frame.columnconfigure(0, weight=1)
+        risk_frame = QGroupBox("Decomposition du score", detail_frame)
+        risk_layout = QVBoxLayout(risk_frame)
         self.risk_widget = RiskBreakdownWidget(risk_frame, surface="panel")
-        self.risk_widget.grid(row=0, column=0, sticky="ew")
+        risk_layout.addWidget(self.risk_widget)
+        detail_layout.addWidget(risk_frame)
 
-        self.investigate_button = ttk.Button(
-            detail_frame,
-            text="\U0001F50D Enqueter sur ce device",
-            style="Subtle.TButton",
-            command=self._open_investigation,
-        )
-        self.investigate_button.grid(row=5, column=0, sticky="e", pady=(0, 12))
-        self.investigate_button.grid_remove()
+        self.investigate_button = QPushButton("Enqueter sur ce device", detail_frame)
+        self.investigate_button.setObjectName("subtle")
+        self.investigate_button.clicked.connect(self._open_investigation)
+        detail_layout.addWidget(self.investigate_button, 0)
+        self.investigate_button.hide()
 
         self.detail_text = ScrollableDetailText(detail_frame, height=14)
-        self.detail_text.grid(row=6, column=0, sticky="nsew")
+        detail_layout.addWidget(self.detail_text, 1)
         self._clear_selection_state()
 
     def refresh_data(self) -> None:
-        severity = "" if self.severity_var.get() == "Toutes" else self.severity_var.get()
-        acknowledged = self.ACK_OPTIONS[self.ack_var.get()]
+        severity = "" if self.severity_combo.currentText() == "Toutes" else self.severity_combo.currentText()
+        acknowledged = self.ACK_OPTIONS[self.ack_combo.currentText()]
         selected_key = self._get_selected_alert_key() or self._selected_alert_key
         alerts = self.controller.list_alerts(severity, acknowledged)
         self._rows.clear()
@@ -336,11 +315,11 @@ class AlertsView(BaseView):
         self.values["device"].set(alert.device_key or "Aucun peripherique associe")
         self.values["incident_status"].set(incident_status_text(case.status) if case else "Aucun incident")
         self.values["decision"].set(decision_text(case.decision) if case else "Aucune")
-        self.incident_status_var.set(self._incident_label(case.status if case else "new"))
-        self.decision_var.set(self._decision_label(case.decision if case else "none"))
-        self.comment_var.set(case.comment if case else alert.analyst_comment)
-        self.reason_var.set(case.resolution_reason if case else alert.resolution_reason)
-        self.risk_widget.update(assessment)
+        self.incident_status_combo.setCurrentText(self._incident_label(case.status if case else "new"))
+        self.decision_combo.setCurrentText(self._decision_label(case.decision if case else "none"))
+        self.comment_entry.setText(case.comment if case else alert.analyst_comment)
+        self.reason_entry.setText(case.resolution_reason if case else alert.resolution_reason)
+        self.risk_widget.set_assessment(assessment)
         self.detail_text.set_text(
             "Alerte :\n{message}\n\n"
             "Decision analyste :\n- Statut incident: {incident}\n- Decision: {decision}\n- Commentaire: {comment}\n- Resolution: {resolution}\n\n"
@@ -354,9 +333,9 @@ class AlertsView(BaseView):
                 resolution=(case.resolution_reason if case else alert.resolution_reason) or "Non renseigne",
             )
         )
-        self.open_case_button.configure(state="normal" if case is None else "disabled")
-        self.save_case_button.configure(state="normal" if alert.id is not None else "disabled")
-        self.ack_button.configure(state="disabled" if alert.acknowledged else "normal")
+        self.open_case_button.setEnabled(case is None)
+        self.save_case_button.setEnabled(alert.id is not None)
+        self.ack_button.setEnabled(not alert.acknowledged)
         self._sync_context_actions()
 
     def _clear_selection_state(self) -> None:
@@ -366,40 +345,39 @@ class AlertsView(BaseView):
         self.case_badge.set("INCIDENT", "INFO")
         for value in self.values.values():
             value.set("-")
-        self.incident_status_var.set("Nouvelle")
-        self.decision_var.set("Aucune")
-        self.comment_var.set("")
-        self.reason_var.set("")
+        self.incident_status_combo.setCurrentText("Nouvelle")
+        self.decision_combo.setCurrentText("Aucune")
+        self.comment_entry.setText("")
+        self.reason_entry.setText("")
         self.detail_text.set_text("Selectionnez une alerte pour consulter son detail, ouvrir un incident et suivre sa resolution.")
-        self.risk_widget.update(None)
-        self.quick_action_bar.grid_remove()
-        self.investigate_button.grid_remove()
-        self.open_case_button.configure(state="disabled")
-        self.save_case_button.configure(state="disabled")
-        self.ack_button.configure(state="disabled")
+        self.risk_widget.set_assessment(None)
+        self.quick_action_bar.hide()
+        self.investigate_button.hide()
+        self.open_case_button.setEnabled(False)
+        self.save_case_button.setEnabled(False)
+        self.ack_button.setEnabled(False)
         self._set_quick_action_buttons(False, has_device=False)
 
     def _sync_context_actions(self) -> None:
         alert = self._selected_alert()
         if alert is None or alert.severity not in {"HIGH", "CRITICAL"}:
-            self.quick_action_bar.grid_remove()
+            self.quick_action_bar.hide()
             self._set_quick_action_buttons(False, has_device=False)
         else:
-            self.quick_action_bar.grid()
+            self.quick_action_bar.show()
             self._set_quick_action_buttons(not self._quick_action_busy, has_device=bool(alert.device_key))
 
         if alert is not None and alert.device_key:
-            self.investigate_button.grid()
-            self.investigate_button.configure(state="normal")
+            self.investigate_button.show()
+            self.investigate_button.setEnabled(True)
         else:
-            self.investigate_button.grid_remove()
+            self.investigate_button.hide()
 
     def _set_quick_action_buttons(self, enabled: bool, *, has_device: bool) -> None:
-        normal_state = "normal" if enabled else "disabled"
-        self.quick_watch_button.configure(state=normal_state)
-        self.quick_false_positive_button.configure(state=normal_state)
-        self.quick_ai_button.configure(state=normal_state)
-        self.quick_blacklist_button.configure(state="normal" if enabled and has_device else "disabled")
+        self.quick_watch_button.setEnabled(enabled)
+        self.quick_false_positive_button.setEnabled(enabled)
+        self.quick_ai_button.setEnabled(enabled)
+        self.quick_blacklist_button.setEnabled(enabled and has_device)
 
     def _run_quick_action(
         self,
@@ -536,10 +514,10 @@ class AlertsView(BaseView):
         self.run_action(
             lambda: self.controller.update_alert_case(
                 alert_id=alert.id,
-                status=self.INCIDENT_STATUS_OPTIONS[self.incident_status_var.get()],
-                decision=self.DECISION_OPTIONS[self.decision_var.get()],
-                comment=self.comment_var.get(),
-                resolution_reason=self.reason_var.get(),
+                status=self.INCIDENT_STATUS_OPTIONS[self.incident_status_combo.currentText()],
+                decision=self.DECISION_OPTIONS[self.decision_combo.currentText()],
+                comment=self.comment_entry.text(),
+                resolution_reason=self.reason_entry.text(),
             ),
             success_message="Workflow incident enregistre.",
             refresh=True,

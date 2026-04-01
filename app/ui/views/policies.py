@@ -1,8 +1,21 @@
 from __future__ import annotations
 
-import tkinter as tk
 from pathlib import Path
-from tkinter import filedialog, messagebox, ttk
+
+from PyQt6.QtWidgets import (
+    QComboBox,
+    QFileDialog,
+    QGridLayout,
+    QGroupBox,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QMessageBox,
+    QPushButton,
+    QTabWidget,
+    QVBoxLayout,
+    QWidget,
+)
 
 from app.ui.views.base import BaseView
 from app.ui.widgets.common import ScrollableTree, SectionHeader, StatusPill
@@ -12,76 +25,82 @@ from app.utils.ui import match_type_text, policy_type_text, shorten_text
 class PoliciesView(BaseView):
     view_title = "Regles USB"
 
-    def __init__(self, master, controller, app) -> None:
-        super().__init__(master, controller, app)
-        self.columnconfigure(0, weight=1)
-        self.rowconfigure(2, weight=1)
+    def __init__(self, parent, controller, app) -> None:
+        super().__init__(parent, controller, app)
         self.tables: dict[str, ScrollableTree] = {}
         self.row_maps: dict[str, dict[str, object]] = {"whitelist": {}, "blacklist": {}}
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(12)
 
         self.header = SectionHeader(
             self,
             "Regles USB",
             "Gestion separee des listes blanche et noire, import/export et regles cibles.",
         )
-        self.header.grid(row=0, column=0, sticky="ew", pady=(0, 16))
+        layout.addWidget(self.header)
 
-        controls = ttk.LabelFrame(self, text="Recherche et echanges", style="Section.TLabelframe", padding=12)
-        controls.grid(row=1, column=0, sticky="ew", pady=(0, 12))
-        controls.columnconfigure(1, weight=1)
-        ttk.Label(controls, text="Recherche").grid(row=0, column=0, sticky="w", padx=(0, 8))
-        self.query_var = tk.StringVar()
-        self.query_entry = ttk.Entry(controls, textvariable=self.query_var)
-        self.query_entry.grid(row=0, column=1, sticky="ew", padx=(0, 12))
-        ttk.Button(controls, text="Appliquer", command=self.refresh_data).grid(row=0, column=2, padx=(0, 8))
-        ttk.Button(controls, text="Importer", command=self._import).grid(row=0, column=3, padx=(0, 8))
-        ttk.Button(controls, text="Exporter", style="Accent.TButton", command=self._export).grid(row=0, column=4)
-        self.query_var.trace_add("write", lambda *_args: self.schedule_refresh(250))
-        self.query_entry.bind("<Return>", lambda _event: self.refresh_data())
+        controls = QGroupBox("Recherche et echanges", self)
+        controls_layout = QGridLayout(controls)
+        controls_layout.setColumnStretch(1, 1)
+        controls_layout.addWidget(QLabel("Recherche", controls), 0, 0)
+        self.query_entry = QLineEdit(controls)
+        controls_layout.addWidget(self.query_entry, 0, 1)
+        apply_button = QPushButton("Appliquer", controls)
+        import_button = QPushButton("Importer", controls)
+        export_button = QPushButton("Exporter", controls)
+        apply_button.clicked.connect(self.refresh_data)
+        import_button.clicked.connect(self._import)
+        export_button.clicked.connect(self._export)
+        controls_layout.addWidget(apply_button, 0, 2)
+        controls_layout.addWidget(import_button, 0, 3)
+        controls_layout.addWidget(export_button, 0, 4)
+        self.query_entry.textChanged.connect(lambda _text: self.schedule_refresh(250))
+        self.query_entry.returnPressed.connect(self.refresh_data)
+        layout.addWidget(controls)
 
-        self.notebook = ttk.Notebook(self)
-        self.notebook.grid(row=2, column=0, sticky="nsew")
-        self.tabs = {}
+        self.notebook = QTabWidget(self)
+        self.tabs: dict[str, QWidget] = {}
+        layout.addWidget(self.notebook, 1)
         for policy_type in ("whitelist", "blacklist"):
-            tab = ttk.Frame(self.notebook, padding=12)
-            tab.columnconfigure(0, weight=1)
-            tab.rowconfigure(1, weight=1)
-            self.notebook.add(tab, text=policy_type_text(policy_type))
+            tab = QWidget(self.notebook)
+            tab_layout = QVBoxLayout(tab)
+            self.notebook.addTab(tab, policy_type_text(policy_type))
             self.tabs[policy_type] = tab
-            self._build_policy_tab(tab, policy_type)
+            self._build_policy_tab(tab_layout, policy_type)
+        self.notebook.currentChanged.connect(lambda _index: self._sync_form_target())
 
-        self.notebook.bind("<<NotebookTabChanged>>", lambda _event: self._sync_form_target())
-
-        form = ttk.LabelFrame(self, text="Ajouter une regle", style="Section.TLabelframe", padding=12)
-        form.grid(row=3, column=0, sticky="ew", pady=(12, 0))
-        for column in range(5):
-            form.columnconfigure(column, weight=1 if column in {1, 2, 3, 4} else 0)
-        ttk.Label(form, text="Cible").grid(row=0, column=0, sticky="w", padx=(0, 8))
+        form = QGroupBox("Ajouter une regle", self)
+        form_layout = QGridLayout(form)
+        form_layout.setColumnStretch(1, 1)
+        form_layout.setColumnStretch(2, 1)
+        form_layout.setColumnStretch(3, 1)
+        form_layout.setColumnStretch(4, 1)
+        form_layout.addWidget(QLabel("Cible", form), 0, 0)
         self.target_badge = StatusPill(form, "", "OK")
-        self.target_badge.grid(row=0, column=1, sticky="w")
-        ttk.Label(form, text="Type de match").grid(row=1, column=0, sticky="w", pady=(12, 0), padx=(0, 8))
-        self.new_match = tk.StringVar(value="VID:PID")
-        ttk.Combobox(
-            form,
-            textvariable=self.new_match,
-            values=["VID:PID", "Numero de serie"],
-            state="readonly",
-        ).grid(row=1, column=1, sticky="ew", pady=(12, 0), padx=(0, 12))
-        ttk.Label(form, text="Valeur").grid(row=1, column=2, sticky="w", pady=(12, 0), padx=(0, 8))
-        self.new_value = tk.StringVar()
-        ttk.Entry(form, textvariable=self.new_value).grid(row=1, column=3, sticky="ew", pady=(12, 0), padx=(0, 12))
-        ttk.Label(form, text="Label").grid(row=2, column=0, sticky="w", pady=(12, 0), padx=(0, 8))
-        self.new_label = tk.StringVar()
-        ttk.Entry(form, textvariable=self.new_label).grid(row=2, column=1, columnspan=2, sticky="ew", pady=(12, 0), padx=(0, 12))
-        ttk.Label(form, text="Notes").grid(row=2, column=3, sticky="w", pady=(12, 0), padx=(0, 8))
-        self.new_notes = tk.StringVar()
-        ttk.Entry(form, textvariable=self.new_notes).grid(row=2, column=4, sticky="ew", pady=(12, 0))
-        self.add_button = ttk.Button(form, text="", style="Accent.TButton", command=self._add_policy)
-        self.add_button.grid(row=3, column=4, sticky="e", pady=(16, 0))
+        form_layout.addWidget(self.target_badge, 0, 1)
+        form_layout.addWidget(QLabel("Type de match", form), 1, 0)
+        self.new_match = QComboBox(form)
+        self.new_match.addItems(["VID:PID", "Numero de serie"])
+        form_layout.addWidget(self.new_match, 1, 1)
+        form_layout.addWidget(QLabel("Valeur", form), 1, 2)
+        self.new_value = QLineEdit(form)
+        form_layout.addWidget(self.new_value, 1, 3)
+        form_layout.addWidget(QLabel("Label", form), 2, 0)
+        self.new_label = QLineEdit(form)
+        form_layout.addWidget(self.new_label, 2, 1, 1, 2)
+        form_layout.addWidget(QLabel("Notes", form), 2, 3)
+        self.new_notes = QLineEdit(form)
+        form_layout.addWidget(self.new_notes, 2, 4)
+        self.add_button = QPushButton("", form)
+        self.add_button.clicked.connect(self._add_policy)
+        form_layout.addWidget(self.add_button, 3, 4)
+        layout.addWidget(form)
         self._sync_form_target()
 
     def refresh_data(self) -> None:
-        query = self.query_var.get().strip()
+        query = self.query_entry.text().strip()
         for policy_type in ("whitelist", "blacklist"):
             entries = self.controller.list_policies(policy_type, query)
             self.row_maps[policy_type].clear()
@@ -95,25 +114,27 @@ class PoliciesView(BaseView):
                 )
                 self.row_maps[policy_type][item_id] = entry
             table.set_empty(bool(entries), f"Aucune regle {policy_type_text(policy_type).lower()} pour ce filtre.")
-            self.notebook.tab(self.tabs[policy_type], text=f"{policy_type_text(policy_type)} ({len(entries)})")
+            self.notebook.setTabText(self.notebook.indexOf(self.tabs[policy_type]), f"{policy_type_text(policy_type)} ({len(entries)})")
 
-    def _build_policy_tab(self, tab, policy_type: str) -> None:
-        top = ttk.Frame(tab, style="Card.TFrame", padding=12)
-        top.grid(row=0, column=0, sticky="ew", pady=(0, 12))
-        top.columnconfigure(0, weight=1)
-        ttk.Label(top, text=f"{policy_type_text(policy_type)} active", style="CardMuted.TLabel").grid(row=0, column=0, sticky="w")
+    def _build_policy_tab(self, tab_layout: QVBoxLayout, policy_type: str) -> None:
+        top = QWidget()
+        top.setObjectName("card")
+        top_layout = QGridLayout(top)
+        top_layout.setContentsMargins(12, 12, 12, 12)
+        top_layout.setColumnStretch(0, 1)
+        label = QLabel(f"{policy_type_text(policy_type)} active", top)
+        label.setObjectName("muted")
+        top_layout.addWidget(label, 0, 0)
         tone = "OK" if policy_type == "whitelist" else "CRITICAL"
         badge = StatusPill(top, policy_type_text(policy_type).upper(), tone)
-        badge.grid(row=0, column=1, sticky="e")
-        ttk.Button(top, text="Supprimer la selection", style="Subtle.TButton", command=lambda value=policy_type: self._delete_policy(value)).grid(
-            row=1,
-            column=1,
-            sticky="e",
-            pady=(10, 0),
-        )
+        top_layout.addWidget(badge, 0, 1)
+        delete_button = QPushButton("Supprimer la selection", top)
+        delete_button.setObjectName("subtle")
+        delete_button.clicked.connect(lambda: self._delete_policy(policy_type))
+        top_layout.addWidget(delete_button, 1, 1)
+        tab_layout.addWidget(top)
 
-        table = ScrollableTree(tab, ("match", "value", "label", "notes"), height=12)
-        table.grid(row=1, column=0, sticky="nsew")
+        table = ScrollableTree(None, ("match", "value", "label", "notes"), height=12)
         for column, label, width in (
             ("match", "Match", 150),
             ("value", "Valeur", 220),
@@ -122,12 +143,13 @@ class PoliciesView(BaseView):
         ):
             table.tree.heading(column, text=label)
             table.tree.column(column, width=width, anchor="w")
+        tab_layout.addWidget(table, 1)
         self.tables[policy_type] = table
 
     def _current_policy_type(self) -> str:
-        selected = self.notebook.select()
+        current_widget = self.notebook.currentWidget()
         for policy_type, frame in self.tabs.items():
-            if str(frame) == selected:
+            if frame is current_widget:
                 return policy_type
         return "whitelist"
 
@@ -135,18 +157,18 @@ class PoliciesView(BaseView):
         policy_type = self._current_policy_type()
         tone = "OK" if policy_type == "whitelist" else "CRITICAL"
         self.target_badge.set(policy_type_text(policy_type).upper(), tone)
-        self.add_button.configure(text=f"Ajouter a la {policy_type_text(policy_type).lower()}")
+        self.add_button.setText(f"Ajouter a la {policy_type_text(policy_type).lower()}")
 
     def _add_policy(self) -> None:
         policy_type = self._current_policy_type()
-        match_type = "vid_pid" if self.new_match.get() == "VID:PID" else "serial"
+        match_type = "vid_pid" if self.new_match.currentText() == "VID:PID" else "serial"
         self.run_action(
             lambda: self.controller.add_policy(
                 policy_type,
                 match_type,
-                self.new_value.get().strip(),
-                self.new_label.get().strip(),
-                self.new_notes.get().strip(),
+                self.new_value.text().strip(),
+                self.new_label.text().strip(),
+                self.new_notes.text().strip(),
             ),
             success_message=f"Regle ajoutee a la {policy_type_text(policy_type).lower()}.",
             refresh=True,
@@ -161,7 +183,7 @@ class PoliciesView(BaseView):
         entry = self.row_maps[policy_type].get(selection[0])
         if entry is None or entry.id is None:
             return
-        if not messagebox.askyesno("Confirmation", f"Supprimer cette regle de {policy_type_text(policy_type).lower()} ?"):
+        if QMessageBox.question(self, "Confirmation", f"Supprimer cette regle de {policy_type_text(policy_type).lower()} ?") != QMessageBox.StandardButton.Yes:
             return
         self.run_action(
             lambda: self.controller.remove_policy(entry.id),
@@ -170,7 +192,12 @@ class PoliciesView(BaseView):
         )
 
     def _import(self) -> None:
-        path = filedialog.askopenfilename(filetypes=[("Regles USB", "*.json *.csv"), ("JSON", "*.json"), ("CSV", "*.csv")])
+        path, _selected_filter = QFileDialog.getOpenFileName(
+            self,
+            "Importer des regles",
+            "",
+            "Regles USB (*.json *.csv);;JSON (*.json);;CSV (*.csv)",
+        )
         if not path:
             return
         self.run_action(
@@ -181,11 +208,11 @@ class PoliciesView(BaseView):
 
     def _export(self) -> None:
         default_path = Path(self.controller.settings.export_directory) / "wirewall_policies.json"
-        path = filedialog.asksaveasfilename(
-            defaultextension=".json",
-            initialfile=default_path.name,
-            initialdir=str(default_path.parent),
-            filetypes=[("JSON", "*.json"), ("CSV", "*.csv")],
+        path, _selected_filter = QFileDialog.getSaveFileName(
+            self,
+            "Exporter les regles",
+            str(default_path),
+            "JSON (*.json);;CSV (*.csv)",
         )
         if not path:
             return

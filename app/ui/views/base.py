@@ -3,28 +3,20 @@ from __future__ import annotations
 import logging
 from typing import Any, Callable
 
-from tkinter import ttk
-
-from app.utils.windows import freeze_redraw, redraw_widget
-
+from PyQt6.QtCore import QTimer
+from PyQt6.QtWidgets import QWidget
 
 LOGGER = logging.getLogger(__name__)
 
 
-class BaseView(ttk.Frame):
+class BaseView(QWidget):
     view_title = ""
 
-    def __init__(self, master, controller, app) -> None:
-        super().__init__(master, padding=18)
+    def __init__(self, parent: QWidget, controller, app) -> None:
+        super().__init__(parent)
         self.controller = controller
         self.app = app
-        self._scheduled_refresh_id: str | None = None
-        self._refresh_impl = self.refresh_data
-        self._resize_impl = self.on_host_resize
-        if getattr(self._refresh_impl, "__func__", None) is not BaseView.refresh_data:
-            self.refresh_data = self._safe_refresh_data  # type: ignore[method-assign]
-        if getattr(self._resize_impl, "__func__", None) is not BaseView.on_host_resize:
-            self.on_host_resize = self._safe_on_host_resize  # type: ignore[method-assign]
+        self._scheduled_refresh_timer: QTimer | None = None
 
     def refresh_data(self) -> None:
         """Override in subclasses."""
@@ -37,48 +29,25 @@ class BaseView(ttk.Frame):
 
     def schedule_refresh(self, delay_ms: int = 250) -> None:
         self.cancel_scheduled_refresh()
-        self._scheduled_refresh_id = self.after(delay_ms, self._run_scheduled_refresh)
+        timer = QTimer(self)
+        timer.setSingleShot(True)
+        timer.timeout.connect(self._run_scheduled_refresh)
+        timer.start(delay_ms)
+        self._scheduled_refresh_timer = timer
 
     def cancel_scheduled_refresh(self) -> None:
-        if self._scheduled_refresh_id is None:
+        if self._scheduled_refresh_timer is None:
             return
-        try:
-            self.after_cancel(self._scheduled_refresh_id)
-        except Exception:
-            pass
-        self._scheduled_refresh_id = None
+        self._scheduled_refresh_timer.stop()
+        self._scheduled_refresh_timer.deleteLater()
+        self._scheduled_refresh_timer = None
 
     def _run_scheduled_refresh(self) -> None:
-        self._scheduled_refresh_id = None
-        self.refresh_data()
+        self._scheduled_refresh_timer = None
         try:
-            self.update_idletasks()
+            self.refresh_data()
         except Exception:
-            pass
-
-    def _safe_refresh_data(self) -> None:
-        with freeze_redraw(self.app):
-            self._refresh_impl()
-            force_layout = getattr(getattr(self, "page", None), "force_layout", None)
-            if callable(force_layout):
-                force_layout()
-            try:
-                self.update_idletasks()
-            except Exception:
-                pass
-        redraw_widget(self.app)
-
-    def _safe_on_host_resize(self, width: int, height: int) -> None:
-        with freeze_redraw(self.app):
-            self._resize_impl(width, height)
-            force_layout = getattr(getattr(self, "page", None), "force_layout", None)
-            if callable(force_layout):
-                force_layout()
-            try:
-                self.update_idletasks()
-            except Exception:
-                pass
-        redraw_widget(self.app)
+            LOGGER.exception("Erreur dans refresh_data() de %s.", self.__class__.__name__)
 
     def run_action(
         self,
@@ -113,3 +82,6 @@ class BaseView(ttk.Frame):
             level = success_level(result) if callable(success_level) else success_level
             self.app.set_status(message, level)
         return result
+
+    def set_status(self, message: str, level: str = "INFO") -> None:
+        self.app.set_status(message, level)

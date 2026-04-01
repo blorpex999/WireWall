@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import logging
-import tkinter as tk
-from tkinter import ttk
+
+from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import QDialog, QFrame, QGridLayout, QGroupBox, QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget
 
 from app.ui.controller import AppController
-from app.ui.theme import COLORS, apply_dark_theme
+from app.ui.theme import COLORS
 from app.ui.widgets.common import LabeledValue, ScrollablePage, StatusPill
 from app.ui.widgets.risk_breakdown import RiskBreakdownWidget
 from app.utils.datetime import parse_timestamp
@@ -14,108 +15,104 @@ from app.utils.ui import category_text, decision_text, severity_color, shorten_t
 LOGGER = logging.getLogger(__name__)
 
 
-class InvestigationWindow(tk.Toplevel):
-    def __init__(self, parent: tk.Tk, controller: AppController, device_key: str) -> None:
+class InvestigationWindow(QDialog):
+    def __init__(self, parent: QWidget | None, controller: AppController, device_key: str) -> None:
         super().__init__(parent)
         self.controller = controller
         self.device_key = device_key
 
-        self.title(f"WireWall - Enquete : {device_key}")
-        self.geometry("920x680")
-        self.minsize(720, 500)
-        self.configure(bg=COLORS["bg"])
-        apply_dark_theme(self)
-        self.protocol("WM_DELETE_WINDOW", self.destroy)
+        self.setWindowTitle(f"WireWall - Enquete : {device_key}")
+        self.resize(920, 680)
+        self.setMinimumSize(720, 500)
+        self.setModal(False)
+        self.setWindowFlag(Qt.WindowType.Window, True)
 
-        self.columnconfigure(0, weight=1)
-        self.rowconfigure(0, weight=1)
-
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
         self.page = ScrollablePage(self)
-        self.page.grid(row=0, column=0, sticky="nsew")
-        self.page.body.columnconfigure(0, weight=1)
+        layout.addWidget(self.page)
+
+        self.content = QWidget(self.page.body)
+        self.page.body_layout.addWidget(self.content)
+        self.content_layout = QVBoxLayout(self.content)
+        self.content_layout.setContentsMargins(18, 18, 18, 18)
+        self.content_layout.setSpacing(12)
 
         device = self.controller.get_device(device_key)
         if device is None:
             LOGGER.warning("Ouverture d'enquete impossible, device introuvable: %s", device_key)
-            missing = ttk.LabelFrame(self.page.body, text="Peripherique", style="Section.TLabelframe", padding=16)
-            missing.grid(row=0, column=0, sticky="ew", padx=18, pady=(18, 12))
-            ttk.Label(missing, text="Peripherique introuvable en base.", style="Muted.TLabel").grid(
-                row=0,
-                column=0,
-                sticky="w",
-            )
-            ttk.Button(self.page.body, text="Fermer", style="Subtle.TButton", command=self.destroy).grid(
-                row=1,
-                column=0,
-                sticky="e",
-                padx=18,
-                pady=(0, 18),
-            )
+            missing = QGroupBox("Peripherique", self.content)
+            missing_layout = QVBoxLayout(missing)
+            label = QLabel("Peripherique introuvable en base.", missing)
+            label.setObjectName("muted")
+            missing_layout.addWidget(label)
+            self.content_layout.addWidget(missing)
+            close_button = QPushButton("Fermer", self.content)
+            close_button.setObjectName("subtle")
+            close_button.clicked.connect(self.close)
+            self.content_layout.addWidget(close_button, 0, Qt.AlignmentFlag.AlignRight)
             return
 
-        identity = ttk.LabelFrame(self.page.body, text="Peripherique", style="Section.TLabelframe", padding=12)
-        identity.grid(row=0, column=0, sticky="ew", padx=18, pady=(18, 12))
-        identity.columnconfigure((0, 1, 2, 3), weight=1)
+        identity = QGroupBox("Peripherique", self.content)
+        identity_layout = QGridLayout(identity)
+        identity_layout.setColumnStretch(0, 1)
+        identity_layout.setColumnStretch(1, 1)
+        identity_layout.setColumnStretch(2, 1)
+        identity_layout.setColumnStretch(3, 1)
+        self.content_layout.addWidget(identity)
 
-        LabeledValue(identity, "VID:PID", device.vid_pid).grid(row=0, column=0, sticky="ew", padx=(0, 12), pady=6)
-        LabeledValue(identity, "Fabricant", device.vendor_name or "-").grid(row=0, column=1, sticky="ew", padx=(0, 12), pady=6)
-        LabeledValue(identity, "Produit", device.product_name or "-").grid(row=0, column=2, sticky="ew", padx=(0, 12), pady=6)
-        LabeledValue(identity, "Numero de serie", device.serial_number or "-").grid(row=0, column=3, sticky="ew", pady=6)
-        LabeledValue(identity, "Categorie", category_text(device.category)).grid(row=1, column=0, sticky="ew", padx=(0, 12), pady=6)
-        trust_cell = tk.Frame(identity, bg=COLORS["panel"], bd=0, highlightthickness=0)
-        trust_cell.grid(row=1, column=1, sticky="ew", padx=(0, 12), pady=6)
-        trust_cell.columnconfigure(0, weight=1)
+        identity_layout.addWidget(LabeledValue(identity, "VID:PID", device.vid_pid), 0, 0)
+        identity_layout.addWidget(LabeledValue(identity, "Fabricant", device.vendor_name or "-"), 0, 1)
+        identity_layout.addWidget(LabeledValue(identity, "Produit", device.product_name or "-"), 0, 2)
+        identity_layout.addWidget(LabeledValue(identity, "Numero de serie", device.serial_number or "-"), 0, 3)
+        identity_layout.addWidget(LabeledValue(identity, "Categorie", category_text(device.category)), 1, 0)
+
+        trust_cell = QWidget(identity)
+        trust_layout = QHBoxLayout(trust_cell)
+        trust_layout.setContentsMargins(0, 0, 0, 0)
+        trust_layout.setSpacing(10)
         self.trust_value = LabeledValue(trust_cell, "Trust state", trust_state_text(device.trust_state))
-        self.trust_value.grid(row=0, column=0, sticky="ew")
+        trust_layout.addWidget(self.trust_value, 1)
         self.trust_badge = StatusPill(trust_cell, trust_state_text(device.trust_state).upper(), trust_state_tone(device.trust_state))
-        self.trust_badge.grid(row=0, column=1, sticky="e", padx=(10, 0))
-        LabeledValue(identity, "Seen count", str(device.seen_count)).grid(row=1, column=2, sticky="ew", padx=(0, 12), pady=6)
-        LabeledValue(identity, "Derniere decision", decision_text(device.last_decision)).grid(row=1, column=3, sticky="ew", pady=6)
+        trust_layout.addWidget(self.trust_badge)
+        identity_layout.addWidget(trust_cell, 1, 1)
+        identity_layout.addWidget(LabeledValue(identity, "Seen count", str(device.seen_count)), 1, 2)
+        identity_layout.addWidget(LabeledValue(identity, "Derniere decision", decision_text(device.last_decision)), 1, 3)
 
-        timeline = ttk.LabelFrame(self.page.body, text="Timeline des evenements", style="Section.TLabelframe", padding=12)
-        timeline.grid(row=1, column=0, sticky="nsew", padx=18, pady=(0, 12))
-        timeline.columnconfigure(0, weight=1)
-        timeline.rowconfigure(0, weight=1)
+        timeline = QGroupBox("Timeline des evenements", self.content)
+        timeline_layout = QVBoxLayout(timeline)
+        self.content_layout.addWidget(timeline)
 
-        timeline_host = tk.Frame(timeline, bg=COLORS["panel"], bd=0, highlightthickness=0)
-        timeline_host.grid(row=0, column=0, sticky="nsew")
-        timeline_host.columnconfigure(0, weight=1)
-        timeline_host.rowconfigure(0, weight=1)
-
-        self.timeline_canvas = tk.Canvas(
-            timeline_host,
-            bg=COLORS["panel"],
-            highlightthickness=0,
-            bd=0,
-            relief="flat",
-            height=320,
-        )
-        self.timeline_canvas.grid(row=0, column=0, sticky="nsew")
-        timeline_scroll = ttk.Scrollbar(timeline_host, orient="vertical", command=self.timeline_canvas.yview)
-        timeline_scroll.grid(row=0, column=1, sticky="ns")
-        self.timeline_canvas.configure(yscrollcommand=timeline_scroll.set)
-
-        self.timeline_body = tk.Frame(self.timeline_canvas, bg=COLORS["panel"], bd=0, highlightthickness=0)
-        self._timeline_window = self.timeline_canvas.create_window((0, 0), window=self.timeline_body, anchor="nw")
-        self.timeline_body.bind("<Configure>", self._on_timeline_body_configure)
-        self.timeline_canvas.bind("<Configure>", self._on_timeline_canvas_configure)
+        self.timeline_host = QWidget(timeline)
+        self.timeline_host_layout = QVBoxLayout(self.timeline_host)
+        self.timeline_host_layout.setContentsMargins(0, 0, 0, 0)
+        self.timeline_host_layout.setSpacing(0)
+        timeline_layout.addWidget(self.timeline_host)
         self._render_timeline()
 
-        assessment_frame = ttk.LabelFrame(self.page.body, text="Analyse de risque", style="Section.TLabelframe", padding=12)
-        assessment_frame.grid(row=2, column=0, sticky="ew", padx=18, pady=(0, 12))
-        assessment_frame.columnconfigure(0, weight=1)
-        risk_widget = RiskBreakdownWidget(assessment_frame, surface="panel")
-        risk_widget.grid(row=0, column=0, sticky="ew")
-        risk_widget.update(self.controller.container.assessment_repo.latest(device_key))
+        assessment_frame = QGroupBox("Analyse de risque", self.content)
+        assessment_layout = QVBoxLayout(assessment_frame)
+        self.content_layout.addWidget(assessment_frame)
+        self.risk_widget = RiskBreakdownWidget(assessment_frame, surface="panel")
+        assessment_layout.addWidget(self.risk_widget)
+        self.risk_widget.set_assessment(self.controller.container.assessment_repo.latest(device_key))
 
-        footer = ttk.Frame(self.page.body)
-        footer.grid(row=3, column=0, sticky="ew", padx=18, pady=(0, 18))
-        footer.columnconfigure(0, weight=1)
-        ttk.Button(footer, text="Fermer", style="Subtle.TButton", command=self.destroy).grid(row=0, column=1, sticky="e")
+        footer = QWidget(self.content)
+        footer_layout = QHBoxLayout(footer)
+        footer_layout.setContentsMargins(0, 0, 0, 0)
+        footer_layout.addStretch(1)
+        close_button = QPushButton("Fermer", footer)
+        close_button.setObjectName("subtle")
+        close_button.clicked.connect(self.close)
+        footer_layout.addWidget(close_button)
+        self.content_layout.addWidget(footer)
 
     def _render_timeline(self) -> None:
-        for child in self.timeline_body.winfo_children():
-            child.destroy()
+        while self.timeline_host_layout.count():
+            item = self.timeline_host_layout.takeAt(0)
+            widget = item.widget()
+            if widget is not None:
+                widget.deleteLater()
 
         events = sorted(
             self.controller.get_device_history(self.device_key, limit=100),
@@ -123,61 +120,41 @@ class InvestigationWindow(tk.Toplevel):
             reverse=True,
         )
         if not events:
-            tk.Label(
-                self.timeline_body,
-                text="Aucun evenement enregistre pour ce peripherique.",
-                bg=COLORS["panel"],
-                fg=COLORS["muted"],
-                font=("Segoe UI", 10),
-                anchor="w",
-            ).grid(row=0, column=0, sticky="ew", padx=12, pady=12)
+            label = QLabel("Aucun evenement enregistre pour ce peripherique.", self.timeline_host)
+            label.setObjectName("muted")
+            self.timeline_host_layout.addWidget(label)
             return
 
-        self.timeline_body.columnconfigure(0, weight=1)
         for index, event in enumerate(events):
-            row_bg = COLORS["panel"] if index % 2 == 0 else COLORS["panel_alt"]
-            row = tk.Frame(self.timeline_body, bg=row_bg, bd=0, highlightthickness=0, padx=12, pady=10)
-            row.grid(row=index, column=0, sticky="ew")
-            row.columnconfigure(3, weight=1)
+            row = QFrame(self.timeline_host)
+            row.setStyleSheet(
+                "background-color: {bg}; padding: 10px 12px;".format(
+                    bg=COLORS["panel"] if index % 2 == 0 else COLORS["panel_alt"],
+                )
+            )
+            row_layout = QHBoxLayout(row)
+            row_layout.setContentsMargins(12, 10, 12, 10)
+            row_layout.setSpacing(10)
 
-            tk.Label(
-                row,
-                text=self._timeline_time(event.occurred_at),
-                bg=row_bg,
-                fg=COLORS["muted"],
-                font=("Consolas", 10),
-            ).grid(row=0, column=0, sticky="w", padx=(0, 10))
-            tk.Label(
-                row,
-                text="\u25CF",
-                bg=row_bg,
-                fg=severity_color(event.severity),
-                padx=4,
-                font=("Segoe UI", 11),
-            ).grid(row=0, column=1, sticky="w", padx=(0, 10))
-            tk.Label(
-                row,
-                text=event.event_type,
-                bg=row_bg,
-                fg=COLORS["text"],
-                font=("Segoe UI Semibold", 10),
-            ).grid(row=0, column=2, sticky="w", padx=(0, 10))
-            tk.Label(
-                row,
-                text=shorten_text(event.summary, 80),
-                bg=row_bg,
-                fg=COLORS["text"],
-                font=("Segoe UI", 10),
-                anchor="w",
-                justify="left",
-            ).grid(row=0, column=3, sticky="ew", padx=(0, 10))
-            StatusPill(row, event.severity, event.severity).grid(row=0, column=4, sticky="e")
+            time_label = QLabel(self._timeline_time(event.occurred_at), row)
+            time_label.setObjectName("muted")
+            row_layout.addWidget(time_label)
 
-    def _on_timeline_body_configure(self, _event: tk.Event) -> None:
-        self.timeline_canvas.configure(scrollregion=self.timeline_canvas.bbox("all"))
+            dot = QLabel("o", row)
+            dot.setStyleSheet(f"color: {severity_color(event.severity)}; font-size: 11pt;")
+            row_layout.addWidget(dot)
 
-    def _on_timeline_canvas_configure(self, event: tk.Event) -> None:
-        self.timeline_canvas.itemconfigure(self._timeline_window, width=event.width)
+            type_label = QLabel(event.event_type, row)
+            type_label.setStyleSheet("font-weight: 600;")
+            row_layout.addWidget(type_label)
+
+            summary_label = QLabel(shorten_text(event.summary, 80), row)
+            summary_label.setWordWrap(True)
+            row_layout.addWidget(summary_label, 1)
+
+            row_layout.addWidget(StatusPill(row, event.severity, event.severity))
+            self.timeline_host_layout.addWidget(row)
+        self.timeline_host_layout.addStretch(1)
 
     def _timeline_time(self, value: str | None) -> str:
         parsed = parse_timestamp(value)

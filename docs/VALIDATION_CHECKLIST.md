@@ -4,13 +4,13 @@
 
 - [ ] Le poste cible est sous Windows 10/11 x64
 - [ ] Le runtime cible est `Python 3.11`
-- [ ] `python scripts\check_runtime.py --require-python 3.11 --require-tk` passe
+- [ ] `python scripts\check_runtime.py --require-python 3.11 --require-qt` passe
 - [ ] `python scripts\check_release_consistency.py` passe avant la release
 - [ ] Le poste de soutenance n'est pas le host Python 3.13 non supporte
 
 ## Application
 
-- [ ] L'application demarre sans erreur Python ni erreur Tkinter
+- [ ] L'application demarre sans erreur Python ni erreur PyQt6
 - [ ] Un second lancement n'ouvre pas une deuxieme instance
 - [ ] Lancement source : aucune console parasite ne reste visible par defaut
 - [ ] L'UI reste reactive pendant les health checks et l'analyse IA
@@ -61,7 +61,7 @@
 
 ## Packaging
 
-- [ ] `scripts\build.bat` passe sur un poste `Python 3.11 + Tcl/Tk` valide
+- [ ] `scripts\build.bat` passe sur un poste `Python 3.11 + PyQt6` valide
 - [ ] `scripts\release_check.bat` passe sur le builder officiel
 - [ ] `dist\WireWall\WireWall.exe` est genere
 - [ ] `libusb-1.0.dll` est presente dans le bundle
@@ -72,7 +72,7 @@
 - [ ] L'installateur se lance sur une machine de test propre
 - [ ] L'installateur full se lance sur une machine de test propre
 - [ ] L'application installee demarre sur une machine de test propre
-- [ ] Le package affiche un message visible en cas d'echec de preflight Tk
+- [ ] Le package affiche un message visible en cas d'echec de preflight Qt
 
 ## Installation / desinstallation
 

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from tkinter import messagebox, ttk
+from PyQt6.QtWidgets import QGroupBox, QHBoxLayout, QLabel, QMessageBox, QPushButton, QVBoxLayout
 
 from app.ui.help_content import SCREEN_HELP
 from app.ui.views.base import BaseView
@@ -11,56 +11,69 @@ from app.utils.ui import device_status_text, tone_for_status
 class USBControlView(BaseView):
     view_title = "Controle USB"
 
-    def __init__(self, master, controller, app) -> None:
-        super().__init__(master, controller, app)
-        for column in range(4):
-            self.columnconfigure(column, weight=1)
-        self.rowconfigure(4, weight=1)
+    def __init__(self, parent, controller, app) -> None:
+        super().__init__(parent, controller, app)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(12)
 
         self.header = SectionHeader(
             self,
             "Controle du stockage USB",
             "Lecture d'etat, actions reelles via USBSTOR et diagnostic des droits necessaires.",
         )
-        self.header.grid(row=0, column=0, columnspan=4, sticky="ew", pady=(0, 16))
+        layout.addWidget(self.header)
 
         self.help_panel = InlineHelpPanel(
             self,
             button_text=str(SCREEN_HELP["usb_control"]["button"]),
             sections=list(SCREEN_HELP["usb_control"]["sections"]),
         )
-        self.help_panel.grid(row=1, column=0, columnspan=4, sticky="ew", pady=(0, 12))
+        layout.addWidget(self.help_panel)
 
+        cards_row = QHBoxLayout()
+        cards_row.setSpacing(12)
+        layout.addLayout(cards_row)
         self.card_status = KpiCard(self, "Etat USBSTOR")
         self.card_session = KpiCard(self, "Session Windows")
         self.card_mode = KpiCard(self, "Mode de fonctionnement")
         self.card_action = KpiCard(self, "Capacite d'action")
-        self.card_status.grid(row=2, column=0, sticky="nsew", padx=(0, 8), pady=(0, 12))
-        self.card_session.grid(row=2, column=1, sticky="nsew", padx=8, pady=(0, 12))
-        self.card_mode.grid(row=2, column=2, sticky="nsew", padx=8, pady=(0, 12))
-        self.card_action.grid(row=2, column=3, sticky="nsew", padx=(8, 0), pady=(0, 12))
+        for card in (self.card_status, self.card_session, self.card_mode, self.card_action):
+            cards_row.addWidget(card, 1)
 
-        actions = ttk.LabelFrame(self, text="Actions reelles", style="Section.TLabelframe", padding=12)
-        actions.grid(row=3, column=0, columnspan=4, sticky="ew", pady=(0, 12))
-        ttk.Button(actions, text="Bloquer le stockage USB", style="Danger.TButton", command=self._block).pack(side="left")
-        ttk.Button(actions, text="Debloquer le stockage USB", style="Accent.TButton", command=self._unblock).pack(side="left", padx=8)
-        ttk.Button(actions, text="Relire le diagnostic", style="Subtle.TButton", command=self.refresh_data).pack(side="left", padx=8)
-        ttk.Button(actions, text="Relancer en admin", style="Subtle.TButton", command=self._relaunch).pack(side="left", padx=8)
+        actions = QGroupBox("Actions reelles", self)
+        actions_layout = QHBoxLayout(actions)
+        self.block_button = QPushButton("Bloquer le stockage USB", actions)
+        self.block_button.setObjectName("danger")
+        self.unblock_button = QPushButton("Debloquer le stockage USB", actions)
+        self.refresh_button = QPushButton("Relire le diagnostic", actions)
+        self.refresh_button.setObjectName("subtle")
+        self.relaunch_button = QPushButton("Relancer en admin", actions)
+        self.relaunch_button.setObjectName("subtle")
+        self.block_button.clicked.connect(self._block)
+        self.unblock_button.clicked.connect(self._unblock)
+        self.refresh_button.clicked.connect(self.refresh_data)
+        self.relaunch_button.clicked.connect(self._relaunch)
+        actions_layout.addWidget(self.block_button)
+        actions_layout.addWidget(self.unblock_button)
+        actions_layout.addWidget(self.refresh_button)
+        actions_layout.addWidget(self.relaunch_button)
+        actions_layout.addStretch(1)
+        layout.addWidget(actions)
 
-        diagnostics = ttk.LabelFrame(self, text="Diagnostic detaille", style="Section.TLabelframe", padding=12)
-        diagnostics.grid(row=4, column=0, columnspan=4, sticky="nsew")
-        diagnostics.columnconfigure(0, weight=1)
-        diagnostics.rowconfigure(1, weight=1)
-        self.note_label = ttk.Label(
+        diagnostics = QGroupBox("Diagnostic detaille", self)
+        diagnostics_layout = QVBoxLayout(diagnostics)
+        self.note_label = QLabel(
+            "Les actions de blocage/deblocage ne concernent que USBSTOR et peuvent necessiter une reinsertion du peripherique.",
             diagnostics,
-            text="Les actions de blocage/deblocage ne concernent que USBSTOR et peuvent necessiter une reinsertion du peripherique.",
-            style="Muted.TLabel",
-            wraplength=1120,
-            justify="left",
         )
-        self.note_label.grid(row=0, column=0, sticky="w", pady=(0, 10))
+        self.note_label.setObjectName("muted")
+        self.note_label.setWordWrap(True)
+        diagnostics_layout.addWidget(self.note_label)
         self.detail_text = ScrollableDetailText(diagnostics, height=20)
-        self.detail_text.grid(row=1, column=0, sticky="nsew")
+        diagnostics_layout.addWidget(self.detail_text, 1)
+        layout.addWidget(diagnostics, 1)
 
     def refresh_data(self) -> None:
         status = self.controller.get_usb_control_status()
@@ -114,6 +127,9 @@ class USBControlView(BaseView):
             )
         )
 
+    def _confirm(self, message: str) -> bool:
+        return QMessageBox.question(self, "Confirmation", message) == QMessageBox.StandardButton.Yes
+
     def _block(self) -> None:
         diagnostics = self.controller.usb_diagnostics()
         if self.controller.demo_mode:
@@ -123,7 +139,7 @@ class USBControlView(BaseView):
             self.app.set_status("Cette action requiert une session administrateur.", "WARNING")
             self.refresh_data()
             return
-        if not messagebox.askyesno("Confirmation", "Bloquer reellement le stockage USB via USBSTOR ?"):
+        if not self._confirm("Bloquer reellement le stockage USB via USBSTOR ?"):
             return
         self.run_action(
             self.controller.block_usb_storage,
@@ -141,7 +157,7 @@ class USBControlView(BaseView):
             self.app.set_status("Cette action requiert une session administrateur.", "WARNING")
             self.refresh_data()
             return
-        if not messagebox.askyesno("Confirmation", "Debloquer reellement le stockage USB via USBSTOR ?"):
+        if not self._confirm("Debloquer reellement le stockage USB via USBSTOR ?"):
             return
         self.run_action(
             self.controller.unblock_usb_storage,

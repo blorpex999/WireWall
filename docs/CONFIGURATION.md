@@ -64,7 +64,7 @@ Les valeurs `scan_interval_seconds`, `alert_threshold` et `dedup_window_seconds`
 ## Conseils de configuration distribution
 
 - Ne versionnez pas votre `config.json` local depuis `%LOCALAPPDATA%`
-- Laissez `ollama_model` sur `qwen2.5:3b` si vous voulez rester aligne avec les scripts et la documentation
+- Laissez `ollama_model` sur `qwen2.5:14b` si vous voulez rester aligne avec les scripts et la documentation
 - Si vous changez de modele recommande, mettez aussi a jour :
   - `config.example.json`
   - `README.md`

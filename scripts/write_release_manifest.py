@@ -25,7 +25,7 @@ def main() -> int:
         "installer_engine": "Inno Setup 6",
         "ai_strategy": {
             "ollama_required_for_ai": True,
-            "default_model": "qwen2.5:3b",
+            "default_model": "qwen2.5:14b",
             "embedded_in_installer": False,
             "bundled_official_installer_optional": True,
             "fallback": "Application utilisable sans IA locale",

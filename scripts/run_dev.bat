@@ -13,7 +13,7 @@ if not exist .venv (
 )
 
 call .venv\Scripts\activate
-python scripts\check_runtime.py --require-python 3.11 --require-tk
+python scripts\check_runtime.py --require-python 3.11 --require-qt
 if errorlevel 1 (
   popd
   exit /b 1

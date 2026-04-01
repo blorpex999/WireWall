@@ -24,10 +24,13 @@ class AppController:
         return self.settings.mode == "demo"
 
     def start_services(self) -> None:
+        if not self.demo_mode:
+            self.container.ollama_runtime_service.ensure_started()
         self.container.usb_monitor.start()
 
     def stop_services(self) -> None:
         self.container.usb_monitor.stop()
+        self.container.ollama_runtime_service.stop()
 
     def refresh_monitor(self) -> None:
         self.container.usb_monitor.refresh_now()
@@ -38,7 +41,7 @@ class AppController:
     def request_health_refresh(self) -> bool:
         return self.container.background_tasks.submit_unique(
             "health_refresh",
-            self.container.health_service.run_all,
+            lambda: self.container.health_service.run_all(self.demo_mode),
             success_event="health_refresh_completed",
             error_event="background_task_error",
         )
@@ -310,7 +313,9 @@ class AppController:
                 raw_status="ok" if ollama_status.status == "ok" else "warning",
                 detail=ollama_status.details,
                 action=(
-                    "Ollama pret pour la demo IA."
+                    "Analyse IA simulee prete pour la demo."
+                    if self.demo_mode
+                    else "Ollama pret pour la demo IA."
                     if ollama_status.status == "ok"
                     else "La demo reste faisable sans IA; eviter cet ecran ou lancer l'assistant IA locale."
                 ),
@@ -322,11 +327,17 @@ class AppController:
                 label="Modele IA attendu",
                 raw_status="ok" if ollama_status.status == "ok" else "warning",
                 detail=(
-                    f"Modele configure '{configured_model}' present."
+                    f"Mode demo: modele configure '{configured_model}' utilise uniquement pour l'analyse simulee."
+                    if self.demo_mode
+                    else f"Modele configure '{configured_model}' present."
                     if ollama_status.status == "ok"
                     else f"Modele attendu '{configured_model}' non confirme."
                 ),
-                action="Si le modele manque, changer de modele dans Parametres ou ignorer la partie IA.",
+                action=(
+                    "Aucune action requise: la demo IA reste simulee."
+                    if self.demo_mode
+                    else "Si le modele manque, changer de modele dans Parametres ou ignorer la partie IA."
+                ),
             )
         )
         return rows
@@ -418,6 +429,10 @@ class AppController:
             model=settings.ollama_model,
             timeout_seconds=settings.ollama_timeout_seconds,
         )
+        self.container.ollama_runtime_service.update(
+            base_url=settings.ollama_base_url,
+            model=settings.ollama_model,
+        )
         self.container.usb_monitor.update_settings(settings)
         self.container.retention_service.apply(settings.history_retention_days)
         self.request_health_refresh()
@@ -427,7 +442,7 @@ class AppController:
     def _run_ai_analysis_sync(self) -> AIAnalysis:
         self.container.brain_service.refresh(self.demo_mode, self.settings.recommendation_mode)
         context = self.container.report_service.build_ai_context(self.demo_mode)
-        analysis = self.container.ollama_service.analyze(context)
+        analysis = self.container.ollama_service.analyze(context, demo_mode=self.demo_mode)
         self.container.ai_analysis_repo.add(analysis)
         return analysis
 

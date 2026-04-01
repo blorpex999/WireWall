@@ -1,1 +1,1 @@
-"""Tkinter UI package for WireWall."""
+"""PyQt6 UI package for WireWall."""

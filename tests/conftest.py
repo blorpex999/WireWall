@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+import os
 import shutil
 import uuid
 from pathlib import Path
 
+os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+
 import pytest
+from PyQt6.QtWidgets import QApplication
 
 from app.config.defaults import build_default_settings
 from app.infrastructure.database import DatabaseManager
@@ -67,3 +71,11 @@ def default_settings():
     settings.mode = "demo"
     settings.export_directory = ""
     return settings
+
+
+@pytest.fixture(scope="session")
+def qapp():
+    app = QApplication.instance()
+    if app is None:
+        app = QApplication(["wirewall-tests", "-platform", "offscreen"])
+    yield app

@@ -28,7 +28,7 @@ def test_build_app_paths_falls_back_to_portable_dir(monkeypatch, workspace_tmp_d
     assert paths.root_dir == workspace_tmp_dir / ".wirewall" / "WireWall"
 
 
-def test_main_returns_error_and_notifies_when_tk_runtime_is_invalid(monkeypatch) -> None:
+def test_main_returns_error_and_notifies_when_qt_runtime_is_invalid(monkeypatch) -> None:
     notified: dict[str, str] = {}
     monkeypatch.setattr(main_module, "parse_args", lambda: SimpleNamespace(demo=False, config=None, allow_standard=True))
     monkeypatch.setattr(
@@ -40,13 +40,13 @@ def test_main_returns_error_and_notifies_when_tk_runtime_is_invalid(monkeypatch)
             release=lambda: None,
         ),
     )
-    monkeypatch.setattr(main_module, "validate_tk_runtime", lambda: (False, "Tk broken"))
+    monkeypatch.setattr(main_module, "validate_qt_runtime", lambda: (False, "Qt broken"))
     monkeypatch.setattr(main_module, "notify_startup_error", lambda message, title="WireWall": notified.setdefault("message", message))
 
     exit_code = main_module.main()
 
     assert exit_code == 1
-    assert "Tk broken" in notified["message"]
+    assert "Qt broken" in notified["message"]
 
 
 def test_main_returns_cleanly_when_another_instance_is_running(monkeypatch) -> None:
@@ -89,6 +89,25 @@ def test_main_replaces_existing_instance_when_requested(monkeypatch) -> None:
             self.released = True
             events.append(f"release:{self.already_running}")
 
+    class FakeQtApp:
+        def setApplicationName(self, name: str) -> None:
+            events.append(f"app-name:{name}")
+
+        def setApplicationVersion(self, version: str) -> None:
+            events.append(f"app-version:{version}")
+
+        def exec(self) -> int:
+            events.append("exec")
+            return 0
+
+    class FakeWindow:
+        def __init__(self, container_arg) -> None:
+            assert container_arg is container
+            events.append("window-init")
+
+        def show(self) -> None:
+            events.append("show")
+
     guards = [Guard(True), Guard(False)]
 
     monkeypatch.setattr(
@@ -98,26 +117,20 @@ def test_main_replaces_existing_instance_when_requested(monkeypatch) -> None:
     )
     monkeypatch.setattr(main_module, "acquire_single_instance", lambda app_name="WireWall": guards.pop(0))
     monkeypatch.setattr(main_module, "close_existing_window", lambda app_name="WireWall": events.append("close") or True)
-    monkeypatch.setattr(main_module, "validate_tk_runtime", lambda: (True, "ok"))
+    monkeypatch.setattr(main_module, "validate_qt_runtime", lambda: (True, "ok"))
+    monkeypatch.setattr(main_module, "create_qapplication", lambda argv: FakeQtApp())
 
     container = SimpleNamespace(shutdown=lambda: events.append("shutdown"))
     monkeypatch.setattr(bootstrap_module, "build_container", lambda config_path=None, force_demo=False: container)
-
-    class FakeApp:
-        def __init__(self, container_arg) -> None:
-            assert container_arg is container
-            events.append("app-init")
-
-        def mainloop(self) -> None:
-            events.append("mainloop")
-
-    monkeypatch.setattr(ui_app_module, "WireWallApp", FakeApp)
+    monkeypatch.setattr(ui_app_module, "WireWallMainWindow", FakeWindow)
 
     exit_code = main_module.main()
 
     assert exit_code == 0
-    assert events[:3] == ["close", "release:True", "app-init"]
-    assert "mainloop" in events
+    assert events[:3] == ["close", "release:True", "app-name:WireWall"]
+    assert "window-init" in events
+    assert "show" in events
+    assert "exec" in events
     assert "shutdown" in events
     assert "release:False" in events
 

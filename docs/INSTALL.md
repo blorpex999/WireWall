@@ -64,7 +64,7 @@ Cette variante :
 
 Elle n'embarque toujours pas :
 
-- le modele `qwen2.5:3b`
+- le modele `qwen2.5:14b`
 
 ## Option 2 - Portable
 
@@ -99,7 +99,7 @@ py -3.11 -m venv .venv
 .venv\Scripts\activate
 python -m pip install --upgrade pip
 python -m pip install -r requirements-dev.txt
-python scripts\check_runtime.py --require-python 3.11 --require-tk
+python scripts\check_runtime.py --require-python 3.11 --require-qt
 copy config.example.json %LOCALAPPDATA%\WireWall\config\config.json
 python main.py
 ```
@@ -111,13 +111,13 @@ En mode source, WireWall tente automatiquement une relance admin. Si tu refuses 
 Option recommandee :
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\setup_ai.ps1 -Model qwen2.5:3b
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\setup_ai.ps1 -Model qwen2.5:14b
 ```
 
 Ou depuis le repo :
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\setup_ai.ps1 -Model qwen2.5:3b
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\setup_ai.ps1 -Model qwen2.5:14b
 ```
 
 Le script :
@@ -131,7 +131,7 @@ Le script :
 Si vous disposez d'un installeur Ollama offline officiel :
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\setup_ai.ps1 -Model qwen2.5:3b -OfflineInstallerPath C:\Temp\OllamaSetup.exe
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\setup_ai.ps1 -Model qwen2.5:14b -OfflineInstallerPath C:\Temp\OllamaSetup.exe
 ```
 
 ## Diagnostic poste cible
@@ -139,7 +139,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\setup_ai.ps1 -Model 
 Le package installe aussi un diagnostic simple :
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\check_target_prereqs.ps1 -Model qwen2.5:3b
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\check_target_prereqs.ps1 -Model qwen2.5:14b
 ```
 
 Ou via le raccourci menu demarrer `Diagnostic prerequis`.

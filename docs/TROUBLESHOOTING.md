@@ -5,26 +5,26 @@
 Cause probable :
 
 - Python 3.11 absent
-- `Tcl/Tk` non fonctionnel
+- `PyQt6` non fonctionnel
 
 Action :
 
 ```bat
-py -3.11 -c "import tkinter; tkinter.Tk().destroy()"
+py -3.11 -c "from PyQt6.QtWidgets import QApplication; app = QApplication(['check', '-platform', 'offscreen']); app.quit()"
 ```
 
-Si cette commande echoue, changez de poste ou reinstallez Python 3.11 avec Tcl/Tk.
+Si cette commande echoue, changez de poste ou reinstallez Python 3.11 avec PyQt6.
 
 ## L'application ne demarre pas en package
 
 Cause probable :
 
 - build realise sur un host non supporte
-- runtime Tk incomplet
+- runtime PyQt6 incomplet
 
 Action :
 
-- refaire le build sur un poste `Python 3.11 + Tcl/Tk` valide
+- refaire le build sur un poste `Python 3.11 + PyQt6` valide
 - verifier `dist\WireWall\WireWall.exe`
 - verifier la presence de `libusb-1.0.dll` dans `dist\WireWall`
 
@@ -166,7 +166,7 @@ Action :
 Cause probable :
 
 - Ollama n'est pas installe
-- le modele `qwen2.5:3b` n'est pas encore telecharge
+- le modele `qwen2.5:14b` n'est pas encore telecharge
 
 Action :
 

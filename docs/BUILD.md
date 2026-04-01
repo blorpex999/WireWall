@@ -6,10 +6,10 @@ Le build officiel doit etre realise sur un poste :
 
 - Windows 10/11 x64
 - Python 3.11 x64
-- Tcl/Tk fonctionnel
+- PyQt6 fonctionnel
 - Inno Setup 6 si l'installateur doit etre produit
 
-Un poste `Python 3.13` ou un runtime Tk casse n'est pas un builder officiel, meme si un bundle peut etre produit.
+Un poste `Python 3.13` ou un runtime PyQt6 casse n'est pas un builder officiel, meme si un bundle peut etre produit.
 
 ## Build du bundle PyInstaller
 
@@ -82,7 +82,7 @@ Ce script :
 
 Limite :
 
-- le modele `qwen2.5:3b` n'est pas embarque ; il sera telecharge ensuite par `setup_ai`
+- le modele `qwen2.5:14b` n'est pas embarque ; il sera telecharge ensuite par `setup_ai`
 
 ## Release complete
 
@@ -124,5 +124,5 @@ scripts\release_full.bat
 - Variante demo : installateur full avec installeur Ollama embarque
 - Le bundle embarque `libusb_package`, `config.example.json` et `VERSION`
 - Le package portable et l'installateur embarquent aussi la documentation et les assistants IA/prerequis
-- Ollama et le modele `qwen2.5:3b` ne sont pas embarques
+- Ollama et le modele `qwen2.5:14b` ne sont pas embarques
 - L'installateur full peut embarquer l'installeur officiel Ollama, mais pas un gros modele local

@@ -3,8 +3,8 @@
 ## Prerequis avant demo
 
 - Poste Windows 10/11 x64
-- Runtime `Python 3.11 + Tcl/Tk` valide ou build PyInstaller produit sur un tel poste
-- `scripts\check_runtime.py --require-python 3.11 --require-tk` valide si vous demarrez depuis les sources
+- Runtime `Python 3.11 + PyQt6` valide ou build PyInstaller produit sur un tel poste
+- `scripts\check_runtime.py --require-python 3.11 --require-qt` valide si vous demarrez depuis les sources
 - Au moins un peripherique USB reel si vous voulez montrer la detection live
 - Session admin requise par defaut au lancement ; verifier simplement que l'UAC a ete acceptee avant la demo
 - Ollama local disponible uniquement si vous voulez montrer l'analyse IA

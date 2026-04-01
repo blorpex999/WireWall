@@ -3,7 +3,7 @@ from __future__ import annotations
 from app.models.entities import AppSettings
 
 APP_NAME = "WireWall"
-DEFAULT_OLLAMA_MODEL = "qwen2.5:3b"
+DEFAULT_OLLAMA_MODEL = "qwen2.5:14b"
 DEFAULT_OLLAMA_URL = "http://127.0.0.1:11434"
 
 PROFILE_PRESETS: dict[str, dict[str, int | str]] = {
@@ -40,7 +40,7 @@ def build_default_settings() -> AppSettings:
         log_level="INFO",
         ollama_base_url=DEFAULT_OLLAMA_URL,
         ollama_model=DEFAULT_OLLAMA_MODEL,
-        ollama_timeout_seconds=30,
+        ollama_timeout_seconds=60,
         security_profile="Normal",
         theme="dark",
         export_directory="",

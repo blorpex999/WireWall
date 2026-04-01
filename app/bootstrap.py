@@ -37,6 +37,7 @@ from app.services.event_bus import EventBus
 from app.services.health_service import HealthCheckService
 from app.services.incident_service import IncidentService
 from app.services.ollama_service import OllamaService
+from app.services.ollama_runtime_service import OllamaRuntimeService
 from app.services.policy_service import PolicyService
 from app.services.recommendation_service import RecommendationService
 from app.services.report_service import ReportService
@@ -79,6 +80,7 @@ class ApplicationContainer:
     runtime_state_service: RuntimeStateService
     usb_control_service: UsbControlService
     ollama_service: OllamaService
+    ollama_runtime_service: OllamaRuntimeService
     report_service: ReportService
     health_service: HealthCheckService
     usb_monitor: UsbMonitorService
@@ -87,6 +89,7 @@ class ApplicationContainer:
         self.usb_monitor.stop()
         self.runtime_state_service.shutdown()
         self.background_tasks.shutdown()
+        self.ollama_runtime_service.stop()
 
 
 def build_container(config_path: str | None = None, force_demo: bool = False) -> ApplicationContainer:
@@ -155,6 +158,10 @@ def build_container(config_path: str | None = None, force_demo: bool = False) ->
         base_url=settings.ollama_base_url,
         model=settings.ollama_model,
         timeout_seconds=settings.ollama_timeout_seconds,
+    )
+    ollama_runtime_service = OllamaRuntimeService(
+        base_url=settings.ollama_base_url,
+        model=settings.ollama_model,
     )
     incident_service = IncidentService(
         incident_repo=incident_repo,
@@ -290,6 +297,7 @@ def build_container(config_path: str | None = None, force_demo: bool = False) ->
         runtime_state_service=runtime_state_service,
         usb_control_service=usb_control_service,
         ollama_service=ollama_service,
+        ollama_runtime_service=ollama_runtime_service,
         report_service=report_service,
         health_service=health_service,
         usb_monitor=usb_monitor,

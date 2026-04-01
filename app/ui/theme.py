@@ -1,8 +1,5 @@
 from __future__ import annotations
 
-import tkinter as tk
-from tkinter import ttk
-
 
 COLORS = {
     "bg": "#0F141B",
@@ -22,182 +19,229 @@ COLORS = {
     "selection": "#263344",
     "disabled": "#6D7785",
     "demo": "#E7A23C",
-    "shadow": "#0C1117",
 }
 
 
-def apply_dark_theme(root: tk.Tk) -> None:
-    root.configure(bg=COLORS["bg"])
-    style = ttk.Style(root)
-    style.theme_use("clam")
-
-    base_font = ("Segoe UI", 10)
-    small_font = ("Segoe UI", 9)
-    title_font = ("Segoe UI Semibold", 11)
-    section_font = ("Segoe UI Semibold", 13)
-    large_font = ("Segoe UI Semibold", 18)
-    hero_font = ("Segoe UI Semibold", 24)
-
-    style.configure(".", background=COLORS["bg"], foreground=COLORS["text"], font=base_font)
-    style.configure("TFrame", background=COLORS["bg"])
-    style.configure("Card.TFrame", background=COLORS["panel"], relief="flat", borderwidth=1)
-    style.configure("CardInner.TFrame", background=COLORS["panel"], relief="flat")
-    style.configure("Inset.TFrame", background=COLORS["panel_alt"], relief="flat")
-    style.configure("Sidebar.TFrame", background=COLORS["panel_alt"])
-    style.configure("SidebarHeader.TFrame", background=COLORS["panel_alt"])
-    style.configure("Toolbar.TFrame", background=COLORS["panel"])
-    style.configure("Section.TLabelframe", background=COLORS["bg"], bordercolor=COLORS["panel_border"], relief="flat")
-    style.configure(
-        "Section.TLabelframe.Label",
-        background=COLORS["bg"],
-        foreground=COLORS["muted"],
-        font=title_font,
-    )
-    style.configure("TLabel", background=COLORS["bg"], foreground=COLORS["text"], font=base_font)
-    style.configure("Card.TLabel", background=COLORS["panel"], foreground=COLORS["text"], font=base_font)
-    style.configure("CardMuted.TLabel", background=COLORS["panel"], foreground=COLORS["muted"], font=small_font)
-    style.configure("Title.TLabel", font=large_font, foreground=COLORS["text"])
-    style.configure("SubTitle.TLabel", font=title_font, foreground=COLORS["muted"])
-    style.configure("SectionTitle.TLabel", font=section_font, foreground=COLORS["text"])
-    style.configure("CardTitle.TLabel", background=COLORS["panel"], font=section_font, foreground=COLORS["text"])
-    style.configure("NavTitle.TLabel", background=COLORS["panel_alt"], font=("Segoe UI Semibold", 18), foreground=COLORS["text"])
-    style.configure("NavSubTitle.TLabel", background=COLORS["panel_alt"], font=small_font, foreground=COLORS["muted"])
-    style.configure("SidebarLogo.TLabel", background=COLORS["panel_alt"])
-    style.configure("Muted.TLabel", foreground=COLORS["muted"], font=small_font)
-    style.configure("Hero.TLabel", font=hero_font, foreground=COLORS["text"])
-    style.configure("Metric.TLabel", background=COLORS["panel"], foreground=COLORS["text"], font=hero_font)
-    style.configure("ValueTitle.TLabel", background=COLORS["panel"], foreground=COLORS["muted"], font=small_font)
-    style.configure("ValueBody.TLabel", background=COLORS["panel"], foreground=COLORS["text"], font=("Segoe UI Semibold", 11))
-
-    style.configure(
-        "Sidebar.TButton",
-        background=COLORS["panel_alt"],
-        foreground=COLORS["text"],
-        borderwidth=0,
-        padding=(14, 10),
-        relief="flat",
-    )
-    style.map(
-        "Sidebar.TButton",
-        background=[("active", COLORS["selection"]), ("disabled", COLORS["panel_alt"])],
-        foreground=[("disabled", COLORS["disabled"])],
-    )
-    style.configure(
-        "SidebarActive.TButton",
-        background=COLORS["selection"],
-        foreground=COLORS["text"],
-        borderwidth=0,
-        padding=(14, 10),
-        relief="flat",
-    )
-    style.map("SidebarActive.TButton", background=[("active", COLORS["selection"])])
-
-    style.configure("TButton", background=COLORS["panel_alt"], foreground=COLORS["text"], padding=(10, 8), borderwidth=0)
-    style.map(
-        "TButton",
-        background=[("active", COLORS["selection"]), ("disabled", COLORS["panel_alt"])],
-        foreground=[("disabled", COLORS["disabled"])],
-    )
-    style.configure("Accent.TButton", background=COLORS["accent"], foreground="#FFFFFF", padding=(12, 8), borderwidth=0)
-    style.map(
-        "Accent.TButton",
-        background=[("active", COLORS["accent_hover"]), ("disabled", COLORS["panel_alt_2"])],
-        foreground=[("disabled", COLORS["disabled"])],
-    )
-    style.configure("Danger.TButton", background=COLORS["danger"], foreground="#FFFFFF", padding=(12, 8), borderwidth=0)
-    style.map(
-        "Danger.TButton",
-        background=[("active", "#FF7D91"), ("disabled", COLORS["panel_alt_2"])],
-        foreground=[("disabled", COLORS["disabled"])],
-    )
-    style.configure("Subtle.TButton", background=COLORS["panel_alt"], foreground=COLORS["muted"], padding=(10, 8), borderwidth=0)
-    style.map(
-        "Subtle.TButton",
-        background=[("active", COLORS["selection"]), ("disabled", COLORS["panel_alt"])],
-        foreground=[("active", COLORS["text"]), ("disabled", COLORS["disabled"])],
-    )
-
-    style.configure(
-        "TEntry",
-        fieldbackground=COLORS["panel"],
-        foreground=COLORS["text"],
-        insertcolor=COLORS["text"],
-        bordercolor=COLORS["panel_border"],
-        lightcolor=COLORS["panel_border"],
-        darkcolor=COLORS["panel_border"],
-        padding=(8, 6),
-    )
-    style.map("TEntry", fieldbackground=[("disabled", COLORS["panel_alt"])], foreground=[("disabled", COLORS["disabled"])])
-
-    style.configure(
-        "TCombobox",
-        fieldbackground=COLORS["panel"],
-        foreground=COLORS["text"],
-        arrowsize=14,
-        arrowcolor=COLORS["muted"],
-        bordercolor=COLORS["panel_border"],
-        lightcolor=COLORS["panel_border"],
-        darkcolor=COLORS["panel_border"],
-        padding=(6, 4),
-    )
-    style.map(
-        "TCombobox",
-        fieldbackground=[("readonly", COLORS["panel"]), ("disabled", COLORS["panel_alt"])],
-        foreground=[("readonly", COLORS["text"]), ("disabled", COLORS["disabled"])],
-        arrowcolor=[("disabled", COLORS["disabled"])],
-    )
-
-    style.configure(
-        "Treeview",
-        background=COLORS["panel"],
-        foreground=COLORS["text"],
-        fieldbackground=COLORS["panel"],
-        rowheight=31,
-        bordercolor=COLORS["panel_border"],
-        lightcolor=COLORS["panel_border"],
-        darkcolor=COLORS["panel_border"],
-    )
-    style.layout("Treeview", [("Treeview.treearea", {"sticky": "nswe"})])
-    style.configure(
-        "Treeview.Heading",
-        background=COLORS["panel_alt"],
-        foreground=COLORS["muted"],
-        relief="flat",
-        font=title_font,
-        padding=(8, 6),
-    )
-    style.map(
-        "Treeview",
-        background=[("selected", COLORS["selection"])],
-        foreground=[("selected", COLORS["text"])],
-    )
-
-    style.configure("Vertical.TScrollbar", background=COLORS["panel_alt"], troughcolor=COLORS["bg"], bordercolor=COLORS["bg"])
-    style.configure("Horizontal.TScrollbar", background=COLORS["panel_alt"], troughcolor=COLORS["bg"], bordercolor=COLORS["bg"])
-
-    style.configure("TNotebook", background=COLORS["bg"], borderwidth=0, tabmargins=(0, 0, 0, 0))
-    style.configure(
-        "TNotebook.Tab",
-        background=COLORS["panel_alt"],
-        foreground=COLORS["muted"],
-        padding=(16, 8),
-        borderwidth=0,
-    )
-    style.map(
-        "TNotebook.Tab",
-        background=[("selected", COLORS["panel"]), ("active", COLORS["selection"])],
-        foreground=[("selected", COLORS["text"]), ("active", COLORS["text"])],
-    )
-
-    root.option_add("*background", COLORS["bg"])
-    root.option_add("*Text.background", COLORS["panel"])
-    root.option_add("*Text.foreground", COLORS["text"])
-    root.option_add("*Text.insertBackground", COLORS["text"])
-    root.option_add("*Text.highlightBackground", COLORS["panel_border"])
-    root.option_add("*Text.highlightColor", COLORS["accent"])
-    root.option_add("*Canvas.background", COLORS["bg"])
-    root.option_add("*Canvas.highlightThickness", "0")
-    root.option_add("*Canvas.borderWidth", "0")
-    root.option_add("*Frame.background", COLORS["bg"])
-    root.option_add("*Label.background", COLORS["bg"])
-    root.option_add("*Toplevel.background", COLORS["bg"])
+def get_stylesheet() -> str:
+    c = COLORS
+    return f"""
+    QMainWindow, QWidget {{
+        background-color: {c['bg']};
+        color: {c['text']};
+        font-family: "Segoe UI";
+        font-size: 10pt;
+    }}
+    QFrame#sidebar {{
+        background-color: {c['panel_alt']};
+        border-right: 1px solid {c['panel_border']};
+        border-radius: 8px;
+    }}
+    QFrame#card {{
+        background-color: {c['panel']};
+        border: 1px solid {c['panel_border']};
+        border-radius: 8px;
+    }}
+    QFrame#panel {{
+        background-color: {c['panel']};
+        border-radius: 6px;
+    }}
+    QFrame#demo_banner {{
+        background-color: {c['panel_alt_2']};
+        border: 1px solid {c['warning']};
+        border-radius: 8px;
+    }}
+    QPushButton#nav_button {{
+        background-color: transparent;
+        color: {c['muted']};
+        border: none;
+        border-radius: 6px;
+        padding: 8px 14px;
+        text-align: left;
+        font-size: 10pt;
+    }}
+    QPushButton#nav_button:hover {{
+        background-color: {c['panel_alt_2']};
+        color: {c['text']};
+    }}
+    QPushButton#nav_button[active="true"] {{
+        background-color: {c['selection']};
+        color: {c['accent']};
+        font-weight: 600;
+    }}
+    QPushButton {{
+        background-color: {c['accent']};
+        color: #FFFFFF;
+        border: none;
+        border-radius: 6px;
+        padding: 7px 16px;
+        font-size: 10pt;
+    }}
+    QPushButton:hover {{
+        background-color: {c['accent_hover']};
+    }}
+    QPushButton:disabled {{
+        background-color: {c['disabled']};
+        color: {c['muted']};
+    }}
+    QPushButton#subtle {{
+        background-color: {c['panel_alt']};
+        color: {c['muted']};
+        border: 1px solid {c['panel_border']};
+    }}
+    QPushButton#subtle:hover {{
+        background-color: {c['panel_alt_2']};
+        color: {c['text']};
+    }}
+    QPushButton#danger {{
+        background-color: {c['danger']};
+        color: #FFFFFF;
+    }}
+    QPushButton#danger:hover {{
+        background-color: {c['danger_soft']};
+    }}
+    QPushButton#pill_button {{
+        padding: 4px 10px;
+    }}
+    QTableWidget, QTreeWidget, QPlainTextEdit, QTextEdit {{
+        background-color: {c['panel']};
+        alternate-background-color: {c['panel_alt']};
+        color: {c['text']};
+        border: 1px solid {c['panel_border']};
+        border-radius: 6px;
+        gridline-color: {c['panel_border']};
+        selection-background-color: {c['selection']};
+        outline: none;
+    }}
+    QTableWidget::item:selected, QTreeWidget::item:selected {{
+        background-color: {c['selection']};
+        color: {c['accent']};
+    }}
+    QHeaderView::section {{
+        background-color: {c['panel_alt']};
+        color: {c['muted']};
+        border: none;
+        border-bottom: 1px solid {c['panel_border']};
+        padding: 6px 8px;
+        font-size: 9pt;
+    }}
+    QScrollBar:vertical {{
+        background: {c['bg']};
+        width: 8px;
+        border: none;
+    }}
+    QScrollBar::handle:vertical {{
+        background: {c['panel_border']};
+        border-radius: 4px;
+        min-height: 30px;
+    }}
+    QScrollBar::handle:vertical:hover {{
+        background: {c['muted']};
+    }}
+    QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical,
+    QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {{
+        border: none;
+        background: none;
+    }}
+    QScrollArea {{
+        border: none;
+        background-color: {c['bg']};
+    }}
+    QComboBox {{
+        background-color: {c['panel_alt']};
+        color: {c['text']};
+        border: 1px solid {c['panel_border']};
+        border-radius: 6px;
+        padding: 5px 10px;
+    }}
+    QComboBox::drop-down {{
+        border: none;
+    }}
+    QComboBox QAbstractItemView {{
+        background-color: {c['panel_alt']};
+        color: {c['text']};
+        selection-background-color: {c['selection']};
+        border: 1px solid {c['panel_border']};
+    }}
+    QLineEdit {{
+        background-color: {c['panel_alt']};
+        color: {c['text']};
+        border: 1px solid {c['panel_border']};
+        border-radius: 6px;
+        padding: 5px 10px;
+    }}
+    QLineEdit:focus {{
+        border: 1px solid {c['accent']};
+    }}
+    QCheckBox {{
+        color: {c['text']};
+        spacing: 8px;
+    }}
+    QCheckBox::indicator {{
+        width: 16px;
+        height: 16px;
+        border: 1px solid {c['panel_border']};
+        border-radius: 3px;
+        background: {c['panel_alt']};
+    }}
+    QCheckBox::indicator:checked {{
+        background: {c['accent']};
+        border-color: {c['accent']};
+    }}
+    QLabel {{
+        color: {c['text']};
+        background: transparent;
+    }}
+    QLabel#muted {{
+        color: {c['muted']};
+        font-size: 9pt;
+    }}
+    QLabel#title {{
+        font-size: 18pt;
+        font-weight: 600;
+    }}
+    QLabel#subtitle {{
+        font-size: 11pt;
+        color: {c['muted']};
+    }}
+    QToolTip {{
+        background-color: {c['panel_alt_2']};
+        color: {c['text']};
+        border: 1px solid {c['panel_border']};
+        padding: 4px 8px;
+    }}
+    QGroupBox {{
+        color: {c['muted']};
+        border: 1px solid {c['panel_border']};
+        border-radius: 6px;
+        margin-top: 8px;
+        padding: 12px;
+        font-size: 9pt;
+        background-color: {c['panel']};
+    }}
+    QGroupBox::title {{
+        subcontrol-origin: margin;
+        left: 10px;
+        padding: 0 4px;
+    }}
+    QTabWidget::pane {{
+        border: 1px solid {c['panel_border']};
+        border-radius: 8px;
+        background: {c['panel']};
+    }}
+    QTabBar::tab {{
+        background: {c['panel_alt']};
+        color: {c['muted']};
+        padding: 8px 14px;
+        border-top-left-radius: 6px;
+        border-top-right-radius: 6px;
+        margin-right: 4px;
+    }}
+    QTabBar::tab:selected {{
+        background: {c['selection']};
+        color: {c['text']};
+    }}
+    QStatusBar {{
+        background-color: {c['panel']};
+        border-top: 1px solid {c['panel_border']};
+    }}
+    """

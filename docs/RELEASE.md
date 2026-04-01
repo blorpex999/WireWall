@@ -65,13 +65,13 @@ scripts\release_from_dist.bat
 
 - Windows 10/11 x64
 - Python 3.11 x64
-- Tcl/Tk valide
+- PyQt6 valide
 - Inno Setup 6 si l'installateur doit etre produit
 
 ## Ollama en release
 
 - Ollama n'est pas embarque dans l'executable ni dans l'installateur
-- Le modele `qwen2.5:3b` n'est pas embarque
+- Le modele `qwen2.5:14b` n'est pas embarque
 - La strategie officielle est :
   - installer WireWall
   - executer l'assistant IA local si necessaire

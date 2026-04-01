@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-import tkinter as tk
-from tkinter import ttk
+from PyQt6.QtWidgets import QComboBox, QGridLayout, QGroupBox, QHBoxLayout, QLabel, QLineEdit, QPushButton, QVBoxLayout, QWidget
 
 from app.ui.views.base import BaseView
 from app.ui.widgets.common import LabeledValue, ScrollableDetailText, ScrollableTree, SectionHeader, StatusPill
@@ -23,57 +22,77 @@ class HistoryView(BaseView):
         "ERROR": "ERROR",
     }
 
-    def __init__(self, master, controller, app) -> None:
-        super().__init__(master, controller, app)
-        self.columnconfigure(0, weight=3)
-        self.columnconfigure(1, weight=2)
-        self.rowconfigure(2, weight=1)
+    def __init__(self, parent, controller, app) -> None:
+        super().__init__(parent, controller, app)
         self._rows: dict[str, object] = {}
         self._selected_event_key: str | None = None
+
+        layout = QGridLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setHorizontalSpacing(16)
+        layout.setVerticalSpacing(12)
+        layout.setColumnStretch(0, 3)
+        layout.setColumnStretch(1, 2)
+        layout.setRowStretch(2, 1)
 
         self.header = SectionHeader(
             self,
             "Historique et audit",
             "Trace horodatee des evenements USB, des anomalies de scan et des exports d'audit.",
         )
-        self.header.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 16))
+        layout.addWidget(self.header, 0, 0, 1, 2)
 
-        toolbar = ttk.LabelFrame(self, text="Filtres et exports", style="Section.TLabelframe", padding=12)
-        toolbar.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(0, 12))
-        toolbar.columnconfigure(1, weight=1)
-        toolbar.columnconfigure(3, weight=1)
-        ttk.Label(toolbar, text="Recherche").grid(row=0, column=0, sticky="w", padx=(0, 8))
-        self.search_var = tk.StringVar()
-        self.search_entry = ttk.Entry(toolbar, textvariable=self.search_var)
-        self.search_entry.grid(row=0, column=1, sticky="ew", padx=(0, 12))
-        ttk.Label(toolbar, text="Gravite").grid(row=0, column=2, sticky="w", padx=(0, 8))
-        self.severity_var = tk.StringVar(value="Toutes")
-        self.severity_combo = ttk.Combobox(
-            toolbar,
-            textvariable=self.severity_var,
-            values=list(self.SEVERITY_OPTIONS.keys()),
-            state="readonly",
-        )
-        self.severity_combo.grid(row=0, column=3, sticky="ew")
-        ttk.Button(toolbar, text="Appliquer", command=self.refresh_data).grid(row=1, column=2, sticky="e", pady=(12, 0))
-        actions = ttk.Frame(toolbar)
-        actions.grid(row=1, column=3, sticky="e", pady=(12, 0))
-        ttk.Button(actions, text="CSV", command=lambda: self._export("csv")).pack(side="left")
-        ttk.Button(actions, text="JSON", command=lambda: self._export("json")).pack(side="left", padx=8)
-        ttk.Button(actions, text="Rapport HTML", style="Accent.TButton", command=lambda: self._export("html")).pack(side="left")
-        self.search_var.trace_add("write", lambda *_args: self.schedule_refresh(250))
-        self.search_entry.bind("<Return>", lambda _event: self.refresh_data())
-        self.severity_combo.bind("<<ComboboxSelected>>", lambda _event: self.refresh_data())
+        toolbar = QGroupBox("Filtres et exports", self)
+        toolbar_layout = QGridLayout(toolbar)
+        toolbar_layout.setHorizontalSpacing(12)
+        toolbar_layout.setVerticalSpacing(12)
+        toolbar_layout.setColumnStretch(1, 1)
+        toolbar_layout.setColumnStretch(3, 1)
+        layout.addWidget(toolbar, 1, 0, 1, 2)
 
-        list_frame = ttk.LabelFrame(self, text="Evenements", style="Section.TLabelframe", padding=12)
-        list_frame.grid(row=2, column=0, sticky="nsew", padx=(0, 8))
-        detail_frame = ttk.LabelFrame(self, text="Detail d'audit", style="Section.TLabelframe", padding=12)
-        detail_frame.grid(row=2, column=1, sticky="nsew", padx=(8, 0))
-        detail_frame.columnconfigure(0, weight=1)
-        detail_frame.rowconfigure(3, weight=1)
+        toolbar_layout.addWidget(QLabel("Recherche", toolbar), 0, 0)
+        self.search_entry = QLineEdit(toolbar)
+        toolbar_layout.addWidget(self.search_entry, 0, 1)
+
+        toolbar_layout.addWidget(QLabel("Gravite", toolbar), 0, 2)
+        self.severity_combo = QComboBox(toolbar)
+        self.severity_combo.addItems(list(self.SEVERITY_OPTIONS.keys()))
+        toolbar_layout.addWidget(self.severity_combo, 0, 3)
+
+        apply_button = QPushButton("Appliquer", toolbar)
+        apply_button.clicked.connect(self.refresh_data)
+        toolbar_layout.addWidget(apply_button, 1, 2)
+
+        actions = QWidget(toolbar)
+        actions_layout = QHBoxLayout(actions)
+        actions_layout.setContentsMargins(0, 0, 0, 0)
+        actions_layout.setSpacing(8)
+        csv_button = QPushButton("CSV", actions)
+        json_button = QPushButton("JSON", actions)
+        html_button = QPushButton("Rapport HTML", actions)
+        csv_button.clicked.connect(lambda: self._export("csv"))
+        json_button.clicked.connect(lambda: self._export("json"))
+        html_button.clicked.connect(lambda: self._export("html"))
+        actions_layout.addWidget(csv_button)
+        actions_layout.addWidget(json_button)
+        actions_layout.addWidget(html_button)
+        actions_layout.addStretch(1)
+        toolbar_layout.addWidget(actions, 1, 3)
+
+        self.search_entry.textChanged.connect(lambda _text: self.schedule_refresh(250))
+        self.search_entry.returnPressed.connect(self.refresh_data)
+        self.severity_combo.currentTextChanged.connect(lambda _text: self.refresh_data())
+
+        list_frame = QGroupBox("Evenements", self)
+        list_layout = QVBoxLayout(list_frame)
+        detail_frame = QGroupBox("Detail d'audit", self)
+        detail_layout = QVBoxLayout(detail_frame)
+        detail_layout.setSpacing(12)
+        layout.addWidget(list_frame, 2, 0)
+        layout.addWidget(detail_frame, 2, 1)
 
         self.table = ScrollableTree(list_frame, ("date", "type", "device", "summary", "severity"), height=18)
-        self.table.pack(fill="both", expand=True)
+        list_layout.addWidget(self.table)
         for column, label, width in (
             ("date", "Date", 150),
             ("type", "Type", 110),
@@ -87,17 +106,22 @@ class HistoryView(BaseView):
         for tone in ("LOW", "MEDIUM", "HIGH", "CRITICAL", "INFO", "WARNING", "ERROR"):
             self.table.tree.tag_configure(tone, foreground=severity_color(tone))
 
-        top = ttk.Frame(detail_frame, style="Card.TFrame", padding=12)
-        top.grid(row=0, column=0, sticky="ew")
-        top.columnconfigure(0, weight=1)
-        ttk.Label(top, text="Resume de l'evenement", style="CardMuted.TLabel").grid(row=0, column=0, sticky="w")
+        top = QWidget(detail_frame)
+        top.setObjectName("card")
+        top_layout = QHBoxLayout(top)
+        top_layout.setContentsMargins(12, 12, 12, 12)
+        top_layout.addWidget(QLabel("Resume de l'evenement", top), 1)
         self.severity_badge = StatusPill(top, "INFO", "INFO")
-        self.severity_badge.grid(row=0, column=1, sticky="e")
+        top_layout.addWidget(self.severity_badge)
+        detail_layout.addWidget(top)
 
-        metrics = ttk.Frame(detail_frame, style="Card.TFrame", padding=12)
-        metrics.grid(row=1, column=0, sticky="ew", pady=(12, 12))
-        for column in range(2):
-            metrics.columnconfigure(column, weight=1)
+        metrics = QWidget(detail_frame)
+        metrics.setObjectName("card")
+        metrics_layout = QGridLayout(metrics)
+        metrics_layout.setContentsMargins(12, 12, 12, 12)
+        metrics_layout.setHorizontalSpacing(10)
+        metrics_layout.setVerticalSpacing(8)
+        detail_layout.addWidget(metrics)
         self.values = {
             "date": LabeledValue(metrics, "Date"),
             "type": LabeledValue(metrics, "Type"),
@@ -115,16 +139,16 @@ class HistoryView(BaseView):
             ("level", 2, 1),
         ]
         for key, row, column in placements:
-            self.values[key].grid(row=row, column=column, sticky="ew", padx=(0 if column == 0 else 10, 0), pady=6)
+            metrics_layout.addWidget(self.values[key], row, column)
 
         self.detail_text = ScrollableDetailText(detail_frame, height=18)
-        self.detail_text.grid(row=3, column=0, sticky="nsew")
+        detail_layout.addWidget(self.detail_text, 1)
         self._clear_selection_state()
 
     def refresh_data(self) -> None:
-        severity = self.SEVERITY_OPTIONS[self.severity_var.get()]
+        severity = self.SEVERITY_OPTIONS[self.severity_combo.currentText()]
         selected_key = self._get_selected_event_key() or self._selected_event_key
-        events = self.controller.list_events(self.search_var.get().strip(), severity)
+        events = self.controller.list_events(self.search_entry.text().strip(), severity)
         self._rows.clear()
         self.table.clear()
         item_to_restore: str | None = None

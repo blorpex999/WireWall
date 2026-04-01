@@ -8,18 +8,18 @@ WireWall suit une architecture en couches :
 - `app/core` : classification USB, moteur de risque, niveaux de criticite
 - `app/infrastructure` : SQLite, config, logging, registre Windows, chemins
 - `app/services` : enumeration USB, monitoring, policies, controle USB, IA locale, rapports, retention, health checks, jobs asynchrones
-- `app/ui` : application Tkinter, controleur, vues, widgets, theme
+- `app/ui` : application PyQt6, controleur, vues, widgets, theme
 - `app/utils` : dates, validation, elevation, helpers Windows
 
 ## Flux applicatif
 
-1. `main.py` verifie d'abord le runtime Tkinter.
+1. `main.py` verifie d'abord le runtime PyQt6.
 2. `app/bootstrap.py` charge la configuration, prepare les chemins, initialise SQLite, repositories et services.
 3. `UsbMonitorService` tourne dans un thread dedie et produit des snapshots USB.
 4. Chaque snapshot est compare au snapshot precedent.
 5. Les evenements, assessments et alertes sont persistants en base.
 6. `EventBus` transporte les notifications vers l'UI.
-7. L'UI consomme les evenements via `after()` sans acces direct des threads de fond aux widgets.
+7. L'UI consomme les evenements via `QTimer` sans acces direct des threads de fond aux widgets.
 8. Les appels potentiellement bloquants comme les health checks reseau et l'analyse Ollama passent par `BackgroundTaskService`.
 
 ## Persistance

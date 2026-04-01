@@ -1,5 +1,5 @@
 param(
-    [string]$Model = "qwen2.5:3b",
+    [string]$Model = "qwen2.5:14b",
     [switch]$AsJson
 )
 

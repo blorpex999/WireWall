@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from tkinter import ttk
+from PyQt6.QtWidgets import QGridLayout, QGroupBox, QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget
 
-from app.ui.views.base import BaseView
 from app.ui.help_content import SCREEN_HELP
+from app.ui.views.base import BaseView
 from app.ui.widgets.common import InlineHelpPanel, LabeledValue, ScrollableDetailText, ScrollableTree, SectionHeader, StatusPill
 from app.utils.datetime import format_for_ui
 from app.utils.ui import health_status_text, severity_color, shorten_text, tone_for_status
@@ -12,13 +12,18 @@ from app.utils.ui import health_status_text, severity_color, shorten_text, tone_
 class AIAnalysisView(BaseView):
     view_title = "Analyse IA"
 
-    def __init__(self, master, controller, app) -> None:
-        super().__init__(master, controller, app)
-        self.columnconfigure(0, weight=2)
-        self.columnconfigure(1, weight=3)
-        self.rowconfigure(3, weight=1)
+    def __init__(self, parent, controller, app) -> None:
+        super().__init__(parent, controller, app)
         self._rows: dict[str, object] = {}
         self._selected_analysis_key: str | None = None
+
+        layout = QGridLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setHorizontalSpacing(16)
+        layout.setVerticalSpacing(12)
+        layout.setColumnStretch(0, 2)
+        layout.setColumnStretch(1, 3)
+        layout.setRowStretch(3, 1)
 
         self.header = SectionHeader(
             self,
@@ -27,49 +32,63 @@ class AIAnalysisView(BaseView):
             "LOCAL",
             "INFO",
         )
-        self.header.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 16))
+        layout.addWidget(self.header, 0, 0, 1, 2)
 
         self.help_panel = InlineHelpPanel(
             self,
             button_text=str(SCREEN_HELP["ai_analysis"]["button"]),
             sections=list(SCREEN_HELP["ai_analysis"]["sections"]),
         )
-        self.help_panel.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(0, 12))
+        layout.addWidget(self.help_panel, 1, 0, 1, 2)
 
-        top = ttk.LabelFrame(self, text="Etat et lancement", style="Section.TLabelframe", padding=12)
-        top.grid(row=2, column=0, columnspan=2, sticky="ew", pady=(0, 12))
-        top.columnconfigure(1, weight=1)
-        top.columnconfigure(3, weight=1)
-        ttk.Label(top, text="Modele").grid(row=0, column=0, sticky="w", padx=(0, 8))
+        top = QGroupBox("Etat et lancement", self)
+        top_layout = QGridLayout(top)
+        top_layout.setHorizontalSpacing(12)
+        top_layout.setVerticalSpacing(10)
+        top_layout.setColumnStretch(1, 1)
+        top_layout.setColumnStretch(3, 1)
+        layout.addWidget(top, 2, 0, 1, 2)
+
+        top_layout.addWidget(QLabel("Modele", top), 0, 0)
         self.model_value = LabeledValue(top, "Modele IA", "-", surface="page")
-        self.model_value.grid(row=0, column=1, sticky="w")
-        ttk.Label(top, text="Etat Ollama").grid(row=0, column=2, sticky="w", padx=(24, 8))
-        badge_box = ttk.Frame(top)
-        badge_box.grid(row=0, column=3, sticky="w")
-        self.ollama_badge = StatusPill(badge_box, "INCONNU", "INFO")
-        self.ollama_badge.pack(side="left")
-        self.ollama_detail = ttk.Label(top, text="", style="Muted.TLabel", wraplength=520, justify="left")
-        self.ollama_detail.grid(row=1, column=0, columnspan=4, sticky="w", pady=(10, 0))
-        self.local_note = ttk.Label(
-            top,
-            text="Analyse locale uniquement. Ollama doit etre disponible sur localhost. L'IA propose et n'agit jamais seule.",
-            style="Muted.TLabel",
-            wraplength=760,
-            justify="left",
-        )
-        self.local_note.grid(row=2, column=0, columnspan=4, sticky="w", pady=(10, 0))
-        self.run_button = ttk.Button(top, text="Lancer l'analyse locale", style="Accent.TButton", command=self._run_analysis)
-        self.run_button.grid(row=0, column=4, rowspan=3, sticky="e")
+        top_layout.addWidget(self.model_value, 0, 1)
 
-        list_frame = ttk.LabelFrame(self, text="Analyses recentes", style="Section.TLabelframe", padding=12)
-        list_frame.grid(row=3, column=0, sticky="nsew", padx=(0, 8))
-        detail_frame = ttk.LabelFrame(self, text="Lecture analyste", style="Section.TLabelframe", padding=12)
-        detail_frame.grid(row=3, column=1, sticky="nsew", padx=(8, 0))
-        detail_frame.columnconfigure(0, weight=1)
-        detail_frame.rowconfigure(4, weight=1)
+        top_layout.addWidget(QLabel("Etat Ollama", top), 0, 2)
+        badge_box = QWidget(top)
+        badge_layout = QHBoxLayout(badge_box)
+        badge_layout.setContentsMargins(0, 0, 0, 0)
+        self.ollama_badge = StatusPill(badge_box, "INCONNU", "INFO")
+        badge_layout.addWidget(self.ollama_badge)
+        badge_layout.addStretch(1)
+        top_layout.addWidget(badge_box, 0, 3)
+
+        self.ollama_detail = QLabel("", top)
+        self.ollama_detail.setObjectName("muted")
+        self.ollama_detail.setWordWrap(True)
+        top_layout.addWidget(self.ollama_detail, 1, 0, 1, 4)
+
+        self.local_note = QLabel(
+            "Analyse locale uniquement. Ollama doit etre disponible sur localhost. L'IA propose et n'agit jamais seule.",
+            top,
+        )
+        self.local_note.setObjectName("muted")
+        self.local_note.setWordWrap(True)
+        top_layout.addWidget(self.local_note, 2, 0, 1, 4)
+
+        self.run_button = QPushButton("Lancer l'analyse locale", top)
+        self.run_button.clicked.connect(self._run_analysis)
+        top_layout.addWidget(self.run_button, 0, 4, 3, 1)
+
+        list_frame = QGroupBox("Analyses recentes", self)
+        list_layout = QVBoxLayout(list_frame)
+        detail_frame = QGroupBox("Lecture analyste", self)
+        detail_layout = QVBoxLayout(detail_frame)
+        detail_layout.setSpacing(12)
+        layout.addWidget(list_frame, 3, 0)
+        layout.addWidget(detail_frame, 3, 1)
 
         self.table = ScrollableTree(list_frame, ("date", "model", "level", "success"), height=18)
-        self.table.pack(fill="both", expand=True)
+        list_layout.addWidget(self.table)
         for column, label, width in (
             ("date", "Date", 150),
             ("model", "Modele", 140),
@@ -82,42 +101,53 @@ class AIAnalysisView(BaseView):
         for level in ("LOW", "MEDIUM", "HIGH", "CRITICAL", "INFO", "WARNING", "ERROR"):
             self.table.tree.tag_configure(level, foreground=severity_color(level))
 
-        top_detail = ttk.Frame(detail_frame, style="Card.TFrame", padding=12)
-        top_detail.grid(row=0, column=0, sticky="ew")
-        top_detail.columnconfigure(0, weight=1)
-        ttk.Label(top_detail, text="Synthese de l'analyse", style="CardMuted.TLabel").grid(row=0, column=0, sticky="w")
+        top_detail = QWidget(detail_frame)
+        top_detail.setObjectName("card")
+        top_detail_layout = QHBoxLayout(top_detail)
+        top_detail_layout.setContentsMargins(12, 12, 12, 12)
+        synth_label = QLabel("Synthese de l'analyse", top_detail)
+        synth_label.setObjectName("muted")
+        top_detail_layout.addWidget(synth_label, 1)
         self.level_badge = StatusPill(top_detail, "N/A", "INFO")
-        self.level_badge.grid(row=0, column=1, sticky="e")
+        top_detail_layout.addWidget(self.level_badge)
+        detail_layout.addWidget(top_detail)
 
-        metrics = ttk.Frame(detail_frame, style="Card.TFrame", padding=12)
-        metrics.grid(row=1, column=0, sticky="ew", pady=(12, 12))
-        for column in range(2):
-            metrics.columnconfigure(column, weight=1)
+        metrics = QWidget(detail_frame)
+        metrics.setObjectName("card")
+        metrics_layout = QGridLayout(metrics)
+        metrics_layout.setContentsMargins(12, 12, 12, 12)
+        metrics_layout.setHorizontalSpacing(10)
+        metrics_layout.setVerticalSpacing(8)
+        detail_layout.addWidget(metrics)
         self.values = {
             "date": LabeledValue(metrics, "Date"),
             "model": LabeledValue(metrics, "Modele"),
             "level": LabeledValue(metrics, "Niveau"),
             "success": LabeledValue(metrics, "Succes"),
         }
-        self.values["date"].grid(row=0, column=0, sticky="ew", padx=(0, 10), pady=6)
-        self.values["model"].grid(row=0, column=1, sticky="ew", pady=6)
-        self.values["level"].grid(row=1, column=0, sticky="ew", padx=(0, 10), pady=6)
-        self.values["success"].grid(row=1, column=1, sticky="ew", pady=6)
+        metrics_layout.addWidget(self.values["date"], 0, 0)
+        metrics_layout.addWidget(self.values["model"], 0, 1)
+        metrics_layout.addWidget(self.values["level"], 1, 0)
+        metrics_layout.addWidget(self.values["success"], 1, 1)
 
-        summary_frame = ttk.LabelFrame(detail_frame, text="Resume", style="Section.TLabelframe", padding=8)
-        summary_frame.grid(row=2, column=0, sticky="nsew", pady=(0, 10))
+        summary_frame = QGroupBox("Resume", detail_frame)
+        summary_layout = QVBoxLayout(summary_frame)
         self.summary_text = ScrollableDetailText(summary_frame, height=6)
-        self.summary_text.pack(fill="both", expand=True)
+        summary_layout.addWidget(self.summary_text)
+        detail_layout.addWidget(summary_frame)
 
-        threats_frame = ttk.LabelFrame(detail_frame, text="Anomalies probables", style="Section.TLabelframe", padding=8)
-        threats_frame.grid(row=3, column=0, sticky="nsew", pady=(0, 10))
+        threats_frame = QGroupBox("Anomalies probables", detail_frame)
+        threats_layout = QVBoxLayout(threats_frame)
         self.threats_text = ScrollableDetailText(threats_frame, height=6)
-        self.threats_text.pack(fill="both", expand=True)
+        threats_layout.addWidget(self.threats_text)
+        detail_layout.addWidget(threats_frame)
 
-        recos_frame = ttk.LabelFrame(detail_frame, text="Recommandations", style="Section.TLabelframe", padding=8)
-        recos_frame.grid(row=4, column=0, sticky="nsew")
+        recos_frame = QGroupBox("Recommandations", detail_frame)
+        recos_layout = QVBoxLayout(recos_frame)
         self.recommendations_text = ScrollableDetailText(recos_frame, height=7)
-        self.recommendations_text.pack(fill="both", expand=True)
+        recos_layout.addWidget(self.recommendations_text)
+        detail_layout.addWidget(recos_frame, 1)
+
         self._clear_selection_state()
 
     def refresh_data(self) -> None:
@@ -126,8 +156,8 @@ class AIAnalysisView(BaseView):
         selected_key = self._get_selected_analysis_key() or self._selected_analysis_key
         self.model_value.set(self.controller.settings.ollama_model)
         self.ollama_badge.set(health_status_text(health.status).upper(), tone_for_status(health.status))
-        self.ollama_detail.configure(text=shorten_text(health.details, 120))
-        self.run_button.configure(state="disabled" if self.controller.is_task_running("ai_analysis") else "normal")
+        self.ollama_detail.setText(shorten_text(health.details, 120))
+        self.run_button.setEnabled(not self.controller.is_task_running("ai_analysis"))
 
         self._rows.clear()
         self.table.clear()

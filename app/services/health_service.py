@@ -17,13 +17,13 @@ class HealthCheckService:
         self.health_repo = health_repo
         self.exports_dir_getter = exports_dir_getter
 
-    def run_all(self) -> list[HealthStatus]:
+    def run_all(self, demo_mode: bool = False) -> list[HealthStatus]:
         statuses = [
             self._usb_backend_status(),
             self._db_status(),
             self._admin_status(),
             self._usbstor_status(),
-            self.ollama_service.health_check(),
+            self.ollama_service.health_check(demo_mode=demo_mode),
             self._folder_status("logs", self.paths.logs_dir),
             self._folder_status("exports", self.exports_dir_getter()),
         ]
