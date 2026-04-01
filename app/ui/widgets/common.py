@@ -81,9 +81,10 @@ class KpiCard(ttk.Frame):
         super().__init__(master, style="Card.TFrame", padding=0)
         self.columnconfigure(0, weight=1)
         self.columnconfigure(1, weight=0)
-        self.top_bar = tk.Frame(self, bg=severity_color("INFO"), height=4)
+        self.top_bar = tk.Frame(self, bg=severity_color("INFO"), height=4, bd=0, highlightthickness=0)
+        self.top_bar.pack_propagate(False)
         self.top_bar.grid(row=0, column=0, columnspan=2, sticky="ew")
-        body = tk.Frame(self, bg=COLORS["panel"], padx=16, pady=14)
+        body = tk.Frame(self, bg=COLORS["panel"], padx=16, pady=14, bd=0, highlightthickness=0)
         body.grid(row=1, column=0, columnspan=2, sticky="nsew")
         body.columnconfigure(0, weight=1)
         body.columnconfigure(1, weight=0)
@@ -120,6 +121,7 @@ class KpiCard(ttk.Frame):
         self.value_var.set(value)
         self.subtitle_var.set(subtitle)
         self.top_bar.configure(bg=severity_color(tone))
+        self.top_bar.update_idletasks()
         if pill_text:
             self.badge.set(pill_text, tone)
             if not self.badge.winfo_ismapped():
@@ -190,14 +192,31 @@ class ScrollablePage(ttk.Frame):
         self.canvas.bind("<Configure>", self._on_canvas_configure)
         self.bind_all("<MouseWheel>", self._on_mousewheel, add="+")
 
-    def _on_body_configure(self, _event: tk.Event) -> None:
+    def _on_body_configure(self, _event: tk.Event | None = None) -> None:
         self.canvas.configure(scrollregion=self.canvas.bbox("all"))
+        try:
+            canvas_width = self.canvas.winfo_width()
+            if canvas_width > 1:
+                self.canvas.itemconfigure(self._body_window, width=canvas_width)
+        except Exception:
+            pass
 
     def _on_canvas_configure(self, event: tk.Event) -> None:
         try:
             self.canvas.itemconfigure(self._body_window, width=event.width)
         except Exception:
             return
+
+    def force_layout(self) -> None:
+        """Forcer le recalcul complet du layout du canvas. Appeler apres refresh_data()."""
+        self.update_idletasks()
+        self.canvas.configure(scrollregion=self.canvas.bbox("all"))
+        try:
+            w = self.canvas.winfo_width()
+            if w > 1:
+                self.canvas.itemconfigure(self._body_window, width=w)
+        except Exception:
+            pass
 
     def _on_mousewheel(self, event: tk.Event) -> None:
         if not self.winfo_ismapped():

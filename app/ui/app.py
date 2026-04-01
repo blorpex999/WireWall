@@ -129,16 +129,17 @@ class WireWallApp(tk.Tk):
     def show_view(self, name: str) -> None:
         if self.current_view_key is not None:
             self.views[self.current_view_key].grid_forget()
-        self.update_idletasks()
+            self.update_idletasks()
         view = self.views[name]
         view.grid(row=0, column=0, sticky="nsew")
+        self.update_idletasks()
         view.reset_scroll_position()
         view.refresh_data()
         self.current_view_key = name
         self._refresh_nav_state()
         self.title(f"WireWall {__version__} - {self._view_label(name)}")
         self.set_status(f"Vue active : {self._view_label(name)}", "INFO")
-        self._notify_view_resize()
+        self.after(50, self._notify_view_resize)
 
     def set_status(self, message: str, level: str = "INFO") -> None:
         self.status_bar.set_status(message, level)

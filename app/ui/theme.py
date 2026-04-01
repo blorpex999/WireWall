@@ -189,6 +189,7 @@ def apply_dark_theme(root: tk.Tk) -> None:
         foreground=[("selected", COLORS["text"]), ("active", COLORS["text"])],
     )
 
+    root.option_add("*background", COLORS["bg"])
     root.option_add("*Text.background", COLORS["panel"])
     root.option_add("*Text.foreground", COLORS["text"])
     root.option_add("*Text.insertBackground", COLORS["text"])
@@ -197,4 +198,6 @@ def apply_dark_theme(root: tk.Tk) -> None:
     root.option_add("*Canvas.background", COLORS["bg"])
     root.option_add("*Canvas.highlightThickness", "0")
     root.option_add("*Canvas.borderWidth", "0")
+    root.option_add("*Frame.background", COLORS["bg"])
+    root.option_add("*Label.background", COLORS["bg"])
     root.option_add("*Toplevel.background", COLORS["bg"])

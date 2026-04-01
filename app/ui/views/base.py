@@ -43,6 +43,10 @@ class BaseView(ttk.Frame):
     def _run_scheduled_refresh(self) -> None:
         self._scheduled_refresh_id = None
         self.refresh_data()
+        try:
+            self.update_idletasks()
+        except Exception:
+            pass
 
     def run_action(
         self,

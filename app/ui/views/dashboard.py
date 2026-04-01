@@ -358,23 +358,24 @@ class DashboardView(BaseView):
             self.brain_new_devices.set("-")
             self.brain_deviations.set("-")
             self.brain_known.set("-")
-            return
+        else:
+            progress_tone = {
+                "LEARNING": "INFO",
+                "STABLE": "OK",
+                "IMPROVING": "OK",
+                "DETERIORATING": "WARNING",
+            }.get(brain_snapshot.progress_status, "INFO")
+            self.brain_level_badge.set(brain_snapshot.global_level, brain_snapshot.global_level)
+            self.brain_progress_badge.set(brain_snapshot.progress_status, progress_tone)
+            self.brain_summary.configure(text=brain_snapshot.summary)
+            self.brain_incidents.set(str(brain_snapshot.open_incident_count))
+            self.brain_alerts.set(str(brain_snapshot.open_alert_count))
+            self.brain_focus.set(", ".join(brain_snapshot.focus_areas) if brain_snapshot.focus_areas else "Aucun focus prioritaire")
+            self.brain_new_devices.set(str(data["new_devices_7d"]))
+            self.brain_deviations.set(str(brain_snapshot.deviation_count))
+            self.brain_known.set(str(data["known_count"]))
 
-        progress_tone = {
-            "LEARNING": "INFO",
-            "STABLE": "OK",
-            "IMPROVING": "OK",
-            "DETERIORATING": "WARNING",
-        }.get(brain_snapshot.progress_status, "INFO")
-        self.brain_level_badge.set(brain_snapshot.global_level, brain_snapshot.global_level)
-        self.brain_progress_badge.set(brain_snapshot.progress_status, progress_tone)
-        self.brain_summary.configure(text=brain_snapshot.summary)
-        self.brain_incidents.set(str(brain_snapshot.open_incident_count))
-        self.brain_alerts.set(str(brain_snapshot.open_alert_count))
-        self.brain_focus.set(", ".join(brain_snapshot.focus_areas) if brain_snapshot.focus_areas else "Aucun focus prioritaire")
-        self.brain_new_devices.set(str(data["new_devices_7d"]))
-        self.brain_deviations.set(str(brain_snapshot.deviation_count))
-        self.brain_known.set(str(data["known_count"]))
+        self.after_idle(self.page.force_layout)
 
     def on_host_resize(self, width: int, height: int) -> None:
         self._dashboard_width = max(width, 960)
@@ -386,7 +387,7 @@ class DashboardView(BaseView):
             mode = "wide"
         self._apply_layout(mode)
         self._update_wrap_lengths()
-        self.after_idle(self.page._on_body_configure, None)
+        self.after(30, self.page.force_layout)
 
     def _build_tile(self, master, title: str) -> dict[str, object]:
         frame = ttk.Frame(master, style="CardInner.TFrame", padding=(8, 4))
@@ -425,6 +426,10 @@ class DashboardView(BaseView):
             tile["frame"].grid_forget()
         for frame in self._section_frames.values():
             frame.grid_forget()
+        try:
+            self.update_idletasks()
+        except Exception:
+            pass
 
         if mode == "compact":
             for column in range(2):
