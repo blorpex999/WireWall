@@ -8,6 +8,7 @@ from typing import Any
 
 from app.models.entities import AIAnalysis, HealthStatus
 from app.utils.datetime import utc_now
+from app.utils.validation import is_local_http_url
 
 try:
     import requests
@@ -38,6 +39,13 @@ class OllamaService:
                 "ollama",
                 "ok",
                 "Mode demo: Ollama non interroge, analyse simulee.",
+                utc_now(),
+            )
+        if not is_local_http_url(self.base_url):
+            return HealthStatus(
+                "ollama",
+                "warning",
+                "Configuration Ollama refusee: l'URL doit rester locale (localhost, 127.0.0.1 ou ::1).",
                 utc_now(),
             )
         if requests is None:
@@ -72,6 +80,12 @@ class OllamaService:
     def analyze(self, context: dict[str, Any], demo_mode: bool = False) -> AIAnalysis:
         if demo_mode:
             return self._build_demo_analysis(context)
+        if not is_local_http_url(self.base_url):
+            return self._build_error_analysis(
+                context=context,
+                summary="Analyse IA refusee: l'URL Ollama doit rester locale (localhost, 127.0.0.1 ou ::1).",
+                recommendations=["Remettre une URL locale Ollama dans les parametres avant de relancer l'analyse."],
+            )
         if requests is None:
             return self._build_error_analysis(
                 context=context,

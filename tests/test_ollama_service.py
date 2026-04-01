@@ -133,6 +133,26 @@ def test_ollama_service_demo_mode_never_calls_network(monkeypatch) -> None:
     assert len(analysis.recommendations) == 2
 
 
+def test_ollama_service_rejects_non_local_base_url(monkeypatch) -> None:
+    def fail(*args, **kwargs):
+        raise AssertionError("Aucun appel reseau ne doit etre effectue pour une URL Ollama distante.")
+
+    monkeypatch.setattr(
+        ollama_module,
+        "requests",
+        SimpleNamespace(get=fail, post=fail, RequestException=FakeRequestException),
+    )
+    service = OllamaService("https://example.com:11434", "qwen2.5:14b", 60)
+
+    health = service.health_check()
+    analysis = service.analyze({"global_score": 20})
+
+    assert health.status == "warning"
+    assert "locale" in health.details.lower()
+    assert analysis.success is False
+    assert "url ollama doit rester locale" in analysis.summary.lower()
+
+
 def test_ollama_service_timeout_returns_clean_error(monkeypatch) -> None:
     def slow_post(*args, **kwargs):
         time.sleep(0.05)

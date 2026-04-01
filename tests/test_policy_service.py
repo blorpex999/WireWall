@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from app.models.entities import USBDevice
 from app.services.policy_service import PolicyService
 
@@ -24,3 +26,12 @@ def test_policy_service_add_evaluate_and_export_import(workspace_tmp_dir, reposi
     imported_repo_service = PolicyService(repositories["policy_repo"], repositories["device_repo"])
     count = imported_repo_service.import_entries(export_path)
     assert count == 1
+
+
+def test_policy_service_rejects_oversized_import_file(workspace_tmp_dir, repositories) -> None:
+    service = PolicyService(repositories["policy_repo"], repositories["device_repo"])
+    oversized = workspace_tmp_dir / "oversized.json"
+    oversized.write_text("[" + (" " * (1024 * 1024 + 8)) + "]", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="trop volumineux"):
+        service.import_entries(oversized)

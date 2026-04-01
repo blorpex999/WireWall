@@ -29,6 +29,25 @@ def test_controller_save_settings_rejects_invalid_numeric_values() -> None:
         )
 
 
+def test_controller_save_settings_rejects_non_local_ollama_url() -> None:
+    settings = build_default_settings()
+    controller = AppController(SimpleNamespace(settings=settings))
+
+    with pytest.raises(ValueError, match="URL Ollama invalide"):
+        controller.save_settings(
+            {
+                "scan_interval_seconds": "5",
+                "history_retention_days": "30",
+                "log_level": "INFO",
+                "ollama_base_url": "https://example.com:11434",
+                "ollama_model": "qwen2.5:14b",
+                "ollama_timeout_seconds": "60",
+                "security_profile": "Normal",
+                "export_directory": "C:\\WireWall\\exports",
+            }
+        )
+
+
 def test_controller_demo_precheck_maps_blocking_and_warning_states() -> None:
     settings = build_default_settings()
     controller = AppController(SimpleNamespace(settings=settings))

@@ -8,6 +8,8 @@ from app.models.entities import PolicyEntry, USBDevice
 from app.utils.datetime import utc_now
 from app.utils.validation import is_valid_vid_pid, normalize_serial, normalize_vid_pid
 
+MAX_POLICY_IMPORT_BYTES = 1024 * 1024
+
 
 class PolicyService:
     def __init__(self, policy_repo, device_repo) -> None:
@@ -79,6 +81,7 @@ class PolicyService:
     def import_entries(self, path: Path) -> int:
         if not path.exists():
             raise FileNotFoundError(f"Fichier introuvable: {path}")
+        self._ensure_supported_import_size(path)
         count = 0
         if path.suffix.lower() == ".json":
             try:
@@ -110,6 +113,14 @@ class PolicyService:
                 )
                 count += 1
         return count
+
+    def _ensure_supported_import_size(self, path: Path) -> None:
+        try:
+            file_size = path.stat().st_size
+        except OSError as exc:
+            raise ValueError(f"Impossible de verifier la taille du fichier: {path}") from exc
+        if file_size > MAX_POLICY_IMPORT_BYTES:
+            raise ValueError("Fichier d'import trop volumineux pour WireWall (max 1 Mo).")
 
     def _normalize(self, match_type: str, value: str) -> str:
         if match_type == "vid_pid":

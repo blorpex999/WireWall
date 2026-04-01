@@ -8,6 +8,7 @@ from app.config.defaults import PROFILE_PRESETS
 from app.models.entities import AIAnalysis, AppSettings, HealthStatus
 from app.utils.admin import relaunch_as_admin
 from app.utils.datetime import days_ago, hours_ago, parse_timestamp, utc_now
+from app.utils.validation import is_local_http_url
 
 
 class AppController:
@@ -383,18 +384,21 @@ class AppController:
         retention_days = self._parse_positive_int(values["history_retention_days"], "Retention historique")
         ollama_timeout = self._parse_positive_int(values["ollama_timeout_seconds"], "Timeout Ollama")
         export_directory = str(values["export_directory"]).strip() or str(self.container.paths.exports_dir)
+        ollama_base_url = str(values["ollama_base_url"]).strip()
         autostart_enabled = self._parse_bool(values.get("autostart_enabled", False))
         desktop_notifications_enabled = self._parse_bool(values.get("desktop_notifications_enabled", True))
         recommendation_mode = str(values.get("recommendation_mode", "balanced")).strip().lower() or "balanced"
         if recommendation_mode not in {"conservative", "balanced", "proactive"}:
             raise ValueError("Mode de recommandation invalide.")
+        if not is_local_http_url(ollama_base_url):
+            raise ValueError("URL Ollama invalide: utiliser uniquement une adresse locale (localhost, 127.0.0.1 ou ::1).")
 
         settings_payload.update(
             {
                 "scan_interval_seconds": scan_interval,
                 "history_retention_days": retention_days,
                 "log_level": str(values["log_level"]),
-                "ollama_base_url": str(values["ollama_base_url"]).strip(),
+                "ollama_base_url": ollama_base_url,
                 "ollama_model": str(values["ollama_model"]).strip(),
                 "ollama_timeout_seconds": ollama_timeout,
                 "security_profile": str(values["security_profile"]),

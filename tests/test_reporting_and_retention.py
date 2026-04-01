@@ -432,3 +432,42 @@ def test_report_service_persists_export_hash_and_chain(workspace_tmp_dir, reposi
     assert audit.file_sha256
     assert audit.chain_hash
     assert audit.config_summary["recommendation_mode"] == settings.recommendation_mode
+
+
+def test_report_service_csv_sanitizes_formula_cells(workspace_tmp_dir, repositories) -> None:
+    device_repo = repositories["device_repo"]
+    event_repo = repositories["event_repo"]
+    alert_repo = repositories["alert_repo"]
+    health_repo = repositories["health_repo"]
+    ai_repo = repositories["ai_repo"]
+    brain_repo = repositories["brain_repo"]
+    policy_service = PolicyService(repositories["policy_repo"], device_repo)
+
+    event_repo.add(
+        DeviceEvent(
+            occurred_at=utc_now(),
+            event_type="=CMD|' /C calc'!A0",
+            device_key="@USB-1",
+            summary="-Resume potentiellement interprete",
+            severity="+HIGH",
+            source="=source",
+        )
+    )
+
+    service = ReportService(
+        exports_dir=workspace_tmp_dir,
+        device_repo=device_repo,
+        event_repo=event_repo,
+        policy_service=policy_service,
+        alert_repo=alert_repo,
+        health_repo=health_repo,
+        ai_analysis_repo=ai_repo,
+        brain_snapshot_repo=brain_repo,
+    )
+    target = service.export_csv(False, str(workspace_tmp_dir / "events.csv"))
+    content = target.read_text(encoding="utf-8")
+
+    assert "\t=CMD|' /C calc'!A0" in content
+    assert "\t@USB-1" in content
+    assert "\t-Resume potentiellement interprete" in content
+    assert "\t+HIGH" in content

@@ -9,6 +9,7 @@ from statistics import mean
 
 from app.models.entities import Alert, DeviceEvent, HealthStatus, PolicyEntry, ReportAudit, USBDevice
 from app.utils.datetime import utc_now
+from app.utils.validation import sanitize_csv_cell
 
 
 class ReportService:
@@ -131,14 +132,14 @@ class ReportService:
             for event in events:
                 writer.writerow(
                     {
-                        "occurred_at": event.occurred_at,
-                        "event_type": event.event_type,
-                        "device_key": event.device_key or "",
-                        "summary": event.summary,
-                        "severity": event.severity,
+                        "occurred_at": sanitize_csv_cell(event.occurred_at),
+                        "event_type": sanitize_csv_cell(event.event_type),
+                        "device_key": sanitize_csv_cell(event.device_key or ""),
+                        "summary": sanitize_csv_cell(event.summary),
+                        "severity": sanitize_csv_cell(event.severity),
                         "score": event.score,
-                        "level": event.level,
-                        "source": event.source,
+                        "level": sanitize_csv_cell(event.level),
+                        "source": sanitize_csv_cell(event.source),
                     }
                 )
         self._persist_export_audit(target, "csv", self.build_context(demo_mode), demo_mode)
