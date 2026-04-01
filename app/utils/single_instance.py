@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import ctypes
 import logging
+import os
 import sys
 from ctypes import wintypes
 from dataclasses import dataclass
@@ -9,6 +10,11 @@ from dataclasses import dataclass
 LOGGER = logging.getLogger(__name__)
 
 ERROR_ALREADY_EXISTS = 183
+WAIT_OBJECT_0 = 0x00000000
+WAIT_TIMEOUT = 0x00000102
+WM_CLOSE = 0x0010
+PROCESS_TERMINATE = 0x0001
+SYNCHRONIZE = 0x00100000
 SW_RESTORE = 9
 SW_SHOW = 5
 
@@ -62,9 +68,9 @@ def acquire_single_instance(app_name: str = "WireWall") -> SingleInstanceGuard:
     )
 
 
-def activate_existing_window(window_title_prefix: str = "WireWall") -> bool:
+def _find_existing_window(window_title_prefix: str = "WireWall") -> tuple[int, int] | None:
     if sys.platform != "win32":
-        return False
+        return None
 
     user32 = ctypes.WinDLL("user32", use_last_error=True)
     user32.EnumWindows.argtypes = [ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM), wintypes.LPARAM]
@@ -83,8 +89,10 @@ def activate_existing_window(window_title_prefix: str = "WireWall") -> bool:
     user32.SetForegroundWindow.restype = wintypes.BOOL
     user32.BringWindowToTop.argtypes = [wintypes.HWND]
     user32.BringWindowToTop.restype = wintypes.BOOL
+    user32.GetWindowThreadProcessId.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.DWORD)]
+    user32.GetWindowThreadProcessId.restype = wintypes.DWORD
 
-    found_hwnd: dict[str, int] = {"hwnd": 0}
+    found: dict[str, int] = {"hwnd": 0, "pid": 0}
 
     @ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
     def _enum_windows(hwnd: int, _lparam: int) -> bool:
@@ -101,14 +109,43 @@ def activate_existing_window(window_title_prefix: str = "WireWall") -> bool:
         if not title.startswith(window_title_prefix):
             return True
 
-        found_hwnd["hwnd"] = int(hwnd)
+        pid = wintypes.DWORD(0)
+        user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+        found["hwnd"] = int(hwnd)
+        found["pid"] = int(pid.value)
         return False
 
     try:
         user32.EnumWindows(_enum_windows, 0)
-        hwnd = found_hwnd["hwnd"]
-        if not hwnd:
+        hwnd = found["hwnd"]
+        pid = found["pid"]
+        if not hwnd or not pid:
+            return None
+        return hwnd, pid
+    except Exception:
+        LOGGER.exception("Impossible de localiser la fenetre WireWall deja ouverte.")
+        return None
+
+
+def activate_existing_window(window_title_prefix: str = "WireWall") -> bool:
+    if sys.platform != "win32":
+        return False
+
+    user32 = ctypes.WinDLL("user32", use_last_error=True)
+    user32.IsIconic.argtypes = [wintypes.HWND]
+    user32.IsIconic.restype = wintypes.BOOL
+    user32.ShowWindow.argtypes = [wintypes.HWND, ctypes.c_int]
+    user32.ShowWindow.restype = wintypes.BOOL
+    user32.SetForegroundWindow.argtypes = [wintypes.HWND]
+    user32.SetForegroundWindow.restype = wintypes.BOOL
+    user32.BringWindowToTop.argtypes = [wintypes.HWND]
+    user32.BringWindowToTop.restype = wintypes.BOOL
+
+    try:
+        target = _find_existing_window(window_title_prefix)
+        if target is None:
             return False
+        hwnd, _pid = target
 
         if user32.IsIconic(hwnd):
             user32.ShowWindow(hwnd, SW_RESTORE)
@@ -120,3 +157,50 @@ def activate_existing_window(window_title_prefix: str = "WireWall") -> bool:
     except Exception:
         LOGGER.exception("Impossible d'activer la fenetre WireWall deja ouverte.")
         return False
+
+
+def close_existing_window(window_title_prefix: str = "WireWall", timeout_ms: int = 5000) -> bool:
+    if sys.platform != "win32":
+        return False
+
+    target = _find_existing_window(window_title_prefix)
+    if target is None:
+        return False
+
+    hwnd, pid = target
+    if pid == os.getpid():
+        return False
+
+    user32 = ctypes.WinDLL("user32", use_last_error=True)
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    user32.PostMessageW.argtypes = [wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM]
+    user32.PostMessageW.restype = wintypes.BOOL
+    kernel32.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+    kernel32.OpenProcess.restype = wintypes.HANDLE
+    kernel32.WaitForSingleObject.argtypes = [wintypes.HANDLE, wintypes.DWORD]
+    kernel32.WaitForSingleObject.restype = wintypes.DWORD
+    kernel32.TerminateProcess.argtypes = [wintypes.HANDLE, wintypes.UINT]
+    kernel32.TerminateProcess.restype = wintypes.BOOL
+    kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
+    kernel32.CloseHandle.restype = wintypes.BOOL
+
+    process_handle = kernel32.OpenProcess(SYNCHRONIZE | PROCESS_TERMINATE, False, pid)
+    if not process_handle:
+        LOGGER.warning("Impossible d'ouvrir le process WireWall existant pour relance propre.")
+        return False
+
+    try:
+        user32.PostMessageW(hwnd, WM_CLOSE, 0, 0)
+        wait_result = kernel32.WaitForSingleObject(process_handle, timeout_ms)
+        if wait_result == WAIT_OBJECT_0:
+            return True
+
+        LOGGER.warning("L'instance WireWall existante ne se ferme pas a temps, terminaison forcee.")
+        if not kernel32.TerminateProcess(process_handle, 0):
+            return False
+        return kernel32.WaitForSingleObject(process_handle, 2000) == WAIT_OBJECT_0
+    except Exception:
+        LOGGER.exception("Impossible de fermer l'instance WireWall deja ouverte.")
+        return False
+    finally:
+        kernel32.CloseHandle(process_handle)

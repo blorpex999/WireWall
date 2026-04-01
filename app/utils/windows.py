@@ -28,13 +28,16 @@ class WindowsDeviceNotificationHook:
 
         hwnd = widget.winfo_id()
         user32 = ctypes.windll.user32
+        is_64bit = ctypes.sizeof(ctypes.c_void_p) == ctypes.sizeof(ctypes.c_longlong)
 
-        if ctypes.sizeof(ctypes.c_void_p) == ctypes.sizeof(ctypes.c_longlong):
+        if is_64bit:
             set_window_long = user32.SetWindowLongPtrW
             call_window_proc = user32.CallWindowProcW
+            set_window_long.argtypes = [wintypes.HWND, ctypes.c_int, ctypes.c_void_p]
         else:
             set_window_long = user32.SetWindowLongW
             call_window_proc = user32.CallWindowProcW
+            set_window_long.argtypes = [wintypes.HWND, ctypes.c_int, wintypes.LONG]
 
         WNDPROC = ctypes.WINFUNCTYPE(
             wintypes.LPARAM,
@@ -59,7 +62,12 @@ class WindowsDeviceNotificationHook:
 
         try:
             self._new_proc = WNDPROC(_wnd_proc)
-            self._old_proc = set_window_long(hwnd, self.GWL_WNDPROC, self._new_proc)
+            if is_64bit:
+                proc_ptr = ctypes.cast(self._new_proc, ctypes.c_void_p)
+                self._old_proc = int(set_window_long(hwnd, self.GWL_WNDPROC, proc_ptr))
+            else:
+                proc_ptr = ctypes.cast(self._new_proc, ctypes.c_void_p).value or 0
+                self._old_proc = int(set_window_long(hwnd, self.GWL_WNDPROC, wintypes.LONG(proc_ptr)))
             self._hwnd = hwnd
             return True
         except Exception:
@@ -75,11 +83,15 @@ class WindowsDeviceNotificationHook:
         user32 = ctypes.windll.user32
         try:
             if ctypes.sizeof(ctypes.c_void_p) == ctypes.sizeof(ctypes.c_longlong):
-                user32.SetWindowLongPtrW(self._hwnd, self.GWL_WNDPROC, self._old_proc)
+                user32.SetWindowLongPtrW.argtypes = [wintypes.HWND, ctypes.c_int, ctypes.c_void_p]
+                user32.SetWindowLongPtrW.restype = wintypes.LPARAM
+                user32.SetWindowLongPtrW(self._hwnd, self.GWL_WNDPROC, ctypes.c_void_p(self._old_proc))
             else:
-                user32.SetWindowLongW(self._hwnd, self.GWL_WNDPROC, self._old_proc)
+                user32.SetWindowLongW.argtypes = [wintypes.HWND, ctypes.c_int, wintypes.LONG]
+                user32.SetWindowLongW.restype = wintypes.LONG
+                user32.SetWindowLongW(self._hwnd, self.GWL_WNDPROC, wintypes.LONG(self._old_proc))
         except Exception:
-            LOGGER.exception("Impossible de détacher le hook WM_DEVICECHANGE.")
+            LOGGER.exception("Impossible de detacher le hook WM_DEVICECHANGE.")
         finally:
             self._hwnd = None
             self._old_proc = None

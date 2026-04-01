@@ -3,10 +3,11 @@ from __future__ import annotations
 import argparse
 import ctypes
 import logging
+import time
 import sys
 
 from app.utils.admin import is_admin, relaunch_as_admin
-from app.utils.single_instance import acquire_single_instance
+from app.utils.single_instance import acquire_single_instance, close_existing_window
 from app.utils.windows import hide_console_window
 from app.version import __version__
 
@@ -31,6 +32,11 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--allow-standard",
+        action="store_true",
+        help=argparse.SUPPRESS,
+    )
+    parser.add_argument(
+        "--replace-existing",
         action="store_true",
         help=argparse.SUPPRESS,
     )
@@ -104,12 +110,49 @@ def main() -> int:
             return 1
 
         if instance_guard.already_running:
-            notify_user_message(
-                "WireWall est deja lance sur ce poste.\n"
-                "La fenetre existante a ete reactivee si elle etait disponible.",
-                flags=0x40,
-            )
-            return 0
+            if getattr(args, "replace_existing", False):
+                logging.getLogger(__name__).info("Instance WireWall existante detectee, tentative de relance propre.")
+                replaced = False
+                try:
+                    replaced = close_existing_window("WireWall")
+                except Exception:
+                    logging.getLogger(__name__).exception("Impossible de fermer l'instance WireWall existante.")
+
+                instance_guard.release()
+                instance_guard = None
+
+                if not replaced:
+                    notify_startup_error(
+                        "WireWall n'a pas pu fermer l'instance deja ouverte.\n"
+                        "Fermez la fenetre existante manuellement puis relancez l'application."
+                    )
+                    return 1
+
+                time.sleep(0.25)
+                try:
+                    instance_guard = acquire_single_instance("WireWall")
+                except Exception as exc:
+                    logging.getLogger(__name__).exception("Impossible de reprendre le verrou apres fermeture de l'instance existante.")
+                    notify_startup_error(
+                        "WireWall a ferme l'instance precedente mais n'a pas pu reprendre le verrou d'instance unique.\n"
+                        f"{exc}\n"
+                        "Relancez l'application."
+                    )
+                    return 1
+
+                if instance_guard.already_running:
+                    notify_startup_error(
+                        "WireWall n'a pas pu reprendre la main apres fermeture de l'instance existante.\n"
+                        "Fermez toutes les fenetres WireWall puis relancez l'application."
+                    )
+                    return 1
+            else:
+                notify_user_message(
+                    "WireWall est deja lance sur ce poste.\n"
+                    "La fenetre existante a ete reactivee si elle etait disponible.",
+                    flags=0x40,
+                )
+                return 0
 
         tk_ok, tk_message = validate_tk_runtime()
         if not tk_ok:

@@ -5,6 +5,7 @@ from types import SimpleNamespace
 import main as main_module
 
 import app.bootstrap as bootstrap_module
+import app.ui.app as ui_app_module
 from app.infrastructure.paths import build_app_paths
 
 
@@ -73,6 +74,52 @@ def test_main_returns_cleanly_when_another_instance_is_running(monkeypatch) -> N
     assert guard.released is True
     assert notifications
     assert "deja lance" in notifications[0]
+
+
+def test_main_replaces_existing_instance_when_requested(monkeypatch) -> None:
+    events: list[str] = []
+
+    class Guard:
+        def __init__(self, already_running: bool) -> None:
+            self.already_running = already_running
+            self.existing_window_activated = already_running
+            self.released = False
+
+        def release(self) -> None:
+            self.released = True
+            events.append(f"release:{self.already_running}")
+
+    guards = [Guard(True), Guard(False)]
+
+    monkeypatch.setattr(
+        main_module,
+        "parse_args",
+        lambda: SimpleNamespace(demo=False, config=None, allow_standard=True, replace_existing=True),
+    )
+    monkeypatch.setattr(main_module, "acquire_single_instance", lambda app_name="WireWall": guards.pop(0))
+    monkeypatch.setattr(main_module, "close_existing_window", lambda app_name="WireWall": events.append("close") or True)
+    monkeypatch.setattr(main_module, "validate_tk_runtime", lambda: (True, "ok"))
+
+    container = SimpleNamespace(shutdown=lambda: events.append("shutdown"))
+    monkeypatch.setattr(bootstrap_module, "build_container", lambda config_path=None, force_demo=False: container)
+
+    class FakeApp:
+        def __init__(self, container_arg) -> None:
+            assert container_arg is container
+            events.append("app-init")
+
+        def mainloop(self) -> None:
+            events.append("mainloop")
+
+    monkeypatch.setattr(ui_app_module, "WireWallApp", FakeApp)
+
+    exit_code = main_module.main()
+
+    assert exit_code == 0
+    assert events[:3] == ["close", "release:True", "app-init"]
+    assert "mainloop" in events
+    assert "shutdown" in events
+    assert "release:False" in events
 
 
 def test_main_relaunches_as_admin_by_default(monkeypatch) -> None:

@@ -27,9 +27,9 @@ if errorlevel 1 (
 
 set "WIREWALL_PYTHONW=%CD%\.venv\Scripts\pythonw.exe"
 if exist "%WIREWALL_PYTHONW%" (
-  "%WIREWALL_PYTHONW%" main.py --demo
+  "%WIREWALL_PYTHONW%" main.py --replace-existing --demo
 ) else (
-  python main.py --demo
+  python main.py --replace-existing --demo
 )
 set "EXIT_CODE=%ERRORLEVEL%"
 popd

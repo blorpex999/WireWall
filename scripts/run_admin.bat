@@ -29,7 +29,7 @@ set "WIREWALL_PYTHON_EXE=%CD%\.venv\Scripts\python.exe"
 set "WIREWALL_PYTHONW_EXE=%CD%\.venv\Scripts\pythonw.exe"
 if exist "%WIREWALL_PYTHONW_EXE%" set "WIREWALL_PYTHON_EXE=%WIREWALL_PYTHONW_EXE%"
 set "WIREWALL_ENTRY=%CD%\main.py"
-set "WIREWALL_ARGS=\"%WIREWALL_ENTRY%\" %*"
+set "WIREWALL_ARGS=\"%WIREWALL_ENTRY%\" --replace-existing %*"
 set "WIREWALL_WORKDIR=%CD%"
 
 powershell -NoProfile -Command "Start-Process -FilePath $env:WIREWALL_PYTHON_EXE -ArgumentList $env:WIREWALL_ARGS -WorkingDirectory $env:WIREWALL_WORKDIR -Verb RunAs"
