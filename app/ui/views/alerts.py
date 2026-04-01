@@ -16,7 +16,15 @@ from PyQt6.QtWidgets import (
 from app.ui.help_content import SCREEN_HELP
 from app.ui.theme import COLORS
 from app.ui.views.base import BaseView
-from app.ui.widgets.common import InlineHelpPanel, LabeledValue, ScrollableDetailText, ScrollableTree, SectionHeader, StatusPill
+from app.ui.widgets.common import (
+    InlineHelpPanel,
+    LabeledValue,
+    ScrollableDetailText,
+    ScrollablePage,
+    ScrollableTree,
+    SectionHeader,
+    StatusPill,
+)
 from app.ui.widgets.risk_breakdown import RiskBreakdownWidget
 from app.utils.datetime import format_for_ui
 from app.utils.ui import decision_text, incident_status_text, incident_status_tone, severity_color, shorten_text
@@ -105,6 +113,13 @@ class AlertsView(BaseView):
         list_layout = QVBoxLayout(list_frame)
         detail_frame = QGroupBox("Detail de l'alerte", self)
         detail_layout = QVBoxLayout(detail_frame)
+        detail_layout.setContentsMargins(0, 0, 0, 0)
+        self.detail_page = ScrollablePage(detail_frame)
+        detail_layout.addWidget(self.detail_page)
+        detail_body = QWidget(self.detail_page.body)
+        self.detail_page.body_layout.addWidget(detail_body)
+        detail_layout = QVBoxLayout(detail_body)
+        detail_layout.setContentsMargins(0, 0, 0, 0)
         detail_layout.setSpacing(12)
         layout.addWidget(list_frame, 3, 0)
         layout.addWidget(detail_frame, 3, 1)
@@ -149,6 +164,8 @@ class AlertsView(BaseView):
         metrics_layout.setContentsMargins(12, 12, 12, 12)
         metrics_layout.setHorizontalSpacing(10)
         metrics_layout.setVerticalSpacing(8)
+        metrics_layout.setColumnStretch(0, 1)
+        metrics_layout.setColumnStretch(1, 1)
         detail_layout.addWidget(metrics)
         self.values = {
             "title": LabeledValue(metrics, "Titre"),
@@ -337,6 +354,7 @@ class AlertsView(BaseView):
         self.save_case_button.setEnabled(alert.id is not None)
         self.ack_button.setEnabled(not alert.acknowledged)
         self._sync_context_actions()
+        self.detail_page.scroll_to_top()
 
     def _clear_selection_state(self) -> None:
         self._selected_alert_key = None
@@ -545,3 +563,6 @@ class AlertsView(BaseView):
             if raw_value == value:
                 return label
         return "Aucune"
+
+    def reset_scroll_position(self) -> None:
+        self.detail_page.scroll_to_top()

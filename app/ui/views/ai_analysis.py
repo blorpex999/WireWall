@@ -4,7 +4,15 @@ from PyQt6.QtWidgets import QGridLayout, QGroupBox, QHBoxLayout, QLabel, QPushBu
 
 from app.ui.help_content import SCREEN_HELP
 from app.ui.views.base import BaseView
-from app.ui.widgets.common import InlineHelpPanel, LabeledValue, ScrollableDetailText, ScrollableTree, SectionHeader, StatusPill
+from app.ui.widgets.common import (
+    InlineHelpPanel,
+    LabeledValue,
+    ScrollableDetailText,
+    ScrollablePage,
+    ScrollableTree,
+    SectionHeader,
+    StatusPill,
+)
 from app.utils.datetime import format_for_ui
 from app.utils.ui import health_status_text, severity_color, shorten_text, tone_for_status
 
@@ -83,6 +91,13 @@ class AIAnalysisView(BaseView):
         list_layout = QVBoxLayout(list_frame)
         detail_frame = QGroupBox("Lecture analyste", self)
         detail_layout = QVBoxLayout(detail_frame)
+        detail_layout.setContentsMargins(0, 0, 0, 0)
+        self.detail_page = ScrollablePage(detail_frame)
+        detail_layout.addWidget(self.detail_page)
+        detail_body = QWidget(self.detail_page.body)
+        self.detail_page.body_layout.addWidget(detail_body)
+        detail_layout = QVBoxLayout(detail_body)
+        detail_layout.setContentsMargins(0, 0, 0, 0)
         detail_layout.setSpacing(12)
         layout.addWidget(list_frame, 3, 0)
         layout.addWidget(detail_frame, 3, 1)
@@ -118,6 +133,8 @@ class AIAnalysisView(BaseView):
         metrics_layout.setContentsMargins(12, 12, 12, 12)
         metrics_layout.setHorizontalSpacing(10)
         metrics_layout.setVerticalSpacing(8)
+        metrics_layout.setColumnStretch(0, 1)
+        metrics_layout.setColumnStretch(1, 1)
         detail_layout.addWidget(metrics)
         self.values = {
             "date": LabeledValue(metrics, "Date"),
@@ -210,6 +227,7 @@ class AIAnalysisView(BaseView):
         self.recommendations_text.set_text(
             "\n- ".join(["Recommandations"] + (analysis.recommendations or ["Aucune recommandation detaillee."]))
         )
+        self.detail_page.scroll_to_top()
 
     def _clear_selection_state(self) -> None:
         self._selected_analysis_key = None
@@ -233,3 +251,6 @@ class AIAnalysisView(BaseView):
         if getattr(analysis, "id", None) is not None:
             return f"id:{analysis.id}"
         return f"{analysis.created_at}|{analysis.model}|{analysis.global_level}"
+
+    def reset_scroll_position(self) -> None:
+        self.detail_page.scroll_to_top()

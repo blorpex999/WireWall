@@ -45,6 +45,7 @@ class RiskBreakdownWidget(QFrame):
         self.score_bar = QProgressBar(self)
         self.score_bar.setRange(0, 100)
         self.score_bar.setTextVisible(True)
+        self.score_bar.setMinimumHeight(24)
         self.score_bar.hide()
         layout.addWidget(self.score_bar)
 

@@ -357,8 +357,7 @@ class WireWallMainWindow(QMainWindow):
         self._repaint_scheduled = False
         self._force_repaint_running = True
         try:
-            self.repaint()
-            QApplication.processEvents()
+            self.update()
         except Exception:  # pragma: no cover - UI safety net
             LOGGER.exception("Erreur pendant le repaint force.")
         finally:

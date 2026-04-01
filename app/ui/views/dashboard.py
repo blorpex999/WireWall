@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from PyQt6.QtCore import QTimer
-from PyQt6.QtWidgets import QGridLayout, QGroupBox, QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget, QFrame
+from PyQt6.QtWidgets import QFrame, QGridLayout, QGroupBox, QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget
 
 from app.ui.help_content import SCREEN_HELP
 from app.ui.theme import COLORS
@@ -132,7 +132,7 @@ class DashboardView(BaseView):
         for column, label, width in (
             ("date", "Date", 145),
             ("type", "Type", 120),
-            ("summary", "Resume", 420),
+            ("summary", "Resume", 360),
             ("severity", "Gravite", 100),
         ):
             self.event_table.tree.heading(column, text=label)
@@ -143,7 +143,7 @@ class DashboardView(BaseView):
         for column, label, width in (
             ("date", "Date", 145),
             ("severity", "Gravite", 95),
-            ("title", "Titre", 330),
+            ("title", "Titre", 260),
             ("score", "Score", 70),
         ):
             self.alert_table.tree.heading(column, text=label)
@@ -154,7 +154,7 @@ class DashboardView(BaseView):
         for column, label, width in (
             ("component", "Composant", 180),
             ("status", "Etat", 130),
-            ("details", "Detail", 900),
+            ("details", "Detail", 520),
         ):
             self.health_table.tree.heading(column, text=label)
             self.health_table.tree.column(column, width=width, anchor="w")
@@ -168,10 +168,13 @@ class DashboardView(BaseView):
         brain_layout.setContentsMargins(0, 0, 0, 0)
         brain_layout.setHorizontalSpacing(12)
         brain_layout.setVerticalSpacing(12)
+        brain_layout.setColumnStretch(0, 1)
+        brain_layout.setColumnStretch(1, 1)
+        brain_layout.setColumnStretch(2, 1)
         self.brain_summary = QLabel("", brain_body)
         self.brain_summary.setObjectName("muted")
         self.brain_summary.setWordWrap(True)
-        brain_layout.addWidget(self.brain_summary, 0, 0)
+        brain_layout.addWidget(self.brain_summary, 0, 0, 1, 3)
         badge_row = QWidget(brain_body)
         badge_row_layout = QHBoxLayout(badge_row)
         badge_row_layout.setContentsMargins(0, 0, 0, 0)
@@ -181,19 +184,19 @@ class DashboardView(BaseView):
         badge_row_layout.addWidget(self.brain_level_badge)
         badge_row_layout.addWidget(self.brain_progress_badge)
         badge_row_layout.addStretch(1)
-        brain_layout.addWidget(badge_row, 0, 1, 1, 2)
+        brain_layout.addWidget(badge_row, 1, 0, 1, 3)
         self.brain_incidents = LabeledValue(brain_body, "Incidents actifs", "-", surface="panel")
         self.brain_alerts = LabeledValue(brain_body, "Alertes ouvertes", "-", surface="panel")
         self.brain_focus = LabeledValue(brain_body, "Points de focus", "-", surface="panel")
         self.brain_new_devices = LabeledValue(brain_body, "Nouveaux 7 jours", "-", surface="panel")
         self.brain_deviations = LabeledValue(brain_body, "Deviations actives", "-", surface="panel")
         self.brain_known = LabeledValue(brain_body, "Parc habituel", "-", surface="panel")
-        brain_layout.addWidget(self.brain_incidents, 1, 0)
-        brain_layout.addWidget(self.brain_alerts, 1, 1)
-        brain_layout.addWidget(self.brain_focus, 1, 2)
-        brain_layout.addWidget(self.brain_new_devices, 2, 0)
-        brain_layout.addWidget(self.brain_deviations, 2, 1)
-        brain_layout.addWidget(self.brain_known, 2, 2)
+        brain_layout.addWidget(self.brain_incidents, 2, 0)
+        brain_layout.addWidget(self.brain_alerts, 2, 1)
+        brain_layout.addWidget(self.brain_focus, 2, 2)
+        brain_layout.addWidget(self.brain_new_devices, 3, 0)
+        brain_layout.addWidget(self.brain_deviations, 3, 1)
+        brain_layout.addWidget(self.brain_known, 3, 2)
 
         suggestions_layout = QGridLayout(suggestions_body)
         suggestions_layout.setContentsMargins(0, 0, 0, 0)
@@ -219,9 +222,9 @@ class DashboardView(BaseView):
         suggestions_layout.addWidget(self.suggestion_table, 1, 0)
         for column, label, width in (
             ("priority", "Priorite", 110),
-            ("title", "Titre", 360),
-            ("action", "Action proposee", 220),
-            ("device", "Peripherique", 240),
+            ("title", "Titre", 260),
+            ("action", "Action proposee", 180),
+            ("device", "Peripherique", 180),
         ):
             self.suggestion_table.tree.heading(column, text=label)
             self.suggestion_table.tree.column(column, width=width, anchor="w")
@@ -243,7 +246,7 @@ class DashboardView(BaseView):
         for column, label, width in (
             ("item", "Point", 170),
             ("status", "Etat", 110),
-            ("action", "Action conseillee", 340),
+            ("action", "Action conseillee", 260),
         ):
             self.precheck_table.tree.heading(column, text=label)
             self.precheck_table.tree.column(column, width=width, anchor="w")
@@ -390,7 +393,6 @@ class DashboardView(BaseView):
             self.brain_deviations.set(str(brain_snapshot.deviation_count))
             self.brain_known.set(str(data["known_count"]))
 
-        self.page.force_layout()
         QTimer.singleShot(0, self.page.force_layout)
 
     def on_host_resize(self, width: int, height: int) -> None:
@@ -450,6 +452,14 @@ class DashboardView(BaseView):
             return
         self._dashboard_mode = mode
 
+        for index in range(5):
+            self.kpi_layout.setColumnStretch(index, 0)
+        for index in range(4):
+            self.status_layout.setColumnStretch(index, 0)
+        for layout in (self.upper_layout, self.middle_layout, self.bottom_layout):
+            for index in range(3):
+                layout.setColumnStretch(index, 0)
+
         for widget in self._kpi_cards:
             self.kpi_layout.removeWidget(widget)
         for tile in self._status_tiles:
@@ -459,11 +469,14 @@ class DashboardView(BaseView):
             self.middle_layout.removeWidget(frame)
             self.bottom_layout.removeWidget(frame)
 
+        self._section_frames["brain"].setMinimumWidth(0)
+
         if mode == "compact":
             for index, tile in enumerate(self._status_tiles):
                 row = index // 2
                 column = index % 2
                 self.status_layout.addWidget(tile["frame"], row, column)
+                self.status_layout.setColumnStretch(column, 1)
             for index, widget in enumerate(self._kpi_cards):
                 row = index // 2
                 column = index % 2
@@ -471,38 +484,60 @@ class DashboardView(BaseView):
                     self.kpi_layout.addWidget(widget, 2, 0, 1, 2)
                 else:
                     self.kpi_layout.addWidget(widget, row, column)
+                self.kpi_layout.setColumnStretch(column, 1)
             self.upper_layout.addWidget(self._section_frames["events"], 0, 0)
             self.upper_layout.addWidget(self._section_frames["alerts"], 1, 0)
             self.middle_layout.addWidget(self._section_frames["health"], 0, 0)
             self.middle_layout.addWidget(self._section_frames["brain"], 1, 0)
             self.bottom_layout.addWidget(self._section_frames["suggestions"], 0, 0)
             self.bottom_layout.addWidget(self._section_frames["precheck"], 1, 0)
+            self.upper_layout.setColumnStretch(0, 1)
+            self.middle_layout.setColumnStretch(0, 1)
+            self.bottom_layout.setColumnStretch(0, 1)
         elif mode == "medium":
             for index, tile in enumerate(self._status_tiles):
                 row = index // 2
                 column = index % 2
                 self.status_layout.addWidget(tile["frame"], row, column)
+                self.status_layout.setColumnStretch(column, 1)
             for index, widget in enumerate(self._kpi_cards):
                 row = index // 3
                 column = index % 3
                 self.kpi_layout.addWidget(widget, row, column)
+                self.kpi_layout.setColumnStretch(column, 1)
             self.upper_layout.addWidget(self._section_frames["events"], 0, 0)
             self.upper_layout.addWidget(self._section_frames["alerts"], 0, 1)
             self.middle_layout.addWidget(self._section_frames["health"], 0, 0)
             self.middle_layout.addWidget(self._section_frames["brain"], 0, 1)
             self.bottom_layout.addWidget(self._section_frames["suggestions"], 0, 0, 1, 2)
             self.bottom_layout.addWidget(self._section_frames["precheck"], 1, 0, 1, 2)
+            self.upper_layout.setColumnStretch(0, 5)
+            self.upper_layout.setColumnStretch(1, 4)
+            self.middle_layout.setColumnStretch(0, 6)
+            self.middle_layout.setColumnStretch(1, 4)
+            self.bottom_layout.setColumnStretch(0, 1)
+            self.bottom_layout.setColumnStretch(1, 1)
+            self._section_frames["brain"].setMinimumWidth(360)
         else:
             for index, tile in enumerate(self._status_tiles):
                 self.status_layout.addWidget(tile["frame"], 0, index)
+                self.status_layout.setColumnStretch(index, 1)
             for index, widget in enumerate(self._kpi_cards):
                 self.kpi_layout.addWidget(widget, 0, index)
+                self.kpi_layout.setColumnStretch(index, 1)
             self.upper_layout.addWidget(self._section_frames["events"], 0, 0)
             self.upper_layout.addWidget(self._section_frames["alerts"], 0, 1)
             self.middle_layout.addWidget(self._section_frames["health"], 0, 0)
             self.middle_layout.addWidget(self._section_frames["brain"], 0, 1)
             self.bottom_layout.addWidget(self._section_frames["suggestions"], 0, 0)
             self.bottom_layout.addWidget(self._section_frames["precheck"], 0, 1)
+            self.upper_layout.setColumnStretch(0, 5)
+            self.upper_layout.setColumnStretch(1, 5)
+            self.middle_layout.setColumnStretch(0, 7)
+            self.middle_layout.setColumnStretch(1, 4)
+            self.bottom_layout.setColumnStretch(0, 5)
+            self.bottom_layout.setColumnStretch(1, 4)
+            self._section_frames["brain"].setMinimumWidth(380)
 
         self._update_wrap_lengths()
 
@@ -528,8 +563,8 @@ class DashboardView(BaseView):
 
         for tile in self._status_tiles:
             tile["detail"].setMaximumWidth(tile_wrap)
-        self.brain_summary.setMaximumWidth(summary_wrap)
-        self.precheck_intro.setMaximumWidth(precheck_wrap)
+        self.brain_summary.setMaximumWidth(16777215)
+        self.precheck_intro.setMaximumWidth(16777215)
         self.event_table.tree.configure(height=event_height)
         self.alert_table.tree.configure(height=event_height)
         self.health_table.tree.configure(height=side_height)

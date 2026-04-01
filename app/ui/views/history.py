@@ -3,7 +3,7 @@ from __future__ import annotations
 from PyQt6.QtWidgets import QComboBox, QGridLayout, QGroupBox, QHBoxLayout, QLabel, QLineEdit, QPushButton, QVBoxLayout, QWidget
 
 from app.ui.views.base import BaseView
-from app.ui.widgets.common import LabeledValue, ScrollableDetailText, ScrollableTree, SectionHeader, StatusPill
+from app.ui.widgets.common import LabeledValue, ScrollableDetailText, ScrollablePage, ScrollableTree, SectionHeader, StatusPill
 from app.utils.datetime import format_for_ui
 from app.utils.ui import severity_color, shorten_text
 
@@ -87,6 +87,13 @@ class HistoryView(BaseView):
         list_layout = QVBoxLayout(list_frame)
         detail_frame = QGroupBox("Detail d'audit", self)
         detail_layout = QVBoxLayout(detail_frame)
+        detail_layout.setContentsMargins(0, 0, 0, 0)
+        self.detail_page = ScrollablePage(detail_frame)
+        detail_layout.addWidget(self.detail_page)
+        detail_body = QWidget(self.detail_page.body)
+        self.detail_page.body_layout.addWidget(detail_body)
+        detail_layout = QVBoxLayout(detail_body)
+        detail_layout.setContentsMargins(0, 0, 0, 0)
         detail_layout.setSpacing(12)
         layout.addWidget(list_frame, 2, 0)
         layout.addWidget(detail_frame, 2, 1)
@@ -121,6 +128,8 @@ class HistoryView(BaseView):
         metrics_layout.setContentsMargins(12, 12, 12, 12)
         metrics_layout.setHorizontalSpacing(10)
         metrics_layout.setVerticalSpacing(8)
+        metrics_layout.setColumnStretch(0, 1)
+        metrics_layout.setColumnStretch(1, 1)
         detail_layout.addWidget(metrics)
         self.values = {
             "date": LabeledValue(metrics, "Date"),
@@ -203,6 +212,7 @@ class HistoryView(BaseView):
                 payload=event.payload,
             )
         )
+        self.detail_page.scroll_to_top()
 
     def _clear_selection_state(self) -> None:
         self._selected_event_key = None
@@ -230,3 +240,6 @@ class HistoryView(BaseView):
             lambda: self.controller.export_report(fmt),
             success_message=lambda target: f"Export {fmt.upper()} genere : {target}",
         )
+
+    def reset_scroll_position(self) -> None:
+        self.detail_page.scroll_to_top()

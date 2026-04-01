@@ -14,7 +14,15 @@ from PyQt6.QtWidgets import (
 
 from app.ui.help_content import SCREEN_HELP
 from app.ui.views.base import BaseView
-from app.ui.widgets.common import InlineHelpPanel, LabeledValue, ScrollableDetailText, ScrollableTree, SectionHeader, StatusPill
+from app.ui.widgets.common import (
+    InlineHelpPanel,
+    LabeledValue,
+    ScrollableDetailText,
+    ScrollablePage,
+    ScrollableTree,
+    SectionHeader,
+    StatusPill,
+)
 from app.utils.datetime import format_for_ui
 from app.utils.ui import (
     category_text,
@@ -115,6 +123,13 @@ class DevicesView(BaseView):
         tree_layout = QVBoxLayout(tree_frame)
         detail_frame = QGroupBox("Fiche peripherique", self)
         detail_layout = QVBoxLayout(detail_frame)
+        detail_layout.setContentsMargins(0, 0, 0, 0)
+        self.detail_page = ScrollablePage(detail_frame)
+        detail_layout.addWidget(self.detail_page)
+        detail_body = QWidget(self.detail_page.body)
+        self.detail_page.body_layout.addWidget(detail_body)
+        detail_layout = QVBoxLayout(detail_body)
+        detail_layout.setContentsMargins(0, 0, 0, 0)
         detail_layout.setSpacing(12)
         layout.addWidget(tree_frame, 3, 0)
         layout.addWidget(detail_frame, 3, 1)
@@ -159,6 +174,8 @@ class DevicesView(BaseView):
         metrics_layout.setContentsMargins(12, 12, 12, 12)
         metrics_layout.setHorizontalSpacing(10)
         metrics_layout.setVerticalSpacing(8)
+        metrics_layout.setColumnStretch(0, 1)
+        metrics_layout.setColumnStretch(1, 1)
         detail_layout.addWidget(metrics)
         self.values = {
             "name": LabeledValue(metrics, "Nom"),
@@ -318,6 +335,7 @@ class DevicesView(BaseView):
                 history="\n".join(history_lines),
             )
         )
+        self.detail_page.scroll_to_top()
         self.whitelist_button.setEnabled(True)
         self.blacklist_button.setEnabled(True)
 
@@ -362,3 +380,6 @@ class DevicesView(BaseView):
     def _refresh_monitor(self) -> None:
         self.controller.refresh_monitor()
         self.app.set_status("Rafraichissement USB demande.", "INFO")
+
+    def reset_scroll_position(self) -> None:
+        self.detail_page.scroll_to_top()

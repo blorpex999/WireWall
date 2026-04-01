@@ -129,12 +129,25 @@ def get_stylesheet() -> str:
         width: 8px;
         border: none;
     }}
+    QScrollBar:horizontal {{
+        background: {c['bg']};
+        height: 8px;
+        border: none;
+    }}
     QScrollBar::handle:vertical {{
         background: {c['panel_border']};
         border-radius: 4px;
         min-height: 30px;
     }}
+    QScrollBar::handle:horizontal {{
+        background: {c['panel_border']};
+        border-radius: 4px;
+        min-width: 30px;
+    }}
     QScrollBar::handle:vertical:hover {{
+        background: {c['muted']};
+    }}
+    QScrollBar::handle:horizontal:hover {{
         background: {c['muted']};
     }}
     QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical,
@@ -152,6 +165,7 @@ def get_stylesheet() -> str:
         border: 1px solid {c['panel_border']};
         border-radius: 6px;
         padding: 5px 10px;
+        min-height: 20px;
     }}
     QComboBox::drop-down {{
         border: none;
@@ -168,6 +182,7 @@ def get_stylesheet() -> str:
         border: 1px solid {c['panel_border']};
         border-radius: 6px;
         padding: 5px 10px;
+        min-height: 20px;
     }}
     QLineEdit:focus {{
         border: 1px solid {c['accent']};

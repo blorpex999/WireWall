@@ -3,13 +3,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Callable
 
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import QTimer, Qt
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import (
     QAbstractItemView,
     QFrame,
     QGridLayout,
     QGroupBox,
+    QHeaderView,
     QHBoxLayout,
     QLabel,
     QPlainTextEdit,
@@ -168,9 +169,11 @@ class LabeledValue(QWidget):
         super().__init__(parent)
         bg = _surface_bg(surface)
         self.setStyleSheet(f"background-color: {bg};")
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
+        self.setMinimumHeight(56)
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(2)
+        layout.setContentsMargins(0, 4, 0, 4)
+        layout.setSpacing(4)
         self.label = QLabel(label, self)
         self.label.setObjectName("muted")
         layout.addWidget(self.label)
@@ -189,15 +192,20 @@ class ScrollablePage(QScrollArea):
         self.setWidgetResizable(True)
         self.setFrameShape(QFrame.Shape.NoFrame)
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self.setAlignment(Qt.AlignmentFlag.AlignTop)
         self.body = QWidget()
+        self.body.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         self.body_layout = QVBoxLayout(self.body)
         self.body_layout.setContentsMargins(0, 0, 0, 0)
         self.body_layout.setSpacing(0)
         self.setWidget(self.body)
 
     def force_layout(self) -> None:
+        self.body_layout.activate()
         self.body.adjustSize()
         self.body.updateGeometry()
+        self.updateGeometry()
         self.viewport().update()
 
     def scroll_to_top(self) -> None:
@@ -302,10 +310,13 @@ class DemoBanner(QFrame):
 
 
 class DetailText(QPlainTextEdit):
-    def __init__(self, parent: QWidget | None = None, **_kwargs) -> None:
+    def __init__(self, parent: QWidget | None = None, *, height: int | None = None, **_kwargs) -> None:
         super().__init__(parent)
         self.setReadOnly(True)
         self.setLineWrapMode(QPlainTextEdit.LineWrapMode.WidgetWidth)
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.setStyleSheet(
             "padding: 8px 10px; background-color: {bg}; color: {text}; border: 1px solid {border}; border-radius: 6px;".format(
                 bg=COLORS["panel"],
@@ -313,6 +324,10 @@ class DetailText(QPlainTextEdit):
                 border=COLORS["panel_border"],
             )
         )
+        if height is not None:
+            line_height = self.fontMetrics().lineSpacing()
+            visible_lines = max(height, 1)
+            self.setMinimumHeight(max(116, (line_height * visible_lines) + 32))
 
     def set_text(self, content: str) -> None:
         if self.toPlainText() == content:
@@ -358,27 +373,57 @@ class _TreeRow:
     tags: tuple[str, ...]
 
 
+class _ResponsiveTableWidget(QTableWidget):
+    def __init__(self, adapter: "_TreeAdapter", rows: int, columns: int, parent: QWidget | None = None) -> None:
+        super().__init__(rows, columns, parent)
+        self._adapter = adapter
+
+    def resizeEvent(self, event) -> None:  # noqa: N802
+        super().resizeEvent(event)
+        self._adapter.schedule_width_sync()
+
+    def showEvent(self, event) -> None:  # noqa: N802
+        super().showEvent(event)
+        self._adapter.schedule_width_sync()
+
+
 class _TreeAdapter:
     def __init__(self, owner: "ScrollableTree", columns: tuple[str, ...], height: int) -> None:
         self._owner = owner
-        self._table = QTableWidget(0, len(columns), owner)
+        self._columns = columns
+        self._preferred_widths = {column: 120 for column in columns}
+        self._alignments = {column: Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter for column in columns}
+        self._width_sync_scheduled = False
+        self._updates_suspended = False
+
+        self._table = _ResponsiveTableWidget(self, 0, len(columns), owner)
         self._table.setAlternatingRowColors(True)
         self._table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self._table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self._table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self._table.setWordWrap(False)
+        self._table.setTextElideMode(Qt.TextElideMode.ElideRight)
         self._table.verticalHeader().setVisible(False)
-        self._table.horizontalHeader().setStretchLastSection(True)
+        self._table.verticalHeader().setDefaultSectionSize(32)
+        self._table.horizontalHeader().setStretchLastSection(False)
+        self._table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
+        self._table.horizontalHeader().setMinimumSectionSize(60)
         self._table.setShowGrid(False)
         self._table.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        self._table.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self._table.setVerticalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
+        self._table.setHorizontalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
+        self._table.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self._table.setHorizontalHeaderLabels(list(columns))
         self._table.itemSelectionChanged.connect(self._emit_select)
-        self._columns = columns
+        self._width_sync_timer = QTimer(self._table)
+        self._width_sync_timer.setSingleShot(True)
+        self._width_sync_timer.timeout.connect(self._apply_column_widths)
         self._row_index_by_id: dict[str, int] = {}
         self._rows: list[_TreeRow] = []
         self._tag_styles: dict[str, dict[str, str]] = {}
-        self._alignments = {column: Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter for column in columns}
         self.configure(height=height)
+        self.schedule_width_sync()
 
     @property
     def widget(self) -> QTableWidget:
@@ -400,9 +445,10 @@ class _TreeAdapter:
             index = self._columns.index(column)
         except ValueError:
             return
-        self._table.setColumnWidth(index, width)
+        self._preferred_widths[column] = width
         self._alignments[column] = _anchor_alignment("e" if anchor == "e" else "w")
         self._refresh_row_styles()
+        self.schedule_width_sync()
 
     def tag_configure(self, tag: str, *, foreground: str) -> None:
         self._tag_styles[tag] = {"foreground": foreground}
@@ -428,10 +474,12 @@ class _TreeAdapter:
         for index, value in enumerate(normalized_values):
             item = QTableWidgetItem("" if value is None else str(value))
             item.setTextAlignment(int(self._alignments[self._columns[index]]))
+            item.setToolTip("" if value is None else str(value))
             if foreground is not None:
                 item.setForeground(QColor(foreground))
             item.setData(Qt.ItemDataRole.UserRole, item_id)
             self._table.setItem(row_index, index, item)
+        self.schedule_width_sync()
         return item_id
 
     def selection(self) -> tuple[str, ...]:
@@ -488,9 +536,19 @@ class _TreeAdapter:
         self._owner._select_callbacks.append(callback)
 
     def clear(self) -> None:
+        self._updates_suspended = True
+        self._table.setUpdatesEnabled(False)
+        self._table.clearSelection()
         self._table.setRowCount(0)
         self._row_index_by_id.clear()
         self._rows.clear()
+        self.schedule_width_sync()
+
+    def finish_update(self) -> None:
+        self._updates_suspended = False
+        self._table.setUpdatesEnabled(True)
+        self.schedule_width_sync()
+        self._table.viewport().update()
 
     def _emit_select(self) -> None:
         self._owner._emit_select()
@@ -514,6 +572,56 @@ class _TreeAdapter:
                 if foreground is not None:
                     item.setForeground(QColor(foreground))
 
+    def schedule_width_sync(self) -> None:
+        if self._width_sync_scheduled:
+            return
+        self._width_sync_scheduled = True
+        self._width_sync_timer.start(0)
+
+    def _apply_column_widths(self) -> None:
+        self._width_sync_scheduled = False
+        if not self._columns:
+            return
+
+        available = max(0, self._table.viewport().width() - 4)
+        if available <= 0:
+            return
+
+        minimums = {column: self._minimum_width(self._preferred_widths[column]) for column in self._columns}
+        total_minimum = sum(minimums.values())
+        total_preferred = sum(self._preferred_widths.values())
+        computed_widths = dict(minimums)
+
+        if available > total_minimum and total_preferred > total_minimum:
+            extra_room = available - total_minimum
+            expandable = {
+                column: max(0, self._preferred_widths[column] - minimums[column])
+                for column in self._columns
+            }
+            total_expandable = sum(expandable.values())
+            if total_expandable > 0:
+                distributed = 0
+                for column in self._columns[:-1]:
+                    share = int(extra_room * (expandable[column] / total_expandable))
+                    computed_widths[column] += share
+                    distributed += share
+                computed_widths[self._columns[-1]] += max(0, extra_room - distributed)
+            else:
+                even_extra = extra_room // len(self._columns)
+                for column in self._columns[:-1]:
+                    computed_widths[column] += even_extra
+                computed_widths[self._columns[-1]] += extra_room - (even_extra * (len(self._columns) - 1))
+
+        for index, column in enumerate(self._columns):
+            self._table.setColumnWidth(index, computed_widths[column])
+
+    def _minimum_width(self, preferred: int) -> int:
+        if preferred <= 120:
+            return max(72, int(preferred * 0.8))
+        if preferred <= 220:
+            return max(84, int(preferred * 0.68))
+        return max(96, min(220, int(preferred * 0.42)))
+
 
 class ScrollableTree(QFrame):
     def __init__(self, parent: QWidget | None, columns: tuple[str, ...], height: int = 12) -> None:
@@ -536,6 +644,8 @@ class ScrollableTree(QFrame):
         self.tree.clear()
 
     def set_empty(self, has_rows: bool, message: str) -> None:
+        if self.tree._updates_suspended:
+            self.tree.finish_update()
         self.empty_label.setVisible(not has_rows)
         if not has_rows:
             self.empty_label.setText(message)
