@@ -41,7 +41,7 @@ class AIAnalysisView(BaseView):
         top.columnconfigure(1, weight=1)
         top.columnconfigure(3, weight=1)
         ttk.Label(top, text="Modele").grid(row=0, column=0, sticky="w", padx=(0, 8))
-        self.model_value = LabeledValue(top, "Modele IA", "-")
+        self.model_value = LabeledValue(top, "Modele IA", "-", surface="page")
         self.model_value.grid(row=0, column=1, sticky="w")
         ttk.Label(top, text="Etat Ollama").grid(row=0, column=2, sticky="w", padx=(24, 8))
         badge_box = ttk.Frame(top)

@@ -156,6 +156,7 @@ def apply_dark_theme(root: tk.Tk) -> None:
         lightcolor=COLORS["panel_border"],
         darkcolor=COLORS["panel_border"],
     )
+    style.layout("Treeview", [("Treeview.treearea", {"sticky": "nswe"})])
     style.configure(
         "Treeview.Heading",
         background=COLORS["panel_alt"],

@@ -92,7 +92,7 @@ class SettingsView(BaseView):
         ttk.Label(
             footer,
             text="Les changements prennent effet au prochain cycle de monitoring, au prochain rapport et au prochain appel Ollama.",
-            style="Muted.TLabel",
+            style="CardMuted.TLabel",
             wraplength=980,
             justify="left",
         ).grid(row=0, column=0, sticky="w")

@@ -7,6 +7,14 @@ from app.ui.theme import COLORS
 from app.utils.ui import severity_color
 
 
+def _surface_bg(surface: str) -> str:
+    return {
+        "page": COLORS["bg"],
+        "panel": COLORS["panel"],
+        "panel_alt": COLORS["panel_alt"],
+    }.get(surface, COLORS["panel"])
+
+
 def _pill_fg(level: str) -> str:
     upper = level.upper()
     if upper in {"WARNING", "MEDIUM"}:
@@ -38,14 +46,26 @@ class SeverityBadge(StatusPill):
     pass
 
 
-class SectionHeader(ttk.Frame):
+class SectionHeader(tk.Frame):
     def __init__(self, master, title: str, subtitle: str = "", tag_text: str = "", tag_level: str = "INFO") -> None:
-        super().__init__(master)
+        super().__init__(master, bg=COLORS["bg"])
         self.columnconfigure(0, weight=1)
         self.title_var = tk.StringVar(value=title)
         self.subtitle_var = tk.StringVar(value=subtitle)
-        ttk.Label(self, textvariable=self.title_var, style="Title.TLabel").grid(row=0, column=0, sticky="w")
-        ttk.Label(self, textvariable=self.subtitle_var, style="SubTitle.TLabel").grid(row=1, column=0, sticky="w", pady=(4, 0))
+        tk.Label(
+            self,
+            textvariable=self.title_var,
+            bg=COLORS["bg"],
+            fg=COLORS["text"],
+            font=("Segoe UI Semibold", 18),
+        ).grid(row=0, column=0, sticky="w")
+        tk.Label(
+            self,
+            textvariable=self.subtitle_var,
+            bg=COLORS["bg"],
+            fg=COLORS["muted"],
+            font=("Segoe UI Semibold", 11),
+        ).grid(row=1, column=0, sticky="w", pady=(4, 0))
         self.tag = StatusPill(self, tag_text, tag_level)
         if tag_text:
             self.tag.grid(row=0, column=1, rowspan=2, sticky="e")
@@ -63,20 +83,38 @@ class KpiCard(ttk.Frame):
         self.columnconfigure(1, weight=0)
         self.top_bar = tk.Frame(self, bg=severity_color("INFO"), height=4)
         self.top_bar.grid(row=0, column=0, columnspan=2, sticky="ew")
-        body = ttk.Frame(self, style="CardInner.TFrame", padding=(16, 14))
+        body = tk.Frame(self, bg=COLORS["panel"], padx=16, pady=14)
         body.grid(row=1, column=0, columnspan=2, sticky="nsew")
         body.columnconfigure(0, weight=1)
         body.columnconfigure(1, weight=0)
 
-        ttk.Label(body, text=title, style="CardMuted.TLabel").grid(row=0, column=0, sticky="w")
+        tk.Label(
+            body,
+            text=title,
+            bg=COLORS["panel"],
+            fg=COLORS["muted"],
+            font=("Segoe UI", 9),
+        ).grid(row=0, column=0, sticky="w")
         self.badge = SeverityBadge(body, "", "INFO")
         self.badge.grid(row=0, column=1, sticky="e")
         self.badge.grid_remove()
 
         self.value_var = tk.StringVar(value=value)
-        ttk.Label(body, textvariable=self.value_var, style="Metric.TLabel").grid(row=1, column=0, columnspan=2, sticky="w", pady=(8, 4))
+        tk.Label(
+            body,
+            textvariable=self.value_var,
+            bg=COLORS["panel"],
+            fg=COLORS["text"],
+            font=("Segoe UI Semibold", 24),
+        ).grid(row=1, column=0, columnspan=2, sticky="w", pady=(8, 4))
         self.subtitle_var = tk.StringVar(value=subtitle)
-        ttk.Label(body, textvariable=self.subtitle_var, style="CardMuted.TLabel").grid(row=2, column=0, columnspan=2, sticky="w")
+        tk.Label(
+            body,
+            textvariable=self.subtitle_var,
+            bg=COLORS["panel"],
+            fg=COLORS["muted"],
+            font=("Segoe UI", 9),
+        ).grid(row=2, column=0, columnspan=2, sticky="w")
 
     def set(self, value: str, subtitle: str = "", tone: str = "INFO", pill_text: str = "") -> None:
         self.value_var.set(value)
@@ -90,23 +128,49 @@ class KpiCard(ttk.Frame):
             self.badge.grid_remove()
 
 
-class LabeledValue(ttk.Frame):
-    def __init__(self, master, label: str, value: str = "-") -> None:
-        super().__init__(master, style="CardInner.TFrame")
+class LabeledValue(tk.Frame):
+    def __init__(self, master, label: str, value: str = "-", surface: str = "panel") -> None:
+        bg = _surface_bg(surface)
+        super().__init__(master, bg=bg, bd=0, highlightthickness=0)
         self.columnconfigure(0, weight=1)
-        ttk.Label(self, text=label, style="ValueTitle.TLabel").grid(row=0, column=0, sticky="w")
+        tk.Label(
+            self,
+            text=label,
+            bg=bg,
+            fg=COLORS["muted"],
+            font=("Segoe UI", 9),
+        ).grid(row=0, column=0, sticky="w")
         self.value_var = tk.StringVar(value=value)
-        ttk.Label(self, textvariable=self.value_var, style="ValueBody.TLabel").grid(row=1, column=0, sticky="w", pady=(2, 0))
+        tk.Label(
+            self,
+            textvariable=self.value_var,
+            bg=bg,
+            fg=COLORS["text"],
+            font=("Segoe UI Semibold", 11),
+        ).grid(row=1, column=0, sticky="w", pady=(2, 0))
 
     def set(self, value: str) -> None:
         self.value_var.set(value)
 
 
-class EmptyState(ttk.Frame):
+class EmptyState(tk.Frame):
     def __init__(self, master, title: str, detail: str) -> None:
-        super().__init__(master, padding=20)
-        ttk.Label(self, text=title, style="SectionTitle.TLabel").pack(anchor="center")
-        ttk.Label(self, text=detail, style="Muted.TLabel", justify="center").pack(anchor="center", pady=(6, 0))
+        super().__init__(master, bg=COLORS["bg"], padx=20, pady=20)
+        tk.Label(
+            self,
+            text=title,
+            bg=COLORS["bg"],
+            fg=COLORS["text"],
+            font=("Segoe UI Semibold", 13),
+        ).pack(anchor="center")
+        tk.Label(
+            self,
+            text=detail,
+            bg=COLORS["bg"],
+            fg=COLORS["muted"],
+            font=("Segoe UI", 9),
+            justify="center",
+        ).pack(anchor="center", pady=(6, 0))
 
 
 class ScrollablePage(ttk.Frame):
@@ -184,7 +248,7 @@ class InlineHelpPanel(ttk.Frame):
             ttk.Label(
                 row,
                 text=text,
-                style="Muted.TLabel",
+                style="CardMuted.TLabel",
                 wraplength=1120,
                 justify="left",
             ).grid(row=0, column=1, sticky="ew")
@@ -201,9 +265,16 @@ class InlineHelpPanel(ttk.Frame):
             self.button.configure(text=self._collapsed_text)
 
 
-class StatusBar(ttk.Frame):
+class StatusBar(tk.Frame):
     def __init__(self, master) -> None:
-        super().__init__(master, style="Card.TFrame", padding=(12, 8))
+        super().__init__(
+            master,
+            bg=COLORS["panel"],
+            highlightbackground=COLORS["panel_border"],
+            highlightthickness=1,
+            padx=12,
+            pady=8,
+        )
         self.columnconfigure(1, weight=1)
         self.message_var = tk.StringVar(value="Pret.")
         self.indicator = tk.Canvas(self, width=12, height=12, bg=COLORS["panel"], highlightthickness=0)
@@ -212,7 +283,13 @@ class StatusBar(ttk.Frame):
         self.level_pill.grid(row=0, column=2, sticky="e", padx=(12, 8))
         self.mode_pill = StatusPill(self, "MODE REEL", "INFO")
         self.mode_pill.grid(row=0, column=3, sticky="e")
-        ttk.Label(self, textvariable=self.message_var).grid(row=0, column=1, sticky="ew", padx=(10, 0))
+        tk.Label(
+            self,
+            textvariable=self.message_var,
+            bg=COLORS["panel"],
+            fg=COLORS["text"],
+            font=("Segoe UI", 10),
+        ).grid(row=0, column=1, sticky="ew", padx=(10, 0))
         self.set_status("Pret.", "INFO")
 
     def set_status(self, message: str, level: str = "INFO") -> None:

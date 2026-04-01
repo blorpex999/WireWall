@@ -65,7 +65,7 @@ class AboutView(BaseView):
                 "WireWall surveille les peripheriques USB Windows, journalise les evenements, applique des policies, "
                 "evalue le risque et expose un controle reel USBSTOR avec analyse IA locale."
             ),
-            style="Muted.TLabel",
+            style="CardMuted.TLabel",
             wraplength=420,
             justify="left",
         )
@@ -74,7 +74,7 @@ class AboutView(BaseView):
         self.flow_label = ttk.Label(
             self.mission_frame,
             text="Je branche un USB -> WireWall observe -> score -> alerte -> incident -> recommandation.",
-            style="Muted.TLabel",
+            style="CardMuted.TLabel",
             wraplength=420,
             justify="left",
         )
