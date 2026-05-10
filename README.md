@@ -203,6 +203,7 @@ Avant chaque release :
 - [Notes orateur Ydays](docs/YDAYS_SPEAKER_NOTES.md)
 - [Script oral 20 minutes Ydays](docs/YDAYS_20MIN_ORAL_SCRIPT.md)
 - [Diapos 20 minutes Ydays](docs/YDAYS_20MIN_SLIDE_DECK.md)
+- [Simulation d'attaque USB](docs/USB_ATTACK_SIMULATION.md)
 - [Runbook demo Ydays](docs/YDAYS_DEMO_RUNBOOK.md)
 - [Troubleshooting](docs/TROUBLESHOOTING.md)
 - [Checklist de validation](docs/VALIDATION_CHECKLIST.md)

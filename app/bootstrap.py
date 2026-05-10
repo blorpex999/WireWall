@@ -33,6 +33,7 @@ from app.services.background_tasks import BackgroundTaskService
 from app.services.baseline_service import BaselineService
 from app.services.brain_service import BrainService
 from app.services.demo_service import DemoDataService, DemoUsbEnumerator, ModeSwitchingUsbEnumerator
+from app.services.demo_threat_marker import DemoThreatMarkerScanner
 from app.services.event_bus import EventBus
 from app.services.health_service import HealthCheckService
 from app.services.incident_service import IncidentService
@@ -154,6 +155,7 @@ def build_container(config_path: str | None = None) -> ApplicationContainer:
     real_enumerator = UsbEnumerator(classifier)
     demo_enumerator = DemoUsbEnumerator(classifier)
     enumerator = ModeSwitchingUsbEnumerator(settings, real_enumerator, demo_enumerator)
+    demo_threat_marker_scanner = DemoThreatMarkerScanner()
     event_bus = EventBus()
     background_tasks = BackgroundTaskService(event_bus)
     baseline_service = BaselineService()
@@ -239,6 +241,7 @@ def build_container(config_path: str | None = None) -> ApplicationContainer:
         incident_service=incident_service,
         event_bus=event_bus,
         settings=settings,
+        demo_threat_marker_scanner=demo_threat_marker_scanner,
     )
 
     demo_mode = settings.mode == "demo"

@@ -4,6 +4,7 @@ from app.config.defaults import build_default_settings
 from app.core.risk_engine import RiskEngine
 from app.models.entities import EnumerationResult, USBDevice
 from app.services.baseline_service import BaselineService
+from app.services.demo_threat_marker import DemoThreatMarker
 from app.services.event_bus import EventBus
 from app.services.incident_service import IncidentService
 from app.services.policy_service import PolicyService
@@ -24,7 +25,15 @@ class FakeEnumerator:
         return current
 
 
-def build_monitor(repositories, snapshots):
+class FakeMarkerScanner:
+    def __init__(self, markers=None):
+        self.markers = markers or []
+
+    def scan(self):
+        return self.markers
+
+
+def build_monitor(repositories, snapshots, marker_scanner=None):
     settings = build_default_settings()
     settings.mode = "demo"
     settings.export_directory = ""
@@ -49,6 +58,7 @@ def build_monitor(repositories, snapshots):
         incident_service=incident_service,
         event_bus=bus,
         settings=settings,
+        demo_threat_marker_scanner=marker_scanner,
     )
     return monitor, bus
 
@@ -117,6 +127,32 @@ def test_monitor_keeps_snapshot_when_enumeration_fails(repositories) -> None:
     assert any(event.event_type == "scan_error" for event in events)
     assert all(event.event_type != "disconnected" for event in events)
     assert any(item["type"] == "monitor_warning" for item in drained)
+
+
+def test_monitor_creates_demo_attack_alert_from_usb_marker(repositories) -> None:
+    monitor, bus = build_monitor(
+        repositories,
+        [EnumerationResult(True, [], "ok", {})],
+        marker_scanner=FakeMarkerScanner(
+            [
+                DemoThreatMarker(
+                    drive_root="E:\\",
+                    marker_path="E:\\WIREWALL_DEMO_THREAT.txt",
+                    marker_name="WIREWALL_DEMO_THREAT.txt",
+                )
+            ]
+        ),
+    )
+
+    assert monitor.scan_once() is True
+
+    events = repositories["event_repo"].list_recent(demo_mode=True)
+    alerts = repositories["alert_repo"].list_all(demo_mode=True)
+    drained = bus.drain()
+
+    assert any(event.event_type == "demo_threat_marker_detected" for event in events)
+    assert any(alert.title == "Simulation d'attaque USB" for alert in alerts)
+    assert any(item["type"] == "alert_created" for item in drained)
 
 
 def test_monitor_reuses_inventory_row_for_reconnected_device_without_serial(repositories) -> None:

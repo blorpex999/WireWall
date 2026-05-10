@@ -32,6 +32,7 @@ class UsbMonitorService:
         incident_service,
         event_bus,
         settings,
+        demo_threat_marker_scanner=None,
     ) -> None:
         self.enumerator = enumerator
         self.device_repo = device_repo
@@ -44,6 +45,7 @@ class UsbMonitorService:
         self.incident_service = incident_service
         self.event_bus = event_bus
         self.settings = settings
+        self.demo_threat_marker_scanner = demo_threat_marker_scanner
         self._current_snapshot: dict[str, USBDevice] = {}
         self._stop_event = threading.Event()
         self._refresh_event = threading.Event()
@@ -139,6 +141,7 @@ class UsbMonitorService:
                 )
 
         self._current_snapshot = new_snapshot
+        self._scan_demo_threat_markers(now)
         self.event_bus.publish("snapshot_updated", {"device_count": len(new_snapshot)})
         return True
 
@@ -222,6 +225,66 @@ class UsbMonitorService:
                         },
                     )
 
+    def _scan_demo_threat_markers(self, now: str) -> None:
+        if not self.demo_mode or self.demo_threat_marker_scanner is None:
+            return
+        try:
+            markers = self.demo_threat_marker_scanner.scan()
+        except Exception:
+            LOGGER.exception("Erreur pendant le scan des marqueurs de simulation USB.")
+            return
+        if not markers:
+            return
+
+        marker = markers[0]
+        event_id = self._create_system_event(
+            event_type="demo_threat_marker_detected",
+            summary=f"Marqueur de simulation d'attaque USB detecte sur {marker.drive_root}.",
+            severity="HIGH",
+            reasons=[
+                "Un fichier marqueur de demonstration WireWall est present a la racine du support.",
+                "Aucun programme n'a ete execute: il s'agit d'un scenario controle.",
+            ],
+            score=85,
+            level="HIGH",
+            payload={
+                "drive_root": marker.drive_root,
+                "marker_name": marker.marker_name,
+                "marker_path": marker.marker_path,
+            },
+        )
+        if event_id is None:
+            return
+
+        alert = Alert(
+            created_at=now,
+            severity="HIGH",
+            title="Simulation d'attaque USB",
+            message=f"Marqueur de scenario suspect detecte sur {marker.drive_root}.",
+            event_id=event_id,
+            score=85,
+            recommendations=[
+                "Presenter ce support comme un scenario controle, sans malware reel.",
+                "Ouvrir un incident et documenter la decision analyste.",
+                "Retirer le support apres la demonstration.",
+            ],
+            demo_mode=True,
+        )
+        alert.id = self.alert_repo.add(alert)
+        if alert.id is not None:
+            case = self.incident_service.ensure_for_alert(alert.id, True)
+            self.alert_repo.attach_case(alert.id, case.id or 0)
+            self.event_bus.publish(
+                "alert_created",
+                {
+                    "alert_id": alert.id,
+                    "severity": alert.severity,
+                    "title": alert.title,
+                    "message": alert.message,
+                    "device_key": None,
+                },
+            )
+
     def _create_event(
         self,
         *,
@@ -257,7 +320,17 @@ class UsbMonitorService:
         self.event_bus.publish("device_event", {"event_id": event_id, "device_key": device.device_key})
         return event_id
 
-    def _create_system_event(self, *, event_type: str, summary: str, severity: str, reasons: list[str]) -> int | None:
+    def _create_system_event(
+        self,
+        *,
+        event_type: str,
+        summary: str,
+        severity: str,
+        reasons: list[str],
+        score: int = 0,
+        level: str = "LOW",
+        payload: dict | None = None,
+    ) -> int | None:
         since = seconds_ago(self.settings.dedup_window_seconds)
         if self.event_repo.has_recent_duplicate(None, event_type, self.demo_mode, since):
             return None
@@ -268,11 +341,11 @@ class UsbMonitorService:
                 device_key=None,
                 summary=summary,
                 severity=severity,
-                score=0,
-                level="LOW",
+                score=score,
+                level=level,
                 reasons=reasons,
                 source="monitor",
-                payload={},
+                payload=payload or {},
                 demo_mode=self.demo_mode,
             )
         )
