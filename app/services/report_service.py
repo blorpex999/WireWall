@@ -86,6 +86,11 @@ class ReportService:
         devices = [USBDevice(**item) for item in context["devices"]]
         alerts = [Alert(**item) for item in context["alerts"]]
         events = [DeviceEvent(**item) for item in context["events"]]
+        priority_devices = sorted(devices, key=self._device_ai_priority, reverse=True)
+        priority_alerts = sorted(alerts, key=self._alert_ai_priority, reverse=True)
+        priority_events = sorted(events, key=self._event_ai_priority, reverse=True)
+        incidents = context["incidents"]
+        suggestions = context["suggestions"]
         return {
             "generated_at": context["generated_at"],
             "mode": context["mode"],
@@ -100,12 +105,12 @@ class ReportService:
                 "suggestion_total": len(context["suggestions"]),
                 "alert_total": len(alerts),
             },
-            "devices": [self._device_ai_view(device) for device in devices[:12]],
-            "recent_events": [self._event_ai_view(event) for event in events[:20]],
-            "alerts": [self._alert_ai_view(alert) for alert in alerts[:12]],
-            "incidents": context["incidents"][:8],
-            "suggestions": context["suggestions"][:8],
-            "recent_ai_observations": [self._analysis_ai_view(item) for item in context["ai_analyses"][:3]],
+            "devices": [self._device_ai_view(device) for device in priority_devices[:8]],
+            "recent_events": [self._event_ai_view(event) for event in priority_events[:14]],
+            "alerts": [self._alert_ai_view(alert) for alert in priority_alerts[:8]],
+            "incidents": [self._incident_ai_view(item) for item in incidents[:6]],
+            "suggestions": [self._suggestion_ai_view(item) for item in suggestions[:6]],
+            "recent_ai_observations": [self._analysis_ai_view(item) for item in context["ai_analyses"][:2]],
             "brain_memory": self._brain_ai_view(context["brain_snapshot"]),
             "audit_integrity": {
                 "event_chain_hash": context["event_chain_hash"],
@@ -369,6 +374,45 @@ class ReportService:
             "summary": self._truncate(str(analysis["summary"]), 180),
             "success": analysis["success"],
         }
+
+    def _incident_ai_view(self, incident: dict[str, object]) -> dict[str, object]:
+        return {
+            "id": incident.get("id"),
+            "created_at": incident.get("created_at"),
+            "status": incident.get("status"),
+            "decision": incident.get("decision"),
+            "device_key": incident.get("device_key"),
+            "alert_id": incident.get("alert_id"),
+            "comment": self._truncate(str(incident.get("comment") or ""), 160),
+            "resolution_reason": self._truncate(str(incident.get("resolution_reason") or ""), 160),
+        }
+
+    def _suggestion_ai_view(self, suggestion: dict[str, object]) -> dict[str, object]:
+        return {
+            "id": suggestion.get("id"),
+            "priority": suggestion.get("priority"),
+            "type": suggestion.get("recommendation_type"),
+            "title": self._truncate(str(suggestion.get("title") or ""), 120),
+            "details": self._truncate(str(suggestion.get("details") or ""), 180),
+            "proposed_action": self._truncate(str(suggestion.get("proposed_action") or ""), 160),
+            "target_device_key": suggestion.get("target_device_key"),
+            "target_alert_id": suggestion.get("target_alert_id"),
+        }
+
+    def _device_ai_priority(self, device: USBDevice) -> tuple[int, int, int, int]:
+        trust_rank = {"DEVIATION": 4, "NEW": 3, "RARE": 2, "KNOWN": 1}.get(device.trust_state.upper(), 0)
+        connected_rank = 1 if device.status == "connected" else 0
+        return (device.risk_score, self._severity_rank(device.risk_level), trust_rank, connected_rank)
+
+    def _alert_ai_priority(self, alert: Alert) -> tuple[int, int, int, str]:
+        open_rank = 0 if alert.acknowledged else 1
+        return (open_rank, self._severity_rank(alert.severity), alert.score, alert.created_at)
+
+    def _event_ai_priority(self, event: DeviceEvent) -> tuple[int, int, str]:
+        return (self._severity_rank(event.severity), event.score, event.occurred_at)
+
+    def _severity_rank(self, level: str) -> int:
+        return {"LOW": 1, "MEDIUM": 2, "HIGH": 3, "CRITICAL": 4}.get((level or "").upper(), 0)
 
     def _event_chain_hash(self, events: list[DeviceEvent]) -> str:
         chain = "GENESIS"

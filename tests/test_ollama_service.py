@@ -59,9 +59,10 @@ def test_ollama_service_success_parses_strict_json(monkeypatch) -> None:
     assert analysis.summary == "Risque eleve sur support USB inconnu."
     assert analysis.threats == ["Support inconnu", "Alerte recente"]
     assert analysis.recommendations == ["Verifier le support", "Confirmer l utilisateur"]
-    assert captured["json"]["options"]["num_predict"] == 180
-    assert '"niveau":"LOW | MEDIUM | HIGH | CRITICAL"' in captured["json"]["prompt"]
-    assert "aucun markdown" in captured["json"]["prompt"]
+    assert captured["json"]["format"] == "json"
+    assert captured["json"]["options"]["num_predict"] == 700
+    assert '"niveau":"LOW|MEDIUM|HIGH|CRITICAL"' in captured["json"]["prompt"]
+    assert "sans markdown" in captured["json"]["prompt"]
 
 
 def test_ollama_service_extracts_json_from_wrapped_text(monkeypatch) -> None:
@@ -85,7 +86,7 @@ def test_ollama_service_extracts_json_from_wrapped_text(monkeypatch) -> None:
     assert analysis.recommendations == ["Continuer la surveillance"]
 
 
-def test_ollama_service_invalid_json_returns_clean_fallback(monkeypatch) -> None:
+def test_ollama_service_invalid_json_returns_contextual_fallback(monkeypatch) -> None:
     fake_requests = SimpleNamespace(
         get=lambda *args, **kwargs: FakeResponse(ok=True, payload={"models": [{"name": "demo-model"}]}),
         post=lambda *args, **kwargs: FakeResponse(ok=True, payload={"response": "pas de json exploitable"}),
@@ -96,9 +97,40 @@ def test_ollama_service_invalid_json_returns_clean_fallback(monkeypatch) -> None
 
     analysis = service.analyze({"global_score": 10})
 
-    assert analysis.success is False
-    assert analysis.global_level == "UNKNOWN"
-    assert "reponse invalide du modele" in analysis.summary
+    assert analysis.success is True
+    assert analysis.global_level == "LOW"
+    assert "Analyse locale de secours" in analysis.summary
+    assert analysis.threats
+    assert analysis.recommendations
+
+
+def test_ollama_service_keeps_detailed_structured_items(monkeypatch) -> None:
+    long_threats = [f"Menace detaillee {index}" for index in range(6)]
+    long_actions = [f"Action detaillee {index}" for index in range(6)]
+    fake_requests = SimpleNamespace(
+        get=lambda *args, **kwargs: FakeResponse(ok=True, payload={"models": [{"name": "demo-model"}]}),
+        post=lambda *args, **kwargs: FakeResponse(
+            ok=True,
+            payload={
+                "response": (
+                    '{"niveau":"CRITICAL","resume":"Analyse detaillee avec plusieurs phrases. Les alertes restent ouvertes. '
+                    'Un support USB suspect doit etre traite par un analyste.","menaces":'
+                    f"{long_threats!r},\"actions\":{long_actions!r}"
+                    "}"
+                ).replace("'", '"')
+            },
+        ),
+        RequestException=FakeRequestException,
+    )
+    monkeypatch.setattr(ollama_module, "requests", fake_requests)
+    service = OllamaService("http://127.0.0.1:11434", "demo-model", 3)
+
+    analysis = service.analyze({"global_score": 90})
+
+    assert analysis.success is True
+    assert analysis.global_level == "CRITICAL"
+    assert len(analysis.threats) == 5
+    assert len(analysis.recommendations) == 5
 
 
 def test_ollama_service_demo_mode_never_calls_network(monkeypatch) -> None:
@@ -168,8 +200,59 @@ def test_ollama_service_timeout_returns_clean_error(monkeypatch) -> None:
 
     analysis = service.analyze({"global_score": 10})
 
-    assert analysis.success is False
-    assert "timeout ollama" in analysis.summary.lower()
+    assert analysis.success is True
+    assert "Analyse locale de secours" in analysis.summary
+    assert any("modele local plus leger" in item for item in analysis.recommendations)
+
+
+def test_ollama_service_prefers_fast_installed_model_for_heavy_config(monkeypatch) -> None:
+    captured: dict[str, object] = {}
+
+    def fake_post(*args, **kwargs):
+        captured["json"] = kwargs.get("json")
+        return FakeResponse(
+            ok=True,
+            payload={
+                "response": '{"niveau":"HIGH","resume":"Analyse rapide.","menaces":["Alerte haute"],"actions":["Verifier incident"]}'
+            },
+        )
+
+    fake_requests = SimpleNamespace(
+        get=lambda *args, **kwargs: FakeResponse(
+            ok=True,
+            payload={"models": [{"name": "qwen2.5:14b"}, {"name": "qwen2.5:3b"}]},
+        ),
+        post=fake_post,
+        RequestException=FakeRequestException,
+    )
+    monkeypatch.setattr(ollama_module, "requests", fake_requests)
+    service = OllamaService("http://127.0.0.1:11434", "qwen2.5:14b", 210)
+
+    analysis = service.analyze({"global_score": 70})
+
+    assert captured["json"]["model"] == "qwen2.5:3b"
+    assert analysis.model == "qwen2.5:3b"
+    assert analysis.success is True
+
+
+def test_ollama_service_does_not_understate_context_level(monkeypatch) -> None:
+    fake_requests = SimpleNamespace(
+        get=lambda *args, **kwargs: FakeResponse(ok=True, payload={"models": [{"name": "demo-model"}]}),
+        post=lambda *args, **kwargs: FakeResponse(
+            ok=True,
+            payload={
+                "response": '{"niveau":"LOW","resume":"Le modele minimise le risque.","menaces":["Alerte critique"],"actions":["Verifier"]}'
+            },
+        ),
+        RequestException=FakeRequestException,
+    )
+    monkeypatch.setattr(ollama_module, "requests", fake_requests)
+    service = OllamaService("http://127.0.0.1:11434", "demo-model", 3)
+
+    analysis = service.analyze({"global_score": 10, "alerts": [{"severity": "CRITICAL", "score": 95}]})
+
+    assert analysis.success is True
+    assert analysis.global_level == "CRITICAL"
 
 
 def test_ollama_service_reports_missing_model_in_health(monkeypatch) -> None:

@@ -18,8 +18,10 @@ except ImportError:  # pragma: no cover - optional during tests
 
 LOGGER = logging.getLogger(__name__)
 ALLOWED_LEVELS = {"LOW", "MEDIUM", "HIGH", "CRITICAL"}
-MAX_SUMMARY_LENGTH = 120
-MAX_LIST_ITEMS = 2
+MAX_SUMMARY_LENGTH = 420
+MAX_LIST_ITEMS = 5
+MAX_RAW_RESPONSE_LENGTH = 8000
+FAST_MODEL_CANDIDATES = ("qwen2.5:3b", "qwen2.5:7b", "mistral:latest")
 
 
 class OllamaService:
@@ -93,24 +95,33 @@ class OllamaService:
                 recommendations=["Installer les dependances runtime avant d'utiliser l'analyse IA."],
             )
 
+        analysis_model = self._select_analysis_model()
         payload = {
-            "model": self.model,
+            "model": analysis_model,
             "prompt": self._build_prompt(context),
             "stream": False,
+            "format": "json",
             "options": {
-                "temperature": 0.2,
-                "num_predict": 180,
+                "temperature": 0.1,
+                "num_predict": 700,
             },
         }
         data = self._call_ollama(payload)
-        raw_response = json.dumps(data, ensure_ascii=False)
+        raw_response = self._safe_raw_response(data)
         error_detail = str(data.get("_wirewall_error_detail", "")).strip()
         if error_detail:
+            if self._can_use_contextual_fallback(error_detail):
+                fallback = self._build_contextual_analysis(context=context, raw_response=raw_response, model=analysis_model)
+                fallback.recommendations = (
+                    fallback.recommendations + self._normalize_items(data.get("_wirewall_error_recommendations"))
+                )[:MAX_LIST_ITEMS]
+                return fallback
             return self._build_error_analysis(
                 context=context,
                 summary=error_detail,
                 recommendations=self._normalize_items(data.get("_wirewall_error_recommendations")),
                 raw_response=raw_response,
+                model=analysis_model,
             )
 
         raw_text = str(data.get("response", "")).strip()
@@ -124,9 +135,12 @@ class OllamaService:
 
         parsed = self._parse_response(raw_text)
         normalized, success = self._normalize_response(parsed)
+        if not success:
+            return self._build_contextual_analysis(context=context, raw_response=raw_response, model=analysis_model)
+        normalized["niveau"] = self._raise_level_from_context(str(normalized["niveau"]), context)
         return AIAnalysis(
             created_at=utc_now(),
-            model=self.model,
+            model=analysis_model,
             global_level=normalized["niveau"],
             summary=normalized["resume"],
             threats=normalized["menaces"],
@@ -137,26 +151,34 @@ class OllamaService:
         )
 
     def _build_prompt(self, context: dict[str, Any]) -> str:
+        context_json = json.dumps(self._prompt_context(context), ensure_ascii=False, separators=(",", ":"))
         return (
             "Tu es un analyste cybersecurite local pour une application Windows de surveillance USB.\n"
-            "Reponds uniquement avec un objet JSON valide.\n"
-            "N'ajoute aucun markdown, aucune phrase d'introduction, aucun commentaire et aucun texte avant ou apres le JSON.\n"
-            "Utilise exactement cette structure:\n"
-            '{"niveau":"LOW | MEDIUM | HIGH | CRITICAL","resume":"Phrase courte decrivant la situation (max 120 chars)","menaces":["menace 1","menace 2"],"actions":["action recommandee 1","action recommandee 2"]}\n'
+            "Ta reponse doit etre directement exploitable par un analyste humain.\n"
+            "Reponds uniquement avec un objet JSON valide, sans markdown et sans texte autour.\n"
+            "Utilise exactement ces cles:\n"
+            '{"niveau":"LOW|MEDIUM|HIGH|CRITICAL","resume":"Analyse en 3 a 5 phrases concretes.","menaces":["anomalie detaillee 1"],"actions":["action analyste 1"]}\n'
             "Contraintes:\n"
-            "- resume en francais, maximum 120 caracteres\n"
-            "- menaces: 2 elements maximum\n"
-            "- actions: 2 elements maximum\n"
+            "- resume en francais, 3 a 5 phrases, cite les chiffres utiles du contexte\n"
+            "- menaces: 3 a 5 elements maximum, precis, relies aux devices/alertes/incidents\n"
+            "- actions: 3 a 5 elements maximum, faisables par un analyste, sans action destructive\n"
             "- niveau doit etre LOW, MEDIUM, HIGH ou CRITICAL\n\n"
-            f"Contexte JSON compact:\n{json.dumps(context, ensure_ascii=False, separators=(',', ':'))}"
+            "Priorites d'analyse:\n"
+            "1. Alertes non acquittees et incidents ouverts.\n"
+            "2. Peripheriques NEW, RARE ou DEVIATION.\n"
+            "3. Scores HIGH/CRITICAL, evenements recents, decisions analyste manquantes.\n"
+            "4. Si un marqueur de simulation USB est present, decris-le comme scenario controle, pas comme infection reelle.\n\n"
+            f"Contexte JSON compact:\n{context_json}"
         )
 
     def _call_ollama(self, payload: dict[str, Any]) -> dict[str, Any]:
+        timeout_seconds = self._request_timeout_for_model(str(payload.get("model") or self.model))
+
         def _request() -> Any:
             response = requests.post(  # type: ignore[union-attr]
                 f"{self.base_url}/api/generate",
                 json=payload,
-                timeout=self.timeout_seconds,
+                timeout=timeout_seconds,
             )
             response.raise_for_status()
             return response.json()
@@ -164,7 +186,7 @@ class OllamaService:
         executor = ThreadPoolExecutor(max_workers=1)
         future = executor.submit(_request)
         try:
-            result = future.result(timeout=self.timeout_seconds)
+            result = future.result(timeout=timeout_seconds)
             if isinstance(result, dict):
                 return result
             LOGGER.warning("Reponse Ollama JSON inattendue: %s", type(result).__name__)
@@ -174,11 +196,11 @@ class OllamaService:
                 "_wirewall_error_recommendations": ["Verifier que le service Ollama local renvoie un JSON valide."],
             }
         except FuturesTimeout:
-            LOGGER.warning("Ollama timeout apres %ss", self.timeout_seconds)
+            LOGGER.warning("Ollama timeout apres %ss", timeout_seconds)
             future.cancel()
             return {
                 "response": "",
-                "_wirewall_error_detail": f"Analyse IA indisponible: timeout Ollama apres {self.timeout_seconds}s.",
+                "_wirewall_error_detail": f"Analyse IA indisponible: timeout Ollama apres {timeout_seconds}s.",
                 "_wirewall_error_recommendations": [
                     "Verifier que le service Ollama local est demarre.",
                     "Augmenter le timeout Ollama ou utiliser un modele local plus leger.",
@@ -211,10 +233,10 @@ class OllamaService:
         if payload == fallback:
             return fallback, False
 
-        level = str(payload.get("niveau", "")).strip().upper()
-        summary = self._truncate_text(str(payload.get("resume", "")).strip())
-        threats = self._normalize_items(payload.get("menaces"))
-        actions = self._normalize_items(payload.get("actions"))
+        level = str(payload.get("niveau") or payload.get("level") or "").strip().upper()
+        summary = self._truncate_text(str(payload.get("resume") or payload.get("summary") or "").strip())
+        threats = self._normalize_items(payload.get("menaces") or payload.get("threats") or payload.get("anomalies"))
+        actions = self._normalize_items(payload.get("actions") or payload.get("recommendations"))
 
         normalized = {
             "niveau": level if level in ALLOWED_LEVELS else "UNKNOWN",
@@ -228,6 +250,55 @@ class OllamaService:
             if not summary:
                 normalized["resume"] = fallback["resume"]
         return normalized, success
+
+    def _build_contextual_analysis(self, *, context: dict[str, Any], raw_response: str = "", model: str | None = None) -> AIAnalysis:
+        summary_data = context.get("summary") if isinstance(context.get("summary"), dict) else {}
+        alerts = [item for item in self._context_list(context.get("alerts")) if isinstance(item, dict)]
+        devices = [item for item in self._context_list(context.get("devices")) if isinstance(item, dict)]
+        incidents = [item for item in self._context_list(context.get("incidents")) if isinstance(item, dict)]
+        suggestions = [item for item in self._context_list(context.get("suggestions")) if isinstance(item, dict)]
+        brain_memory = context.get("brain_memory") if isinstance(context.get("brain_memory"), dict) else {}
+
+        level = self._context_level(context, alerts, devices, brain_memory)
+        alert_total = self._parse_int(summary_data.get("alert_total"), default=len(alerts))
+        incident_total = self._parse_int(summary_data.get("incident_total"), default=len(incidents))
+        device_total = self._parse_int(summary_data.get("device_total"), default=len(devices))
+        connected_total = self._parse_int(summary_data.get("connected_total"), default=0)
+        deviation_total = self._parse_int(summary_data.get("deviation_total"), default=0)
+        new_device_total = self._parse_int(summary_data.get("new_device_total"), default=0)
+
+        top_alert = alerts[0] if alerts else {}
+        top_alert_title = str(top_alert.get("title") or "").strip()
+        top_alert_severity = str(top_alert.get("severity") or "").strip().upper()
+        focus = top_alert_title or self._first_device_name(devices) or "surveillance USB courante"
+        summary = (
+            f"Analyse locale de secours: niveau {level} sur {device_total} peripherique(s), "
+            f"dont {connected_total} connecte(s). {alert_total} alerte(s) et {incident_total} incident(s) sont a suivre. "
+            f"Le point prioritaire est {focus}"
+            f"{f' ({top_alert_severity})' if top_alert_severity else ''}. "
+            f"Le contexte signale {new_device_total} nouveau(x) peripherique(s) et {deviation_total} deviation(s)."
+        )
+
+        threats = self._derive_threats(alerts, devices)
+        actions = self._derive_actions(alerts, devices, incidents, suggestions)
+        payload = {
+            "niveau": level,
+            "resume": self._truncate_text(summary),
+            "menaces": threats,
+            "actions": actions,
+            "source": "local_contextual_fallback",
+        }
+        return AIAnalysis(
+            created_at=utc_now(),
+            model=model or self.model,
+            global_level=payload["niveau"],
+            summary=payload["resume"],
+            threats=payload["menaces"],
+            recommendations=payload["actions"],
+            raw_response=raw_response or json.dumps(payload, ensure_ascii=False),
+            success=True,
+            context=context,
+        )
 
     def _build_demo_analysis(self, context: dict[str, Any]) -> AIAnalysis:
         score = self._parse_int(context.get("global_score"), default=0)
@@ -286,6 +357,94 @@ class OllamaService:
             threats.append(self._truncate_text(f"{prefix}{detail}"))
         return threats[:MAX_LIST_ITEMS]
 
+    def _context_level(
+        self,
+        context: dict[str, Any],
+        alerts: list[dict[str, Any]],
+        devices: list[dict[str, Any]],
+        brain_memory: dict[str, Any],
+    ) -> str:
+        levels = [str(brain_memory.get("global_level") or "").strip().upper()]
+        levels.append(self._level_from_score(self._parse_int(context.get("global_score"), default=0)))
+        for alert in alerts:
+            levels.append(str(alert.get("severity") or "").strip().upper())
+        for device in devices:
+            levels.append(str(device.get("risk_level") or "").strip().upper())
+        return max((level for level in levels if level in ALLOWED_LEVELS), key=self._level_rank, default="LOW")
+
+    def _raise_level_from_context(self, model_level: str, context: dict[str, Any]) -> str:
+        alerts = [item for item in self._context_list(context.get("alerts")) if isinstance(item, dict)]
+        devices = [item for item in self._context_list(context.get("devices")) if isinstance(item, dict)]
+        brain_memory = context.get("brain_memory") if isinstance(context.get("brain_memory"), dict) else {}
+        context_level = self._context_level(context, alerts, devices, brain_memory)
+        if self._level_rank(context_level) > self._level_rank(model_level):
+            return context_level
+        return model_level if model_level in ALLOWED_LEVELS else context_level
+
+    def _derive_threats(self, alerts: list[dict[str, Any]], devices: list[dict[str, Any]]) -> list[str]:
+        threats: list[str] = []
+        for alert in alerts:
+            title = str(alert.get("title") or "").strip()
+            message = str(alert.get("message") or "").strip()
+            severity = str(alert.get("severity") or "").strip().upper()
+            score = self._parse_int(alert.get("score"), default=0)
+            if not title and not message:
+                continue
+            prefix = f"Alerte {severity}" if severity else "Alerte"
+            detail = title or message
+            extra = f" score {score}" if score else ""
+            threats.append(self._truncate_text(f"{prefix}: {detail}.{extra}", 220))
+            if len(threats) >= MAX_LIST_ITEMS:
+                return threats
+        for device in devices:
+            trust_state = str(device.get("trust_state") or "").strip().upper()
+            risk_level = str(device.get("risk_level") or "").strip().upper()
+            risk_score = self._parse_int(device.get("risk_score"), default=0)
+            if trust_state not in {"NEW", "RARE", "DEVIATION"} and risk_level not in {"HIGH", "CRITICAL"}:
+                continue
+            name = str(device.get("name") or device.get("device_key") or "Peripherique USB").strip()
+            threats.append(
+                self._truncate_text(
+                    f"{name}: etat {trust_state or 'inconnu'}, risque {risk_level or 'UNKNOWN'} ({risk_score}).",
+                    220,
+                )
+            )
+            if len(threats) >= MAX_LIST_ITEMS:
+                return threats
+        return threats or ["Aucune anomalie forte isolee; continuer la surveillance et confirmer la baseline."]
+
+    def _derive_actions(
+        self,
+        alerts: list[dict[str, Any]],
+        devices: list[dict[str, Any]],
+        incidents: list[dict[str, Any]],
+        suggestions: list[dict[str, Any]],
+    ) -> list[str]:
+        actions: list[str] = []
+        if alerts:
+            actions.append("Traiter d'abord les alertes non acquittees et documenter la decision analyste dans l'incident.")
+        hot_device = self._first_device_name(devices)
+        if hot_device:
+            actions.append(f"Verifier l'identite et l'usage attendu de {hot_device} avant whitelist ou blacklist.")
+        if incidents:
+            actions.append("Mettre a jour les incidents ouverts avec statut, commentaire, decision et raison de resolution.")
+        if suggestions:
+            actions.append("Valider ou rejeter les suggestions supervisees pour stabiliser la baseline WireWall.")
+        if any("simulation" in str(alert.get("title") or "").lower() for alert in alerts):
+            actions.append("Presenter le support USB comme scenario controle et retirer le disque apres la demonstration.")
+        actions.append("Relancer une analyse apres debranchement/rebranchement ou apres correction des alertes.")
+        return actions[:MAX_LIST_ITEMS]
+
+    def _first_device_name(self, devices: list[dict[str, Any]]) -> str:
+        for device in devices:
+            name = str(device.get("name") or "").strip()
+            if name:
+                return name
+        return ""
+
+    def _level_rank(self, level: str) -> int:
+        return {"LOW": 1, "MEDIUM": 2, "HIGH": 3, "CRITICAL": 4}.get(level.upper(), 0)
+
     def _extract_model_names(self, payload: dict[str, Any]) -> list[str]:
         models = payload.get("models", [])
         names: list[str] = []
@@ -302,10 +461,11 @@ class OllamaService:
         summary: str,
         recommendations: list[str],
         raw_response: str = "",
+        model: str | None = None,
     ) -> AIAnalysis:
         return AIAnalysis(
             created_at=utc_now(),
-            model=self.model,
+            model=model or self.model,
             global_level="UNKNOWN",
             summary=self._truncate_text(summary) or self._fallback_response()["resume"],
             recommendations=recommendations[:MAX_LIST_ITEMS],
@@ -313,6 +473,90 @@ class OllamaService:
             success=False,
             context=context,
         )
+
+    def _select_analysis_model(self) -> str:
+        if not self._is_heavy_model(self.model):
+            return self.model
+        names = self._available_model_names()
+        for candidate in FAST_MODEL_CANDIDATES:
+            if candidate in names:
+                return candidate
+        return self.model
+
+    def _available_model_names(self) -> list[str]:
+        if requests is None or not is_local_http_url(self.base_url):
+            return []
+        try:
+            response = requests.get(f"{self.base_url}/api/tags", timeout=2)
+            response.raise_for_status()
+            payload = response.json()
+            if not isinstance(payload, dict):
+                return []
+            return self._extract_model_names(payload)
+        except self._request_exception_cls():
+            return []
+        except ValueError:
+            return []
+
+    def _is_heavy_model(self, model: str) -> bool:
+        normalized = model.lower()
+        return any(token in normalized for token in (":13b", ":14b", ":30b", ":32b", ":70b"))
+
+    def _request_timeout_for_model(self, model: str) -> int | float:
+        cap = 120 if self._is_heavy_model(model) else 45
+        return min(self.timeout_seconds, cap)
+
+    def _can_use_contextual_fallback(self, detail: str) -> bool:
+        normalized = detail.lower()
+        return "timeout ollama" in normalized or "reponse ollama invalide" in normalized
+
+    def _prompt_context(self, context: dict[str, Any]) -> dict[str, Any]:
+        brain_memory = context.get("brain_memory") if isinstance(context.get("brain_memory"), dict) else None
+        compact_brain = None
+        if brain_memory is not None:
+            compact_brain = {
+                "global_level": brain_memory.get("global_level"),
+                "progress_status": brain_memory.get("progress_status"),
+                "global_score": brain_memory.get("global_score"),
+                "incident_count": brain_memory.get("incident_count"),
+                "open_alert_count": brain_memory.get("open_alert_count"),
+                "summary": brain_memory.get("summary"),
+                "recommendations": self._context_list(brain_memory.get("recommendations"))[:3],
+                "focus_areas": self._context_list(brain_memory.get("focus_areas"))[:3],
+            }
+        return {
+            "generated_at": context.get("generated_at"),
+            "mode": context.get("mode"),
+            "global_score": context.get("global_score"),
+            "summary": context.get("summary"),
+            "devices": self._context_list(context.get("devices"))[:4],
+            "alerts": self._context_list(context.get("alerts"))[:4],
+            "recent_events": self._context_list(context.get("recent_events"))[:6],
+            "incidents": self._context_list(context.get("incidents"))[:3],
+            "suggestions": self._context_list(context.get("suggestions"))[:3],
+            "recent_ai_observations": self._context_list(context.get("recent_ai_observations"))[:1],
+            "brain_memory": compact_brain,
+        }
+
+    def _safe_raw_response(self, data: dict[str, Any]) -> str:
+        keep_keys = (
+            "model",
+            "created_at",
+            "response",
+            "done",
+            "done_reason",
+            "total_duration",
+            "load_duration",
+            "prompt_eval_count",
+            "eval_count",
+            "error",
+            "_wirewall_error_detail",
+            "_wirewall_error_recommendations",
+        )
+        safe: dict[str, Any] = {key: data[key] for key in keep_keys if key in data}
+        if "response" in safe:
+            safe["response"] = self._truncate_text(str(safe["response"]), 5000)
+        return self._truncate_text(json.dumps(safe or data, ensure_ascii=False), MAX_RAW_RESPONSE_LENGTH)
 
     def _build_error_detail(self, exc: Exception) -> str:
         response = getattr(exc, "response", None)
