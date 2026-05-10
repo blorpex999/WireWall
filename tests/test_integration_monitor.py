@@ -33,9 +33,9 @@ class FakeMarkerScanner:
         return self.markers
 
 
-def build_monitor(repositories, snapshots, marker_scanner=None):
+def build_monitor(repositories, snapshots, marker_scanner=None, mode="demo"):
     settings = build_default_settings()
-    settings.mode = "demo"
+    settings.mode = mode
     settings.export_directory = ""
     policy_service = PolicyService(repositories["policy_repo"], repositories["device_repo"])
     incident_service = IncidentService(
@@ -150,8 +150,37 @@ def test_monitor_creates_demo_attack_alert_from_usb_marker(repositories) -> None
     alerts = repositories["alert_repo"].list_all(demo_mode=True)
     drained = bus.drain()
 
-    assert any(event.event_type == "demo_threat_marker_detected" for event in events)
+    assert any(event.event_type == "usb_attack_simulation_marker_detected" for event in events)
     assert any(alert.title == "Simulation d'attaque USB" for alert in alerts)
+    assert any(item["type"] == "alert_created" for item in drained)
+
+
+def test_monitor_creates_real_attack_simulation_alert_from_usb_marker(repositories) -> None:
+    monitor, bus = build_monitor(
+        repositories,
+        [EnumerationResult(True, [], "ok", {})],
+        marker_scanner=FakeMarkerScanner(
+            [
+                DemoThreatMarker(
+                    drive_root="E:\\",
+                    marker_path="E:\\WIREWALL_DEMO_THREAT.txt",
+                    marker_name="WIREWALL_DEMO_THREAT.txt",
+                )
+            ]
+        ),
+        mode="real",
+    )
+
+    assert monitor.scan_once() is True
+
+    demo_events = repositories["event_repo"].list_recent(demo_mode=True)
+    real_events = repositories["event_repo"].list_recent(demo_mode=False)
+    real_alerts = repositories["alert_repo"].list_all(demo_mode=False)
+    drained = bus.drain()
+
+    assert not demo_events
+    assert any(event.event_type == "usb_attack_simulation_marker_detected" for event in real_events)
+    assert any(alert.title == "Simulation d'attaque USB" for alert in real_alerts)
     assert any(item["type"] == "alert_created" for item in drained)
 
 

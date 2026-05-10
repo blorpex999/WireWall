@@ -4,7 +4,7 @@ Objectif: obtenir un effet de demo credible quand un disque USB externe est bran
 
 ## Principe
 
-WireWall peut detecter un marqueur de simulation place a la racine d'un support USB quand l'application est en `Mode demo`.
+WireWall peut detecter un marqueur de simulation place a la racine d'un support USB en `Mode reel` ou en `Mode demo`.
 
 Marqueurs reconnus:
 
@@ -42,7 +42,11 @@ Le script cree:
 7. Montrer l'alerte `Simulation d'attaque USB`.
 8. Ouvrir ou commenter l'incident associe.
 
-Phrase a dire:
+Phrase a dire en mode reel:
+
+> Le disque est vraiment branche au poste. Il ne contient pas de malware reel: il contient un marqueur inoffensif qui simule un support suspect. WireWall detecte ce marqueur et declenche le workflow reel: alerte, incident, recommandation et trace.
+
+Phrase a dire en mode demo:
 
 > Ce disque ne contient pas de malware reel. Il contient un marqueur inoffensif qui simule un support suspect. WireWall le detecte et declenche le meme workflow: alerte, incident, recommandation et trace.
 

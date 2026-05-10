@@ -226,7 +226,7 @@ class UsbMonitorService:
                     )
 
     def _scan_demo_threat_markers(self, now: str) -> None:
-        if not self.demo_mode or self.demo_threat_marker_scanner is None:
+        if self.demo_threat_marker_scanner is None:
             return
         try:
             markers = self.demo_threat_marker_scanner.scan()
@@ -238,7 +238,7 @@ class UsbMonitorService:
 
         marker = markers[0]
         event_id = self._create_system_event(
-            event_type="demo_threat_marker_detected",
+            event_type="usb_attack_simulation_marker_detected",
             summary=f"Marqueur de simulation d'attaque USB detecte sur {marker.drive_root}.",
             severity="HIGH",
             reasons=[
@@ -268,11 +268,11 @@ class UsbMonitorService:
                 "Ouvrir un incident et documenter la decision analyste.",
                 "Retirer le support apres la demonstration.",
             ],
-            demo_mode=True,
+            demo_mode=self.demo_mode,
         )
         alert.id = self.alert_repo.add(alert)
         if alert.id is not None:
-            case = self.incident_service.ensure_for_alert(alert.id, True)
+            case = self.incident_service.ensure_for_alert(alert.id, self.demo_mode)
             self.alert_repo.attach_case(alert.id, case.id or 0)
             self.event_bus.publish(
                 "alert_created",
