@@ -23,7 +23,7 @@
 
 ## Scenario 5 minutes
 
-1. Ouvrir `Dashboard` et montrer le risque global, les KPI, le `Precheck demo` et la sante.
+1. Ouvrir `Dashboard` et montrer le risque global, les KPI, le `Precheck reel` et la sante.
 2. Utiliser `Comprendre` si tu veux cadrer le discours en une phrase claire.
 3. Brancher un peripherique USB et passer sur `Peripheriques`.
 4. Montrer la classification, le score, la baseline (`Nouveau`, `Connu`, `Deviation`) et la difference entre donnees brutes et interpretation.
@@ -42,7 +42,7 @@
 
 ## Points a mettre en avant
 
-- separation claire entre mode reel et mode demo
+- separation claire entre mode reel et mode reel
 - monitoring utilisateur honnete base sur `PyUSB/libusb1`
 - aide integree pour expliquer ce qui est reel, calcule ou optionnel
 - policies persistantes et auditables
@@ -57,7 +57,7 @@
 - "WireWall sert de demonstrateur de controle et de visibilite sur l'exposition USB d'un poste Windows."
 - "Nous separons clairement ce qui est reel, ce qui depend des droits admin et ce qui depend du materiel."
 - "L'application ne promet pas un driver kernel : elle assume un monitoring utilisateur robuste et documente."
-- "Le mode demo est isole pour montrer des cas suspects sans falsifier les donnees reelles."
+- "Le mode reel est isole pour montrer des cas suspects sans falsifier les donnees reelles."
 
 ## Plans B en soutenance
 
@@ -66,7 +66,7 @@
 - montrer l'ecran `Analyse IA`
 - montrer le diagnostic d'indisponibilite
 - expliquer que l'analyse est locale, optionnelle et non simulee
-- utiliser le `Precheck demo` pour justifier le choix de ne pas montrer l'IA
+- utiliser le `Precheck reel` pour justifier le choix de ne pas montrer l'IA
 - montrer au besoin `Assistant IA locale` ou `Diagnostic prerequis`
 
 ### Si les droits admin ne sont pas disponibles
@@ -77,7 +77,7 @@
 
 ### Si aucun vrai peripherique USB n'est branche
 
-- utiliser `scripts\run_demo.bat`
+- utiliser `scripts\run_dev.bat`
 - montrer la banniere demo et expliquer que la base est separee
 - presenter alertes, historique et scoring sans pretendre a une detection materielle live
 

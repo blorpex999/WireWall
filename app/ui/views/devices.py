@@ -71,8 +71,8 @@ class DevicesView(BaseView):
             self,
             "Peripheriques USB",
             "Inventaire actif, contexte de confiance et actions de policy sur les equipements observes.",
-            "MODE DEMO" if self.controller.demo_mode else "MODE REEL",
-            "WARNING" if self.controller.demo_mode else "INFO",
+            "MODE REEL",
+            "INFO",
         )
         layout.addWidget(self.header, 0, 0, 1, 2)
 
@@ -233,6 +233,8 @@ class DevicesView(BaseView):
         self._clear_selection_state()
 
     def refresh_data(self) -> None:
+        demo_mode = self.controller.demo_mode
+        self.header.set_tag("MODE DEMO" if demo_mode else "MODE REEL", "WARNING" if demo_mode else "INFO")
         selected_key = self._get_selected_device_key() or self._selected_device_key
         devices = self.controller.list_devices(
             search=self.search_entry.text().strip(),

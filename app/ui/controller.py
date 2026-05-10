@@ -5,7 +5,9 @@ from statistics import mean
 from typing import Any
 
 from app.config.defaults import PROFILE_PRESETS
-from app.models.entities import AIAnalysis, AppSettings, HealthStatus
+from app.infrastructure.database import DatabaseManager
+from app.infrastructure.repositories import SettingsRepository
+from app.models.entities import AIAnalysis, AppSettings, HealthStatus, OperationResult
 from app.utils.admin import relaunch_as_admin
 from app.utils.datetime import days_ago, hours_ago, parse_timestamp, utc_now
 from app.utils.validation import is_local_http_url
@@ -22,7 +24,7 @@ class AppController:
 
     @property
     def demo_mode(self) -> bool:
-        return self.settings.mode == "demo"
+        return str(self.settings.mode).lower() == "demo"
 
     def start_services(self) -> None:
         if not self.demo_mode:
@@ -212,9 +214,13 @@ class AppController:
         return self.container.usb_control_service.get_status()
 
     def block_usb_storage(self):
+        if self.demo_mode:
+            return OperationResult(False, "demo", "Mode demo actif: aucune modification USBSTOR reelle n'est appliquee.")
         return self.container.usb_control_service.block_storage()
 
     def unblock_usb_storage(self):
+        if self.demo_mode:
+            return OperationResult(False, "demo", "Mode demo actif: aucune modification USBSTOR reelle n'est appliquee.")
         return self.container.usb_control_service.unblock_storage()
 
     def relaunch_admin(self) -> bool:
@@ -263,16 +269,20 @@ class AppController:
             self._build_precheck_row(
                 key="mode",
                 label="Mode courant",
-                raw_status="warning" if self.demo_mode else "ok",
-                detail="Mode demo isole." if self.demo_mode else "Mode reel actif.",
-                action="Dire clairement au jury si la base de demonstration est active.",
+                raw_status="ok",
+                detail="Mode demo actif." if self.demo_mode else "Mode reel actif.",
+                action=(
+                    "Scenario USB simule isole des evenements reels."
+                    if self.demo_mode
+                    else "Surveiller les donnees reelles du poste."
+                ),
             ),
             self._build_health_precheck(
                 key="usb_backend",
                 label="Backend USB",
                 health_status=health_map.get("usb_backend"),
                 blocking_on=("warning", "error"),
-                fallback_action="Verifier libusb1 avant la demonstration.",
+                fallback_action="Verifier libusb1 avant l'utilisation.",
             ),
             self._build_health_precheck(
                 key="database",
@@ -291,7 +301,7 @@ class AppController:
                 key="exports",
                 label="Dossier exports",
                 health_status=health_map.get("exports"),
-                fallback_action="Choisir un dossier d'export accessible avant la demo.",
+                fallback_action="Choisir un dossier d'export accessible.",
             ),
             self._build_health_precheck(
                 key="admin",
@@ -303,7 +313,7 @@ class AppController:
                 key="usbstor",
                 label="Lecture USBSTOR",
                 health_status=health_map.get("usbstor"),
-                fallback_action="Verifier la cle USBSTOR ou basculer la demo sur le monitoring.",
+                fallback_action="Verifier la cle USBSTOR et les droits administrateur.",
             ),
         ]
 
@@ -314,11 +324,9 @@ class AppController:
                 raw_status="ok" if ollama_status.status == "ok" else "warning",
                 detail=ollama_status.details,
                 action=(
-                    "Analyse IA simulee prete pour la demo."
-                    if self.demo_mode
-                    else "Ollama pret pour la demo IA."
+                    "Ollama pret pour l'analyse IA locale."
                     if ollama_status.status == "ok"
-                    else "La demo reste faisable sans IA; eviter cet ecran ou lancer l'assistant IA locale."
+                    else "L'application reste utilisable sans IA; lancer Ollama pour activer l'analyse locale."
                 ),
             )
         )
@@ -328,16 +336,12 @@ class AppController:
                 label="Modele IA attendu",
                 raw_status="ok" if ollama_status.status == "ok" else "warning",
                 detail=(
-                    f"Mode demo: modele configure '{configured_model}' utilise uniquement pour l'analyse simulee."
-                    if self.demo_mode
-                    else f"Modele configure '{configured_model}' present."
+                    f"Modele configure '{configured_model}' present."
                     if ollama_status.status == "ok"
                     else f"Modele attendu '{configured_model}' non confirme."
                 ),
                 action=(
-                    "Aucune action requise: la demo IA reste simulee."
-                    if self.demo_mode
-                    else "Si le modele manque, changer de modele dans Parametres ou ignorer la partie IA."
+                    "Si le modele manque, changer de modele dans Parametres ou ignorer la partie IA."
                 ),
             )
         )
@@ -378,6 +382,13 @@ class AppController:
         self._last_settings_notice = None
         return notice
 
+    def set_demo_mode(self, enabled: bool) -> AppSettings:
+        settings_payload = self.settings.to_dict()
+        settings_payload["mode"] = "demo" if enabled else "real"
+        settings = AppSettings(**settings_payload)
+        self._persist_settings_for_mode(settings)
+        return settings
+
     def save_settings(self, values: dict[str, Any]) -> AppSettings:
         settings_payload = self.settings.to_dict()
         scan_interval = self._parse_positive_int(values["scan_interval_seconds"], "Frequence de scan")
@@ -388,6 +399,7 @@ class AppController:
         autostart_enabled = self._parse_bool(values.get("autostart_enabled", False))
         desktop_notifications_enabled = self._parse_bool(values.get("desktop_notifications_enabled", True))
         recommendation_mode = str(values.get("recommendation_mode", "balanced")).strip().lower() or "balanced"
+        mode = "demo" if self._parse_bool(values.get("demo_mode", self.demo_mode)) else "real"
         if recommendation_mode not in {"conservative", "balanced", "proactive"}:
             raise ValueError("Mode de recommandation invalide.")
         if not is_local_http_url(ollama_base_url):
@@ -406,6 +418,7 @@ class AppController:
                 "autostart_enabled": autostart_enabled,
                 "desktop_notifications_enabled": desktop_notifications_enabled,
                 "recommendation_mode": recommendation_mode,
+                "mode": mode,
             }
         )
         preset = PROFILE_PRESETS.get(settings_payload["security_profile"], {})
@@ -414,34 +427,77 @@ class AppController:
             preset.get("dedup_window_seconds", settings_payload["dedup_window_seconds"])
         )
         settings = AppSettings(**settings_payload)
+        if settings.mode != self.settings.mode:
+            self._persist_settings_for_mode(settings)
+            return settings
+        return self._apply_settings(settings)
 
+    def _apply_settings(self, settings: AppSettings) -> AppSettings:
+        previous_demo_mode = self.demo_mode
+        settings.mode = str(settings.mode or "real").strip().lower()
+        if settings.mode not in {"real", "demo"}:
+            settings.mode = "real"
         self._last_settings_notice = None
-        if settings.mode != "demo":
-            autostart_result = self.container.autostart_service.apply(settings.autostart_enabled)
-            if not autostart_result.success:
-                self._last_settings_notice = (autostart_result.message, "WARNING")
-        else:
-            self._last_settings_notice = ("Le demarrage automatique reste ignore en mode demo.", "INFO")
+        autostart_result = (
+            OperationResult(True, "skipped", "Demarrage automatique ignore en mode demo.")
+            if settings.mode == "demo"
+            else self.container.autostart_service.apply(settings.autostart_enabled)
+        )
+        if not autostart_result.success:
+            self._last_settings_notice = (autostart_result.message, "WARNING")
 
-        self.container.settings = settings
-        self.container.settings_repo.save(settings)
-        self.container.config_loader.save(settings)
-        self.container.report_service.exports_dir = Path(settings.export_directory)
+        for key, value in settings.to_dict().items():
+            setattr(self.container.settings, key, value)
+        active_settings = self.container.settings
+
+        self.container.settings_repo.save(active_settings)
+        self.container.config_loader.save(active_settings)
+        self.container.report_service.exports_dir = Path(active_settings.export_directory)
         self.container.report_service.exports_dir.mkdir(parents=True, exist_ok=True)
         self.container.ollama_service.update(
-            base_url=settings.ollama_base_url,
-            model=settings.ollama_model,
-            timeout_seconds=settings.ollama_timeout_seconds,
+            base_url=active_settings.ollama_base_url,
+            model=active_settings.ollama_model,
+            timeout_seconds=active_settings.ollama_timeout_seconds,
         )
         self.container.ollama_runtime_service.update(
-            base_url=settings.ollama_base_url,
-            model=settings.ollama_model,
+            base_url=active_settings.ollama_base_url,
+            model=active_settings.ollama_model,
         )
-        self.container.usb_monitor.update_settings(settings)
-        self.container.retention_service.apply(settings.history_retention_days)
+        if hasattr(self.container.usb_monitor.enumerator, "update_settings"):
+            self.container.usb_monitor.enumerator.update_settings(active_settings)
+        self.container.usb_monitor.update_settings(active_settings)
+        self.container.retention_service.apply(active_settings.history_retention_days)
+        if self.demo_mode:
+            self.container.ollama_runtime_service.stop()
+            self._seed_demo_data()
+        else:
+            self.container.ollama_runtime_service.ensure_started()
+        if previous_demo_mode != self.demo_mode:
+            self.container.usb_monitor.refresh_now()
         self.request_health_refresh()
         self.request_brain_refresh()
-        return settings
+        return active_settings
+
+    def _persist_settings_for_mode(self, settings: AppSettings) -> None:
+        settings.mode = str(settings.mode or "real").strip().lower()
+        if settings.mode not in {"real", "demo"}:
+            settings.mode = "real"
+        self.container.config_loader.save(settings)
+
+        target_db_path = self.container.paths.demo_db_path if settings.mode == "demo" else self.container.paths.db_path
+        if target_db_path == self.container.db.db_path:
+            self.container.settings_repo.save(settings)
+            return
+
+        target_db = DatabaseManager(target_db_path)
+        target_db.initialize()
+        SettingsRepository(target_db).save(settings)
+
+    def _seed_demo_data(self) -> None:
+        demo_data_service = getattr(self.container, "demo_data_service", None)
+        if demo_data_service is None:
+            return
+        demo_data_service.seed(self.container.policy_service, self.container.alert_repo, self.container.event_repo)
 
     def _run_ai_analysis_sync(self) -> AIAnalysis:
         self.container.brain_service.refresh(self.demo_mode, self.settings.recommendation_mode)
@@ -511,7 +567,7 @@ class AppController:
             status = "OK"
         elif normalized == "error":
             tone = "ERROR"
-            status = "Bloquant demo"
+            status = "Bloquant"
         else:
             tone = "WARNING"
             status = "A surveiller"

@@ -9,6 +9,7 @@ from app.utils.datetime import utc_now
 from app.utils.validation import is_valid_vid_pid, normalize_serial, normalize_vid_pid
 
 MAX_POLICY_IMPORT_BYTES = 1024 * 1024
+DEMO_ONLY_POLICY_MARKER = "[demo_only]"
 
 
 class PolicyService:
@@ -46,7 +47,11 @@ class PolicyService:
         return self.policy_repo.list_all(policy_type=policy_type, query=query)
 
     def evaluate_device(self, device: USBDevice) -> dict[str, object]:
-        matches = self.policy_repo.find_matching(device.vid_pid, device.serial_number)
+        matches = [
+            entry
+            for entry in self.policy_repo.find_matching(device.vid_pid, device.serial_number)
+            if self._policy_applies_to_device(entry, device)
+        ]
         policy_types = {entry.policy_type for entry in matches}
         known_device = self.device_repo.get(device.device_key) is not None
         return {
@@ -66,12 +71,22 @@ class PolicyService:
             )
             return path
         if path.suffix.lower() != ".csv":
-            raise ValueError("Le format d'export policy doit être .json ou .csv.")
+            raise ValueError("Le format d'export policy doit etre .json ou .csv.")
 
         with path.open("w", newline="", encoding="utf-8") as handle:
             writer = csv.DictWriter(
                 handle,
-                fieldnames=["id", "policy_type", "match_type", "value", "label", "notes", "enabled", "created_at", "updated_at"],
+                fieldnames=[
+                    "id",
+                    "policy_type",
+                    "match_type",
+                    "value",
+                    "label",
+                    "notes",
+                    "enabled",
+                    "created_at",
+                    "updated_at",
+                ],
             )
             writer.writeheader()
             for entry in entries:
@@ -99,7 +114,7 @@ class PolicyService:
                 count += 1
             return count
         if path.suffix.lower() != ".csv":
-            raise ValueError("Le format d'import policy doit être .json ou .csv.")
+            raise ValueError("Le format d'import policy doit etre .json ou .csv.")
 
         with path.open("r", newline="", encoding="utf-8") as handle:
             reader = csv.DictReader(handle)
@@ -130,4 +145,10 @@ class PolicyService:
             return normalized
         if match_type == "serial":
             return normalize_serial(value)
-        raise ValueError("Type de correspondance de policy non supporté.")
+        raise ValueError("Type de correspondance de policy non supporte.")
+
+    def _policy_applies_to_device(self, entry: PolicyEntry, device: USBDevice) -> bool:
+        notes = (entry.notes or "").lower()
+        if DEMO_ONLY_POLICY_MARKER in notes and not device.demo_mode:
+            return False
+        return True

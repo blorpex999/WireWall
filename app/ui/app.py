@@ -2,11 +2,15 @@ from __future__ import annotations
 
 import logging
 import platform
+import subprocess
+import sys
+from pathlib import Path
 
 from PyQt6.QtCore import QTimer, Qt
 from PyQt6.QtGui import QCloseEvent, QIcon, QPixmap, QResizeEvent
 from PyQt6.QtWidgets import (
     QApplication,
+    QCheckBox,
     QFrame,
     QHBoxLayout,
     QLabel,
@@ -30,7 +34,7 @@ from app.ui.views.history import HistoryView
 from app.ui.views.policies import PoliciesView
 from app.ui.views.settings import SettingsView
 from app.ui.views.usb_control import USBControlView
-from app.ui.widgets.common import DemoBanner, StatusBar, StatusPill
+from app.ui.widgets.common import StatusBar, StatusPill
 from app.utils.resources import asset_path
 from app.utils.windows import WindowsDeviceNotificationFilter
 from app.version import __version__
@@ -73,24 +77,27 @@ class WireWallMainWindow(QMainWindow):
         self._configure_window_icon()
 
         root = QWidget(self)
+        root.setObjectName("app_root")
+        root.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self.setCentralWidget(root)
         root_layout = QVBoxLayout(root)
-        root_layout.setContentsMargins(14, 14, 14, 14)
-        root_layout.setSpacing(8)
-
-        self.banner = DemoBanner(root, visible=self.controller.demo_mode)
-        root_layout.addWidget(self.banner)
+        root_layout.setContentsMargins(16, 16, 16, 12)
+        root_layout.setSpacing(10)
 
         shell = QWidget(root)
+        shell.setObjectName("app_shell")
+        shell.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         shell_layout = QHBoxLayout(shell)
         shell_layout.setContentsMargins(0, 0, 0, 0)
-        shell_layout.setSpacing(8)
+        shell_layout.setSpacing(10)
         root_layout.addWidget(shell, 1)
 
         self.sidebar = self._build_sidebar(shell)
         shell_layout.addWidget(self.sidebar)
 
         self.stack = QStackedWidget(shell)
+        self.stack.setObjectName("content_stack")
+        self.stack.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         shell_layout.addWidget(self.stack, 1)
 
         for key, _label, view_class in self.view_specs:
@@ -129,7 +136,8 @@ class WireWallMainWindow(QMainWindow):
     def _build_sidebar(self, parent: QWidget) -> QFrame:
         sidebar = QFrame(parent)
         sidebar.setObjectName("sidebar")
-        sidebar.setFixedWidth(220)
+        sidebar.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        sidebar.setFixedWidth(256)
 
         layout = QVBoxLayout(sidebar)
         layout.setContentsMargins(16, 16, 16, 16)
@@ -137,12 +145,13 @@ class WireWallMainWindow(QMainWindow):
 
         header = QWidget(sidebar)
         header_layout = QHBoxLayout(header)
-        header_layout.setContentsMargins(4, 2, 4, 16)
-        header_layout.setSpacing(10)
+        header_layout.setContentsMargins(2, 2, 2, 18)
+        header_layout.setSpacing(12)
         layout.addWidget(header)
 
         logo_label = QLabel(header)
         logo_label.setAlignment(Qt.AlignmentFlag.AlignTop)
+        logo_label.setFixedSize(52, 52)
         logo_pixmap = self._load_logo_pixmap()
         if logo_pixmap is not None:
             logo_label.setPixmap(logo_pixmap)
@@ -151,11 +160,12 @@ class WireWallMainWindow(QMainWindow):
         title_box = QWidget(header)
         title_layout = QVBoxLayout(title_box)
         title_layout.setContentsMargins(0, 0, 0, 0)
-        title_layout.setSpacing(4)
+        title_layout.setSpacing(5)
         header_layout.addWidget(title_box, 1)
 
         title = QLabel("WireWall", title_box)
-        title.setStyleSheet("font-size: 22pt; font-weight: 600;")
+        title.setStyleSheet("font-size: 20pt; font-weight: 650;")
+        title.setMinimumWidth(118)
         title_layout.addWidget(title)
 
         subtitle = QLabel("Surveillance USB Windows", title_box)
@@ -163,8 +173,14 @@ class WireWallMainWindow(QMainWindow):
         subtitle.setWordWrap(True)
         title_layout.addWidget(subtitle)
 
-        self.sidebar_mode = StatusPill(header, "", "INFO")
-        header_layout.addWidget(self.sidebar_mode, 0, Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignRight)
+        self.sidebar_mode = StatusPill(title_box, "", "INFO")
+        title_layout.addWidget(self.sidebar_mode, 0, Qt.AlignmentFlag.AlignLeft)
+
+        self.demo_toggle = QCheckBox("Mode demo", sidebar)
+        self.demo_toggle.setToolTip("Basculer entre les vrais peripheriques USB et un scenario USB simule.")
+        self.demo_toggle.setChecked(self.controller.demo_mode)
+        self.demo_toggle.toggled.connect(self._toggle_demo_mode)
+        layout.addWidget(self.demo_toggle)
 
         for key, label, _view_class in self.view_specs:
             button = QPushButton(label, sidebar)
@@ -272,6 +288,59 @@ class WireWallMainWindow(QMainWindow):
     def set_status(self, message: str, level: str = "INFO") -> None:
         self.status_bar_widget.set_status(message, level)
 
+    def refresh_mode_state(self, refresh_views: bool = False) -> None:
+        self._refresh_mode_badges()
+        if not refresh_views:
+            return
+        self._refresh_view("dashboard")
+        if self.current_view_key is not None and self.current_view_key != "dashboard":
+            self._refresh_view(self.current_view_key)
+        self.request_repaint()
+
+    def _toggle_demo_mode(self, checked: bool) -> None:
+        self.demo_toggle.setEnabled(False)
+        restart_requested = False
+        try:
+            target_settings = self.controller.set_demo_mode(checked)
+            self.set_status(
+                "Mode demo enregistre. Redemarrage de WireWall pour ouvrir la base demo."
+                if target_settings.mode == "demo"
+                else "Mode reel enregistre. Redemarrage de WireWall pour ouvrir la base reelle.",
+                "WARNING" if target_settings.mode == "demo" else "OK",
+            )
+            restart_requested = True
+            QTimer.singleShot(500, self._restart_application)
+        except Exception:
+            LOGGER.exception("Impossible de basculer le mode WireWall.")
+            self.demo_toggle.blockSignals(True)
+            self.demo_toggle.setChecked(self.controller.demo_mode)
+            self.demo_toggle.blockSignals(False)
+            self.set_status("Impossible de changer de mode.", "ERROR")
+        finally:
+            if not restart_requested:
+                self.demo_toggle.setEnabled(True)
+
+    def restart_for_mode_switch(self, target_mode: str) -> None:
+        self.set_status(
+            "Mode demo enregistre. Redemarrage de WireWall pour ouvrir la base demo."
+            if target_mode == "demo"
+            else "Mode reel enregistre. Redemarrage de WireWall pour ouvrir la base reelle.",
+            "WARNING" if target_mode == "demo" else "OK",
+        )
+        QTimer.singleShot(500, self._restart_application)
+
+    def _restart_application(self) -> None:
+        launch_args = list(sys.argv[1:] if getattr(sys, "frozen", False) else sys.argv)
+        if "--replace-existing" not in launch_args:
+            launch_args.append("--replace-existing")
+        try:
+            subprocess.Popen([sys.executable, *launch_args], cwd=str(Path.cwd()))
+        except Exception:
+            LOGGER.exception("Impossible de relancer WireWall apres changement de mode.")
+            self.set_status("Mode enregistre, mais relance automatique impossible. Relance WireWall manuellement.", "ERROR")
+            return
+        QApplication.quit()
+
     def _poll_backend_events(self) -> None:
         refresh_views: set[str] = set()
         for event in self.container.event_bus.drain():
@@ -349,7 +418,7 @@ class WireWallMainWindow(QMainWindow):
         if self._repaint_scheduled or self._force_repaint_running:
             return
         self._repaint_scheduled = True
-        QTimer.singleShot(0, self._force_repaint)
+        QTimer.singleShot(16, self._force_repaint)
 
     def _force_repaint(self) -> None:
         if self._force_repaint_running:
@@ -392,10 +461,13 @@ class WireWallMainWindow(QMainWindow):
             button.update()
 
     def _refresh_mode_badges(self) -> None:
-        if self.controller.demo_mode:
-            self.sidebar_mode.set("DEMO", "WARNING")
-        else:
-            self.sidebar_mode.set("REEL", "INFO")
+        demo_mode = self.controller.demo_mode
+        self.sidebar_mode.set("DEMO" if demo_mode else "REEL", "WARNING" if demo_mode else "INFO")
+        self.status_bar_widget.set_mode(demo_mode)
+        if hasattr(self, "demo_toggle"):
+            self.demo_toggle.blockSignals(True)
+            self.demo_toggle.setChecked(demo_mode)
+            self.demo_toggle.blockSignals(False)
 
     def _view_label(self, key: str) -> str:
         for view_key, label, _view_class in self.view_specs:

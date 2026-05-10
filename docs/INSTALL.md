@@ -3,7 +3,7 @@
 ## Modes d'installation supportes
 
 - installateur Windows `Inno Setup`
-- installateur Windows `full demo` avec installeur Ollama embarque
+- installateur Windows `full` avec installeur Ollama embarque
 - package portable `zip`
 - execution developpeur depuis les sources
 
@@ -48,7 +48,7 @@ Il n'embarque pas :
 - Ollama
 - le modele local
 
-## Option 1 bis - Installateur full demo
+## Option 1 bis - Installateur full
 
 Lancer :
 

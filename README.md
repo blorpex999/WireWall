@@ -8,13 +8,13 @@ WireWall est une application desktop Windows de supervision USB orientee cyberse
 - bundle `PyInstaller` one-folder
 - package portable `zip`
 - installateur Windows standard `Inno Setup`
-- installateur Windows `full demo` avec installeur Ollama embarque
+- installateur Windows `full` avec installeur Ollama embarque
 
 ## Verites importantes
 
 - WireWall fonctionne sans Ollama. L'analyse IA est optionnelle et strictement locale.
 - Ollama et le modele recommande `qwen2.5:14b` ne sont pas embarques dans l'executable.
-- La distribution `full demo` peut embarquer l'installeur officiel Ollama, mais pas le modele lui-meme.
+- La distribution `full` peut embarquer l'installeur officiel Ollama, mais pas le modele lui-meme.
 - Le modele reste telecharge en seconde phase par l'assistant IA local.
 - Les dossiers runtime `%LOCALAPPDATA%\WireWall` sont crees par l'application au premier lancement.
 - Une seule instance WireWall peut tourner a la fois sur un poste ; un second lancement tente de reactiver la fenetre existante.
@@ -41,7 +41,7 @@ WireWall est une application desktop Windows de supervision USB orientee cyberse
 ## Ce que 1.3.1 ajoute
 
 - aide integree `Comprendre` sur les ecrans cles pour expliquer ce qui est reel, deduit et demonstrable
-- bloc `Precheck demo` dans le tableau de bord pour verifier rapidement si la soutenance peut partir en mode reel, demo, avec ou sans IA
+- bloc `Precheck reel` dans le tableau de bord pour verifier rapidement si le poste est pret avec ou sans IA
 - ecran `A propos` enrichi avec flux produit, limites honnetes et lexique USB de base
 - documentation pedagogique supplementaire pour expliquer `PyUSB/libusb`, `USBSTOR`, la baseline et l'IA locale
 
@@ -107,7 +107,7 @@ scripts\package_portable.bat
 scripts\build_installer.bat
 ```
 
-### Installateur Windows full demo
+### Installateur Windows full
 
 ```bat
 scripts\build_full_installer.bat
@@ -121,7 +121,7 @@ Ce mode telecharge l'installeur officiel Ollama et l'embarque dans l'installateu
 scripts\release.bat
 ```
 
-### Release complete full demo
+### Release complete full
 
 ```bat
 scripts\release_full.bat
@@ -149,18 +149,17 @@ Mode recommande pour un autre poste :
    - sinon installer Ollama via `winget` si possible
    - telecharger `qwen2.5:14b`
 
-Si `winget` est indisponible ou si le poste est offline, l'assistant bascule en mode guide. Avec la distribution `full demo`, l'installeur officiel Ollama est deja inclus, mais le modele reste a telecharger separement.
+Si `winget` est indisponible ou si le poste est offline, l'assistant bascule en mode guide. Avec la distribution `full`, l'installeur officiel Ollama est deja inclus, mais le modele reste a telecharger separement.
 
 ## Aides de soutenance integrees
 
 - `Comprendre` : bouton discret sur `Dashboard`, `Peripheriques`, `Alertes`, `Controle USB`, `Analyse IA` et `A propos`
-- `Precheck demo` : bloc lecture seule dans le tableau de bord pour verifier backend USB, DB, logs, exports, admin, USBSTOR, Ollama et modele attendu
+- `Precheck reel` : bloc lecture seule dans le tableau de bord pour verifier backend USB, DB, logs, exports, admin, USBSTOR, Ollama et modele attendu
 - `A propos` : flux du produit, lexique USB et limites honnetes pour preparer ton discours
 
 ## Scripts principaux
 
 - `scripts\run_dev.bat` : lancement source en mode reel
-- `scripts\run_demo.bat` : lancement source en mode demo
 - `scripts\run_admin.bat` : lancement source eleve pour les tests `USBSTOR`
 - en 1.3.2, `scripts\run_dev.bat` et l'executable packagé demandent eux aussi l'elevation par defaut
 - `scripts\test.bat` : suite `pytest`
@@ -170,7 +169,7 @@ Si `winget` est indisponible ou si le poste est offline, l'assistant bascule en 
 - `scripts\build_full_installer.bat` : compilation Inno Setup avec installeur Ollama embarque
 - `scripts\release_check.bat` : validation tests + coherence release + build bundle
 - `scripts\release.bat` : pipeline de release standard
-- `scripts\release_full.bat` : pipeline de release demo avec installeur Ollama embarque
+- `scripts\release_full.bat` : pipeline de release full avec installeur Ollama embarque
 - `scripts\release_from_dist.bat` : regenere portable et installateurs a partir d'un `dist\WireWall\` deja construit
 - `scripts\validate_artifacts.bat` : verification des artefacts de release
 - `scripts\check_release_consistency.py` : verification docs/package/version/scripts

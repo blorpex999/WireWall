@@ -281,32 +281,8 @@ class StatusBar(QStatusBar):
         self.indicator.setStyleSheet(f"background-color:{color}; border-radius:6px;")
         self.level_pill.set(level.upper(), level)
 
-    def set_mode(self, demo_mode: bool) -> None:
-        if demo_mode:
-            self.mode_pill.set("MODE DEMO", "WARNING")
-        else:
-            self.mode_pill.set("MODE REEL", "INFO")
-
-
-class DemoBanner(QFrame):
-    def __init__(self, parent: QWidget | None = None, visible: bool = True) -> None:
-        super().__init__(parent)
-        self.setObjectName("demo_banner")
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(14, 10, 14, 10)
-        layout.setSpacing(4)
-
-        title = QLabel("DEMO MODE", self)
-        title.setStyleSheet(f"color:{COLORS['warning']}; font-size:11pt; font-weight:600;")
-        layout.addWidget(title)
-
-        body = QLabel(
-            "Donnees simulees isolees. Les actions reelles de controle USB sont volontairement distinguees.",
-            self,
-        )
-        body.setWordWrap(True)
-        layout.addWidget(body)
-        self.setVisible(visible)
+    def set_mode(self, demo_mode: bool = False) -> None:
+        self.mode_pill.set("MODE DEMO" if demo_mode else "MODE REEL", "WARNING" if demo_mode else "INFO")
 
 
 class DetailText(QPlainTextEdit):
@@ -538,6 +514,7 @@ class _TreeAdapter:
     def clear(self) -> None:
         self._updates_suspended = True
         self._table.setUpdatesEnabled(False)
+        self._table.blockSignals(True)
         self._table.clearSelection()
         self._table.setRowCount(0)
         self._row_index_by_id.clear()
@@ -546,8 +523,12 @@ class _TreeAdapter:
 
     def finish_update(self) -> None:
         self._updates_suspended = False
+        self._table.blockSignals(False)
         self._table.setUpdatesEnabled(True)
-        self.schedule_width_sync()
+        if self._width_sync_scheduled:
+            self._width_sync_timer.start(0)
+        else:
+            self.schedule_width_sync()
         self._table.viewport().update()
 
     def _emit_select(self) -> None:
@@ -576,10 +557,15 @@ class _TreeAdapter:
         if self._width_sync_scheduled:
             return
         self._width_sync_scheduled = True
+        if self._updates_suspended:
+            return
         self._width_sync_timer.start(0)
 
     def _apply_column_widths(self) -> None:
         self._width_sync_scheduled = False
+        if self._updates_suspended:
+            self._width_sync_scheduled = True
+            return
         if not self._columns:
             return
 

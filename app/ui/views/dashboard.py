@@ -46,8 +46,8 @@ class DashboardView(BaseView):
             self.content,
             "Tableau de bord",
             "Vue de synthese de l'activite USB, des incidents, des suggestions et de l'etat de la plateforme.",
-            "MODE DEMO" if self.controller.demo_mode else "MODE REEL",
-            "WARNING" if self.controller.demo_mode else "INFO",
+            "MODE REEL",
+            "INFO",
         )
         self.content_layout.addWidget(self.header, 0, 0)
 
@@ -116,7 +116,7 @@ class DashboardView(BaseView):
         health_frame, health_body = self._build_section("Etat des composants")
         brain_frame, brain_body = self._build_section("Moteur d'analyse continu")
         suggestions_frame, suggestions_body = self._build_section("Suggestions supervisees")
-        precheck_frame, precheck_body = self._build_section("Precheck demo")
+        precheck_frame, precheck_body = self._build_section("Precheck reel")
 
         self._section_frames = {
             "events": events_frame,
@@ -235,7 +235,7 @@ class DashboardView(BaseView):
         precheck_layout = QVBoxLayout(precheck_body)
         precheck_layout.setContentsMargins(0, 0, 0, 0)
         self.precheck_intro = QLabel(
-            "Lecture seule. Aucun effet de bord. Utilise les checks existants pour preparer la demo.",
+            "Lecture seule. Aucun effet de bord. Utilise les checks existants pour verifier le poste reel.",
             precheck_body,
         )
         self.precheck_intro.setObjectName("muted")
@@ -259,6 +259,13 @@ class DashboardView(BaseView):
 
     def refresh_data(self) -> None:
         data = self.controller.get_dashboard_data()
+        demo_mode = self.controller.demo_mode
+        self.header.set_tag("MODE DEMO" if demo_mode else "MODE REEL", "WARNING" if demo_mode else "INFO")
+        self.precheck_intro.setText(
+            "Mode demo actif. Les peripheriques affiches viennent du scenario simule et les donnees restent isolees."
+            if demo_mode
+            else "Lecture seule. Aucun effet de bord. Utilise les checks existants pour verifier le poste reel."
+        )
         risk_level = risk_level_from_score(data["global_score"])
         health_map = {status.component: status for status in data["health"]}
         admin_status = health_map.get("admin")

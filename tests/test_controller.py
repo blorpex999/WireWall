@@ -48,7 +48,7 @@ def test_controller_save_settings_rejects_non_local_ollama_url() -> None:
         )
 
 
-def test_controller_demo_precheck_maps_blocking_and_warning_states() -> None:
+def test_controller_real_precheck_maps_blocking_and_warning_states() -> None:
     settings = build_default_settings()
     controller = AppController(SimpleNamespace(settings=settings))
     controller.get_health_statuses = lambda: [
@@ -63,16 +63,16 @@ def test_controller_demo_precheck_maps_blocking_and_warning_states() -> None:
 
     rows = {row["key"]: row for row in controller.get_demo_precheck()}
 
-    assert rows["database"]["status"] == "Bloquant demo"
+    assert rows["database"]["status"] == "Bloquant"
     assert rows["exports"]["status"] == "A surveiller"
     assert rows["ollama"]["status"] == "A surveiller"
     assert rows["model"]["status"] == "A surveiller"
     assert rows["usb_backend"]["status"] == "OK"
 
 
-def test_controller_demo_precheck_marks_demo_mode_and_model_ready() -> None:
+def test_controller_real_precheck_marks_real_mode_and_model_ready() -> None:
     settings = build_default_settings()
-    settings.mode = "demo"
+    settings.mode = "real"
     settings.ollama_model = "qwen2.5:14b"
     controller = AppController(SimpleNamespace(settings=settings))
     controller.get_health_statuses = lambda: [
@@ -86,22 +86,22 @@ def test_controller_demo_precheck_marks_demo_mode_and_model_ready() -> None:
     controller.get_ollama_health_status = lambda: HealthStatus(
         "ollama",
         "ok",
-        "Mode demo: Ollama non interroge, analyse simulee.",
+        "Ollama repond localement.",
         utc_now(),
     )
 
     rows = {row["key"]: row for row in controller.get_demo_precheck()}
 
-    assert rows["mode"]["status"] == "A surveiller"
+    assert rows["mode"]["status"] == "OK"
     assert rows["model"]["status"] == "OK"
     assert rows["ollama"]["status"] == "OK"
-    assert "analyse simulee" in rows["ollama"]["detail"].lower()
-    assert "simulee" in rows["model"]["action"].lower()
+    assert "localement" in rows["ollama"]["detail"].lower()
+    assert "modele" in rows["model"]["action"].lower()
 
 
-def test_controller_start_services_skips_ollama_runtime_in_demo() -> None:
+def test_controller_start_services_starts_real_services() -> None:
     settings = build_default_settings()
-    settings.mode = "demo"
+    settings.mode = "real"
     calls: list[str] = []
     controller = AppController(
         SimpleNamespace(
@@ -113,12 +113,12 @@ def test_controller_start_services_skips_ollama_runtime_in_demo() -> None:
 
     controller.start_services()
 
-    assert calls == ["monitor"]
+    assert calls == ["ollama", "monitor"]
 
 
-def test_controller_request_health_refresh_passes_demo_mode() -> None:
+def test_controller_request_health_refresh_passes_real_mode() -> None:
     settings = build_default_settings()
-    settings.mode = "demo"
+    settings.mode = "real"
     calls: list[bool] = []
 
     class FakeBackgroundTasks:
@@ -138,12 +138,35 @@ def test_controller_request_health_refresh_passes_demo_mode() -> None:
     )
 
     assert controller.request_health_refresh() is True
+    assert calls == [False]
+
+
+def test_controller_request_health_refresh_passes_demo_mode() -> None:
+    settings = build_default_settings()
+    settings.mode = "demo"
+    calls: list[bool] = []
+
+    class FakeBackgroundTasks:
+        def submit_unique(self, name, func, success_event, error_event):
+            func()
+            return True
+
+    controller = AppController(
+        SimpleNamespace(
+            settings=settings,
+            background_tasks=FakeBackgroundTasks(),
+            health_service=SimpleNamespace(run_all=lambda demo_mode=False: calls.append(demo_mode)),
+        )
+    )
+
+    assert controller.demo_mode is True
+    assert controller.request_health_refresh() is True
     assert calls == [True]
 
 
-def test_controller_run_ai_analysis_sync_passes_demo_mode() -> None:
+def test_controller_run_ai_analysis_sync_passes_real_mode() -> None:
     settings = build_default_settings()
-    settings.mode = "demo"
+    settings.mode = "real"
     captured: dict[str, object] = {}
     analysis = SimpleNamespace(success=True)
 
@@ -151,7 +174,7 @@ def test_controller_run_ai_analysis_sync_passes_demo_mode() -> None:
         SimpleNamespace(
             settings=settings,
             brain_service=SimpleNamespace(refresh=lambda demo_mode, recommendation_mode: captured.update({"brain": demo_mode})),
-            report_service=SimpleNamespace(build_ai_context=lambda demo_mode: {"mode": "demo", "demo": demo_mode}),
+            report_service=SimpleNamespace(build_ai_context=lambda demo_mode: {"mode": "real", "demo": demo_mode}),
             ollama_service=SimpleNamespace(
                 analyze=lambda context, demo_mode=False: captured.update({"context": context, "demo": demo_mode}) or analysis
             ),
@@ -162,7 +185,7 @@ def test_controller_run_ai_analysis_sync_passes_demo_mode() -> None:
     result = controller._run_ai_analysis_sync()
 
     assert result is analysis
-    assert captured["brain"] is True
-    assert captured["demo"] is True
-    assert captured["context"] == {"mode": "demo", "demo": True}
+    assert captured["brain"] is False
+    assert captured["demo"] is False
+    assert captured["context"] == {"mode": "real", "demo": False}
     assert captured["saved"] is analysis

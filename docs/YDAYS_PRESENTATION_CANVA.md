@@ -320,7 +320,7 @@ Texte a afficher:
 
 - `Sans Ollama: l'IA est optionnelle, le logiciel reste exploitable`
 - `Sans admin: le monitoring reste visible, seul USBSTOR est limite`
-- `Sans USB reel: le mode demo reste separe du mode reel`
+- `Sans USB reel: le mode reel reste separe du mode reel`
 
 Visuel recommande:
 
@@ -332,7 +332,7 @@ Usage:
 
 ## Captures d'ecran a preparer
 
-- dashboard avec `Precheck demo` visible
+- dashboard avec `Precheck reel` visible
 - vue `Peripheriques`
 - vue `Alertes`
 - vue `Controle USB`

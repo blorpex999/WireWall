@@ -186,4 +186,4 @@ def shorten_text(value: str, limit: int = 88) -> str:
     text = (value or "").strip()
     if len(text) <= limit:
         return text
-    return text[: max(0, limit - 1)].rstrip() + "…"
+    return text[: max(0, limit - 3)].rstrip() + "..."

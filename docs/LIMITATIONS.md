@@ -28,7 +28,7 @@
 - Meme avec l'installateur `full`, seul l'installeur officiel Ollama peut etre embarque proprement, pas le modele lui-meme.
 - L'analyse IA ne fonctionne que si le service local repond sur `localhost`.
 - En cas d'indisponibilite, WireWall retourne un diagnostic et ne fabrique pas de resultat.
-- Le `Precheck demo` peut signaler un probleme Ollama ou modele attendu, mais ne telecharge rien automatiquement.
+- Le `Precheck reel` peut signaler un probleme Ollama ou modele attendu, mais ne telecharge rien automatiquement.
 
 ## Cerveau local, baseline et suggestions
 

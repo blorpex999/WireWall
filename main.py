@@ -17,11 +17,6 @@ LOGGER = logging.getLogger(__name__)
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=f"WireWall {__version__} - Surveillance USB Windows")
     parser.add_argument(
-        "--demo",
-        action="store_true",
-        help="Demarre l'application en mode demonstration isole.",
-    )
-    parser.add_argument(
         "--config",
         type=str,
         default=None,
@@ -55,9 +50,12 @@ def validate_qt_runtime() -> tuple[bool, str]:
 
 
 def create_qapplication(argv: list[str]):
-    from PyQt6.QtWidgets import QApplication
+    from PyQt6.QtWidgets import QApplication, QStyleFactory
 
-    return QApplication(argv)
+    app = QApplication(argv)
+    if "Fusion" in QStyleFactory.keys():
+        app.setStyle("Fusion")
+    return app
 
 
 def notify_user_message(message: str, title: str = "WireWall", flags: int = 0x10) -> None:
@@ -172,7 +170,7 @@ def main() -> int:
             qt_app = create_qapplication(sys.argv)
             qt_app.setApplicationName("WireWall")
             qt_app.setApplicationVersion(__version__)
-            container = build_container(config_path=args.config, force_demo=args.demo)
+            container = build_container(config_path=args.config)
             window = WireWallMainWindow(container)
             window.show()
             return qt_app.exec()

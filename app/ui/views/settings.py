@@ -35,6 +35,7 @@ class SettingsView(BaseView):
 
         self.fields: dict[str, QLineEdit | QComboBox] = {}
         self.checks = {
+            "demo_mode": QCheckBox("Activer le mode demo USB simule", self.content),
             "autostart_enabled": QCheckBox("Activer le demarrage avec Windows", self.content),
             "desktop_notifications_enabled": QCheckBox(
                 "Notifications locales des alertes HIGH / CRITICAL",
@@ -47,7 +48,8 @@ class SettingsView(BaseView):
         monitoring_layout.setColumnStretch(1, 1)
         self._add_entry_field(monitoring_layout, 0, "Frequence de scan (s)", "scan_interval_seconds")
         self._add_combo_field(monitoring_layout, 1, "Profil de securite", "security_profile", ["Normal", "Strict", "Presentation"])
-        monitoring_layout.addWidget(self.checks["autostart_enabled"], 2, 0, 1, 2)
+        monitoring_layout.addWidget(self.checks["demo_mode"], 2, 0, 1, 2)
+        monitoring_layout.addWidget(self.checks["autostart_enabled"], 3, 0, 1, 2)
         self.content_layout.addWidget(monitoring, 1, 0)
 
         audit = QGroupBox("Audit, alertes et suggestions", self.content)
@@ -110,7 +112,10 @@ class SettingsView(BaseView):
             else:
                 widget.setText(value)
         for field_name, widget in self.checks.items():
-            widget.setChecked(bool(getattr(settings, field_name)))
+            if field_name == "demo_mode":
+                widget.setChecked(self.controller.demo_mode)
+            else:
+                widget.setChecked(bool(getattr(settings, field_name)))
         self.db_path_label.setText(str(self.controller.get_database_path()))
         self.page.force_layout()
 
@@ -123,11 +128,16 @@ class SettingsView(BaseView):
                 values[key] = widget.text()
         for key, widget in self.checks.items():
             values[key] = widget.isChecked()
-        self.run_action(
+        result = self.run_action(
             lambda: self.controller.save_settings(values),
             success_message=self._success_message,
             refresh=True,
         )
+        if result is not None:
+            if result.mode != self.controller.settings.mode:
+                self.app.restart_for_mode_switch(result.mode)
+            else:
+                self.app.refresh_mode_state(refresh_views=True)
 
     def _success_message(self, settings) -> str:
         notice = self.controller.consume_settings_notice()

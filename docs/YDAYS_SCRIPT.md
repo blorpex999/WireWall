@@ -8,7 +8,7 @@ Dire:
 
 "WireWall surveille l'exposition USB d'un poste Windows. Ici on voit l'etat global, les incidents ouverts, les suggestions et le precheck de demo."
 
-### 2. Montrer le precheck demo
+### 2. Montrer le Precheck reel
 
 Dire:
 
@@ -92,4 +92,4 @@ Dire:
 
 Dire:
 
-"Je passe en mode demo pour montrer les flux sans melanger les donnees reelles du poste."
+"Je reste en mode reel pour montrer les flux avec les donnees reelles du poste."

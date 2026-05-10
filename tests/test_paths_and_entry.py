@@ -121,7 +121,7 @@ def test_main_replaces_existing_instance_when_requested(monkeypatch) -> None:
     monkeypatch.setattr(main_module, "create_qapplication", lambda argv: FakeQtApp())
 
     container = SimpleNamespace(shutdown=lambda: events.append("shutdown"))
-    monkeypatch.setattr(bootstrap_module, "build_container", lambda config_path=None, force_demo=False: container)
+    monkeypatch.setattr(bootstrap_module, "build_container", lambda config_path=None: container)
     monkeypatch.setattr(ui_app_module, "WireWallMainWindow", FakeWindow)
 
     exit_code = main_module.main()
@@ -163,14 +163,14 @@ def test_main_notifies_when_admin_relaunch_is_refused(monkeypatch) -> None:
     assert "administrateur" in notifications[0]
 
 
-def test_force_demo_does_not_persist_demo_mode_in_config(monkeypatch, workspace_tmp_dir) -> None:
+def test_build_container_honors_demo_mode_from_config(monkeypatch, workspace_tmp_dir) -> None:
     config_dir = workspace_tmp_dir / "WireWall" / "config"
     config_dir.mkdir(parents=True, exist_ok=True)
     config_path = config_dir / "config.json"
     config_path.write_text(
         """
         {
-          "mode": "real",
+          "mode": "demo",
           "export_directory": ""
         }
         """,
@@ -181,10 +181,16 @@ def test_force_demo_does_not_persist_demo_mode_in_config(monkeypatch, workspace_
 
     monkeypatch.setattr(bootstrap_module, "build_app_paths", lambda app_name: paths)
 
-    container = bootstrap_module.build_container(force_demo=True)
+    container = bootstrap_module.build_container()
     try:
         persisted = config_path.read_text(encoding="utf-8")
-        assert '"mode": "real"' in persisted
+        assert '"mode": "demo"' in persisted
         assert container.settings.mode == "demo"
+        assert container.db.db_path == paths.demo_db_path
+        assert container.usb_monitor.scan_once() is True
+        assert container.usb_monitor.scan_once() is True
+        demo_devices = container.device_repo.list_all(demo_mode=True)
+        assert any(device.serial_number == "DEMO-ST-999" for device in demo_devices)
+        assert container.alert_repo.list_all(demo_mode=True)
     finally:
         container.shutdown()

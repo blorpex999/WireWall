@@ -32,7 +32,7 @@ from app.services.autostart_service import AutostartService
 from app.services.background_tasks import BackgroundTaskService
 from app.services.baseline_service import BaselineService
 from app.services.brain_service import BrainService
-from app.services.demo_service import DemoDataService, DemoUsbEnumerator
+from app.services.demo_service import DemoDataService, DemoUsbEnumerator, ModeSwitchingUsbEnumerator
 from app.services.event_bus import EventBus
 from app.services.health_service import HealthCheckService
 from app.services.incident_service import IncidentService
@@ -47,6 +47,12 @@ from app.services.usb_control_service import UsbControlService
 from app.services.usb_enumerator import UsbEnumerator
 from app.services.usb_monitor import UsbMonitorService
 from app.utils.datetime import utc_now
+
+
+def _normalize_mode(settings: AppSettings) -> None:
+    settings.mode = str(settings.mode or "real").strip().lower()
+    if settings.mode not in {"real", "demo"}:
+        settings.mode = "real"
 
 
 @dataclass(slots=True)
@@ -84,6 +90,7 @@ class ApplicationContainer:
     report_service: ReportService
     health_service: HealthCheckService
     usb_monitor: UsbMonitorService
+    demo_data_service: DemoDataService
 
     def shutdown(self) -> None:
         self.usb_monitor.stop()
@@ -92,7 +99,7 @@ class ApplicationContainer:
         self.ollama_runtime_service.stop()
 
 
-def build_container(config_path: str | None = None, force_demo: bool = False) -> ApplicationContainer:
+def build_container(config_path: str | None = None) -> ApplicationContainer:
     paths = build_app_paths(APP_NAME)
     try:
         paths.ensure()
@@ -103,12 +110,11 @@ def build_container(config_path: str | None = None, force_demo: bool = False) ->
     config_file = Path(config_path) if config_path else paths.config_file
     config_loader = ConfigLoader(config_file)
     settings = config_loader.load()
-    configured_mode = settings.mode
-    if force_demo:
-        settings.mode = "demo"
+    _normalize_mode(settings)
+    requested_mode = settings.mode
     settings.export_directory = settings.export_directory or str(paths.exports_dir)
 
-    db_path = paths.demo_db_path if settings.mode == "demo" else paths.db_path
+    db_path = paths.demo_db_path if requested_mode == "demo" else paths.db_path
     db = DatabaseManager(db_path)
     db.initialize()
 
@@ -119,8 +125,8 @@ def build_container(config_path: str | None = None, force_demo: bool = False) ->
         merged.update(persisted)
         settings = AppSettings(**merged)
         config_loader.apply_profile_defaults(settings)
-    if force_demo:
-        settings.mode = "demo"
+    _normalize_mode(settings)
+    settings.mode = requested_mode
     settings.export_directory = settings.export_directory or str(paths.exports_dir)
 
     setup_logging(paths.logs_dir, settings.log_level)
@@ -129,8 +135,6 @@ def build_container(config_path: str | None = None, force_demo: bool = False) ->
 
     settings_repo.save(settings)
     persisted_settings = AppSettings(**settings.to_dict())
-    if force_demo:
-        persisted_settings.mode = configured_mode
     config_loader.save(persisted_settings)
 
     device_repo = DeviceRepository(db)
@@ -147,11 +151,14 @@ def build_container(config_path: str | None = None, force_demo: bool = False) ->
     runtime_state_repo = RuntimeStateRepository(db)
 
     classifier = DeviceClassifier()
-    enumerator = DemoUsbEnumerator(classifier) if settings.mode == "demo" else UsbEnumerator(classifier)
+    real_enumerator = UsbEnumerator(classifier)
+    demo_enumerator = DemoUsbEnumerator(classifier)
+    enumerator = ModeSwitchingUsbEnumerator(settings, real_enumerator, demo_enumerator)
     event_bus = EventBus()
     background_tasks = BackgroundTaskService(event_bus)
     baseline_service = BaselineService()
     policy_service = PolicyService(policy_repo, device_repo)
+    demo_data_service = DemoDataService()
     autostart_service = AutostartService()
     usb_control_service = UsbControlService(RegistryManager())
     ollama_service = OllamaService(
@@ -234,11 +241,13 @@ def build_container(config_path: str | None = None, force_demo: bool = False) ->
         settings=settings,
     )
 
+    demo_mode = settings.mode == "demo"
+    if demo_mode:
+        demo_data_service.seed(policy_service, alert_repo, event_repo)
+
     retention_service.apply(settings.history_retention_days)
-    runtime_recovered = runtime_state_service.startup(settings.mode, settings.mode == "demo")
-    if settings.mode == "demo":
-        DemoDataService().seed(policy_service, alert_repo, event_repo)
-    if settings.autostart_enabled and settings.mode != "demo":
+    runtime_recovered = runtime_state_service.startup(settings.mode, demo_mode)
+    if settings.autostart_enabled and not demo_mode:
         result = autostart_service.apply(True)
         if not result.success:
             logger.warning("Activation du demarrage automatique impossible: %s", result.message)
@@ -254,11 +263,11 @@ def build_container(config_path: str | None = None, force_demo: bool = False) ->
                     reasons=["Le demarrage automatique n'a pas pu etre active automatiquement."],
                     source="bootstrap",
                     payload=result.details,
-                    demo_mode=settings.mode == "demo",
+                    demo_mode=demo_mode,
                 )
             )
             event_bus.publish("monitor_warning", {"message": result.message, "details": result.details})
-    brain_service.refresh(settings.mode == "demo", settings.recommendation_mode)
+    brain_service.refresh(demo_mode, settings.recommendation_mode)
 
     if runtime_recovered:
         logger.warning("Reprise detectee apres fermeture non propre.")
@@ -301,4 +310,5 @@ def build_container(config_path: str | None = None, force_demo: bool = False) ->
         report_service=report_service,
         health_service=health_service,
         usb_monitor=usb_monitor,
+        demo_data_service=demo_data_service,
     )

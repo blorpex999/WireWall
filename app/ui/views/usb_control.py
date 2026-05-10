@@ -95,16 +95,18 @@ class USBControlView(BaseView):
         )
         self.card_mode.set(
             "DEMO" if demo_mode else "REEL",
-            "Aucune action reelle autorisee en demo." if demo_mode else "Actions reelles disponibles selon les droits.",
+            "Scenario simule actif: aucune action USBSTOR reelle." if demo_mode else "Actions reelles disponibles selon les droits.",
             tone="WARNING" if demo_mode else "INFO",
-            pill_text="ISOLE" if demo_mode else "LIVE",
+            pill_text="SIMULE" if demo_mode else "LIVE",
         )
         if demo_mode:
-            self.card_action.set("Desactivee", "Le mode demo ne doit pas agir sur le poste.", tone="WARNING", pill_text="SAFE")
+            self.card_action.set("Suspendue", "Les boutons USBSTOR sont desactives en mode demo.", tone="WARNING", pill_text="DEMO")
         elif is_admin:
             self.card_action.set("Disponible", "Le registre USBSTOR peut etre modifie et relu.", tone="OK", pill_text="WRITE")
         else:
             self.card_action.set("Lecture seule", "Le diagnostic reste disponible sans elevation.", tone="WARNING", pill_text="READ")
+        self.block_button.setEnabled(not demo_mode)
+        self.unblock_button.setEnabled(not demo_mode)
 
         self.detail_text.set_text(
             "Lecture courante :\n"
@@ -131,10 +133,10 @@ class USBControlView(BaseView):
         return QMessageBox.question(self, "Confirmation", message) == QMessageBox.StandardButton.Yes
 
     def _block(self) -> None:
-        diagnostics = self.controller.usb_diagnostics()
         if self.controller.demo_mode:
-            self.app.set_status("Action desactivee en mode demo pour eviter toute confusion avec le mode reel.", "WARNING")
+            self.app.set_status("Mode demo actif: aucune action USBSTOR reelle n'est appliquee.", "WARNING")
             return
+        diagnostics = self.controller.usb_diagnostics()
         if not diagnostics.get("is_admin"):
             self.app.set_status("Cette action requiert une session administrateur.", "WARNING")
             self.refresh_data()
@@ -149,10 +151,10 @@ class USBControlView(BaseView):
         )
 
     def _unblock(self) -> None:
-        diagnostics = self.controller.usb_diagnostics()
         if self.controller.demo_mode:
-            self.app.set_status("Action desactivee en mode demo pour eviter toute confusion avec le mode reel.", "WARNING")
+            self.app.set_status("Mode demo actif: aucune action USBSTOR reelle n'est appliquee.", "WARNING")
             return
+        diagnostics = self.controller.usb_diagnostics()
         if not diagnostics.get("is_admin"):
             self.app.set_status("Cette action requiert une session administrateur.", "WARNING")
             self.refresh_data()

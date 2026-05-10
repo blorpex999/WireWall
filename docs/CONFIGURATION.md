@@ -18,7 +18,7 @@ Le fichier d'exemple fourni est `config.example.json`.
 
 ## Parametres principaux
 
-- `mode` : `real` ou `demo`
+- `mode` : toujours force a `real`
 - `scan_interval_seconds` : frequence de polling USB
 - `history_retention_days` : retention des evenements, alertes, assessments et analyses IA
 - `log_level` : `INFO`, `WARNING`, `ERROR`, `DEBUG`
@@ -39,7 +39,7 @@ Le fichier d'exemple fourni est `config.example.json`.
 
 - `Normal` : profil par defaut, equilibre entre sensibilite et stabilite
 - `Strict` : scans plus frequents, seuil d'alerte plus bas
-- `Presentation` : scans plus stables et fenetre anti-doublon plus large pour une demo plus lisible
+- `Presentation` : scans plus stables et fenetre anti-doublon plus large pour une presentation plus lisible
 
 Les valeurs `scan_interval_seconds`, `alert_threshold` et `dedup_window_seconds` sont recalibrees selon le profil choisi.
 
@@ -53,10 +53,9 @@ Les valeurs `scan_interval_seconds`, `alert_threshold` et `dedup_window_seconds`
   - `proactive` : suggestions plus frequentes
 - Les decisions analyste (`whitelist`, `blacklist`, `watch`, `trusted`) sont memorisees localement.
 
-## Conseils de configuration demo
+## Conseils de configuration terrain
 
 - Conserver `mode: "real"` pour les tests terrain
-- Utiliser `scripts\run_demo.bat` pour un scenario demo separe
 - Definir `export_directory` si vous voulez un dossier d'exports visible et stable pendant la soutenance
 - Pour `qwen2.5:14b`, un timeout de `180` a `210` secondes est plus realiste sur un laptop milieu de gamme
 - La valeur projet recommandee est `210` secondes

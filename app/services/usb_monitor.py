@@ -70,7 +70,10 @@ class UsbMonitorService:
         self._refresh_event.set()
 
     def update_settings(self, settings) -> None:
+        previous_demo_mode = self.demo_mode
         self.settings = settings
+        if previous_demo_mode != self.demo_mode:
+            self._current_snapshot = {}
         self.refresh_now()
 
     def _run(self) -> None:

@@ -3,7 +3,6 @@
 ## Lancement
 
 - Mode reel : `scripts\run_dev.bat`
-- Mode demo : `scripts\run_demo.bat`
 - Mode admin : `scripts\run_admin.bat`
 - Version installee : `WireWall` via le raccourci menu demarrer
 - Version portable : `WireWall.exe`
@@ -14,7 +13,7 @@
 
 ## Ecrans a connaitre
 
-- `Dashboard` : vue synthese, risque global, incidents ouverts, suggestions supervisees, sante plateforme et `Precheck demo`
+- `Dashboard` : vue synthese, risque global, incidents ouverts, suggestions supervisees, sante plateforme et `Precheck reel`
 - `Peripheriques` : inventaire actif, baseline locale, details, historique, whitelist et blacklist
 - `Alertes` : alertes persistantes, workflow incident, commentaire analyste et resolution
 - `Historique` : evenements USB, filtres et exports
@@ -27,7 +26,7 @@
 
 ## Flux de travail recommande
 
-1. Verifier le `Dashboard`, le `Precheck demo` et le panneau de sante.
+1. Verifier le `Dashboard`, le `Precheck reel` et le panneau de sante.
 2. Brancher ou debrancher un peripherique USB.
 3. Verifier la detection, la baseline, la source d'identification et l'historique dans `Peripheriques`.
 4. Ouvrir un incident depuis `Alertes` si une alerte merite un suivi.
@@ -39,7 +38,7 @@
 
 ## Feedbacks importants
 
-- En mode demo, l'application l'indique visuellement et la base utilisee est separee.
+- WireWall fonctionne uniquement en mode reel dans cette version.
 - Le bouton `Comprendre` n'ajoute aucune logique metier: il sert a t'aider a expliquer l'ecran et ses limites.
 - Si Ollama est indisponible, l'ecran IA affiche un diagnostic au lieu d'un faux resultat.
 - Si l'elevation UAC est refusee, WireWall s'arrete au lieu de lancer une session degradee silencieuse.

@@ -116,7 +116,7 @@ Action :
 
 - verifier le panneau `Health`
 - verifier le message `usb_backend`
-- utiliser le mode demo si aucun vrai materiel n'est disponible
+- utiliser le mode reel si aucun vrai materiel n'est disponible
 
 ## Ollama indisponible
 

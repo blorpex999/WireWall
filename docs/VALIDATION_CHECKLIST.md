@@ -15,7 +15,7 @@
 - [ ] Lancement source : aucune console parasite ne reste visible par defaut
 - [ ] L'UI reste reactive pendant les health checks et l'analyse IA
 - [ ] Chaque vue se charge sans bouton casse ni message incoherent
-- [ ] Le mode demo est visuellement distinct du mode reel
+- [ ] L'application affiche uniquement le mode reel
 - [ ] L'icone WireWall personnalisee apparait dans la fenetre et la barre des taches
 
 ## USB
@@ -44,7 +44,7 @@
 - [ ] En non-admin, un diagnostic explicite est affiche
 - [ ] En admin, le blocage retourne un etat relu et verifie
 - [ ] En admin, le deblocage retourne un etat relu et verifie
-- [ ] La demo rappelle qu'une reinsertion ou une nouvelle session peut etre necessaire
+- [ ] L'interface rappelle qu'une reinsertion ou une nouvelle session peut etre necessaire
 
 ## IA locale
 
@@ -67,7 +67,7 @@
 - [ ] `libusb-1.0.dll` est presente dans le bundle
 - [ ] `release\WireWall-<version>-win64-portable.zip` est genere
 - [ ] `release\WireWall-Setup-<version>.exe` est genere
-- [ ] `release\WireWall-Setup-<version>-full.exe` est genere si la variante demo a ete construite
+- [ ] `release\WireWall-Setup-<version>-full.exe` est genere si la variante full a ete construite
 - [ ] Le package portable demarre sur une machine de test propre
 - [ ] L'installateur se lance sur une machine de test propre
 - [ ] L'installateur full se lance sur une machine de test propre

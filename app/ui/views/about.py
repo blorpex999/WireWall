@@ -35,7 +35,7 @@ class AboutView(BaseView):
         self.header = SectionHeader(
             self.content,
             "A propos de WireWall",
-            "Presentation produit, contexte Ydays et perimetre technique de la demonstration.",
+            "Presentation produit, contexte Ydays et perimetre technique du mode reel.",
         )
         self.content_layout.addWidget(self.header, 0, 0, 1, 2)
 
@@ -115,7 +115,7 @@ class AboutView(BaseView):
         self.context_label = QLabel(
             "Demonstrateur de securite poste de travail concu pour une soutenance credible.\n\n"
             "Points forts a montrer : tableau de bord, inventaire USB, alertes, controle USBSTOR et analyse IA locale.\n\n"
-            "Discours honnete : pas d'interception noyau, pas de faux succes, mode demo strictement separe du mode reel.",
+            "Discours honnete : pas d'interception noyau, pas de faux succes, donnees issues du poste reel.",
             self.context_frame,
         )
         self.context_label.setWordWrap(True)
@@ -160,10 +160,8 @@ class AboutView(BaseView):
         self.identity_values["version"].set(__version__)
         self.identity_values["team"].set(settings.author_name or "Equipe non renseignee")
         self.identity_values["org"].set(settings.organization_name or "Organisation non renseignee")
-        if self.controller.demo_mode:
-            self.mode_badge.set("MODE DEMO", "WARNING")
-        else:
-            self.mode_badge.set("MODE REEL", "INFO")
+        demo_mode = self.controller.demo_mode
+        self.mode_badge.set("MODE DEMO" if demo_mode else "MODE REEL", "WARNING" if demo_mode else "INFO")
         self.glossary.clear()
         for term, definition in GLOSSARY:
             self.glossary.tree.insert("", "end", values=(term, definition))

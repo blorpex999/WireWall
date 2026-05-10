@@ -18,7 +18,7 @@ class FakeShell32:
 def test_relaunch_as_admin_script_mode(monkeypatch) -> None:
     shell32 = FakeShell32()
     monkeypatch.setattr(admin_module, "ctypes", SimpleNamespace(windll=SimpleNamespace(shell32=shell32)))
-    monkeypatch.setattr(admin_module.sys, "argv", ["main.py", "--demo"], raising=False)
+    monkeypatch.setattr(admin_module.sys, "argv", ["main.py", "--replace-existing"], raising=False)
     monkeypatch.setattr(admin_module.sys, "executable", r"C:\Python311\python.exe", raising=False)
     monkeypatch.setattr(admin_module.sys, "frozen", False, raising=False)
 
@@ -27,7 +27,7 @@ def test_relaunch_as_admin_script_mode(monkeypatch) -> None:
     _hwnd, verb, file_name, parameters, directory, show = shell32.calls[0]
     assert verb == "runas"
     assert file_name == r"C:\Python311\python.exe"
-    assert parameters == f'"{Path("main.py").resolve()}" --demo'
+    assert parameters == f'"{Path("main.py").resolve()}" --replace-existing'
     assert directory == str(Path("main.py").resolve().parent)
     assert show == 1
 
@@ -35,7 +35,7 @@ def test_relaunch_as_admin_script_mode(monkeypatch) -> None:
 def test_relaunch_as_admin_frozen_mode(monkeypatch) -> None:
     shell32 = FakeShell32()
     monkeypatch.setattr(admin_module, "ctypes", SimpleNamespace(windll=SimpleNamespace(shell32=shell32)))
-    monkeypatch.setattr(admin_module.sys, "argv", [r"C:\WireWall\WireWall.exe", "--demo"], raising=False)
+    monkeypatch.setattr(admin_module.sys, "argv", [r"C:\WireWall\WireWall.exe", "--replace-existing"], raising=False)
     monkeypatch.setattr(admin_module.sys, "executable", r"C:\WireWall\WireWall.exe", raising=False)
     monkeypatch.setattr(admin_module.sys, "frozen", True, raising=False)
 
@@ -44,6 +44,6 @@ def test_relaunch_as_admin_frozen_mode(monkeypatch) -> None:
     _hwnd, verb, file_name, parameters, directory, show = shell32.calls[0]
     assert verb == "runas"
     assert file_name == r"C:\WireWall\WireWall.exe"
-    assert parameters == "--demo"
+    assert parameters == "--replace-existing"
     assert directory == str(Path(r"C:\WireWall\WireWall.exe").parent)
     assert show == 1

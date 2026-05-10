@@ -68,7 +68,7 @@ Prerequis supplementaires :
   - ou `%ProgramFiles%\Inno Setup 6\ISCC.exe`
   - ou via la variable d'environnement `ISCC_EXE`
 
-## Build de l'installateur full demo
+## Build de l'installateur full
 
 ```bat
 scripts\build_full_installer.bat

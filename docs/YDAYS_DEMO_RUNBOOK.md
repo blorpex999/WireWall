@@ -19,7 +19,7 @@ Montrer:
 
 - risque global
 - tuiles de sante
-- bloc `Precheck demo`
+- bloc `Precheck reel`
 
 Dire:
 
@@ -129,7 +129,7 @@ Montrer:
 
 Dire:
 
-- "Nous pouvons passer en mode demo sans melanger les donnees reelles et les donnees de demonstration."
+- "Nous pouvons passer en mode reel sans melanger les donnees reelles et les donnees de demonstration."
 
 ## Si le temps se resserre
 

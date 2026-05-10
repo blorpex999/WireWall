@@ -68,7 +68,7 @@ def repositories(temp_db: DatabaseManager) -> dict[str, object]:
 @pytest.fixture()
 def default_settings():
     settings = build_default_settings()
-    settings.mode = "demo"
+    settings.mode = "real"
     settings.export_directory = ""
     return settings
 

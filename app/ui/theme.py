@@ -2,38 +2,45 @@ from __future__ import annotations
 
 
 COLORS = {
-    "bg": "#0F141B",
-    "panel": "#161D27",
-    "panel_alt": "#1C2430",
-    "panel_alt_2": "#232D3B",
-    "panel_border": "#2B3747",
-    "text": "#EDF1F6",
-    "muted": "#97A4B5",
-    "accent": "#28A1FF",
-    "accent_hover": "#4AB0FF",
-    "success": "#67C587",
-    "warning": "#F0BE52",
-    "danger": "#FF657D",
-    "danger_soft": "#E85060",
-    "info": "#4AB0FF",
-    "selection": "#263344",
-    "disabled": "#6D7785",
-    "demo": "#E7A23C",
+    "bg": "#101418",
+    "panel": "#171D22",
+    "panel_alt": "#1E252B",
+    "panel_alt_2": "#263039",
+    "panel_border": "#33404A",
+    "text": "#F2F5F7",
+    "muted": "#A6B1BA",
+    "accent": "#2D9CDB",
+    "accent_hover": "#45ACE7",
+    "success": "#62BE7B",
+    "warning": "#E8B84D",
+    "danger": "#E85D75",
+    "danger_soft": "#D94E66",
+    "info": "#43A5E6",
+    "selection": "#213241",
+    "disabled": "#596570",
 }
 
 
 def get_stylesheet() -> str:
     c = COLORS
     return f"""
-    QMainWindow, QWidget {{
+    QMainWindow {{
         background-color: {c['bg']};
         color: {c['text']};
         font-family: "Segoe UI";
         font-size: 10pt;
     }}
+    QWidget {{
+        color: {c['text']};
+        font-family: "Segoe UI";
+        font-size: 10pt;
+    }}
+    QWidget#app_root, QWidget#app_shell, QStackedWidget#content_stack {{
+        background-color: {c['bg']};
+    }}
     QFrame#sidebar {{
         background-color: {c['panel_alt']};
-        border-right: 1px solid {c['panel_border']};
+        border: 1px solid {c['panel_border']};
         border-radius: 8px;
     }}
     QFrame#card {{
@@ -42,20 +49,16 @@ def get_stylesheet() -> str:
         border-radius: 8px;
     }}
     QFrame#panel {{
-        background-color: {c['panel']};
+        background-color: {c['panel_alt']};
+        border: 1px solid {c['panel_border']};
         border-radius: 6px;
-    }}
-    QFrame#demo_banner {{
-        background-color: {c['panel_alt_2']};
-        border: 1px solid {c['warning']};
-        border-radius: 8px;
     }}
     QPushButton#nav_button {{
         background-color: transparent;
         color: {c['muted']};
         border: none;
         border-radius: 6px;
-        padding: 8px 14px;
+        padding: 9px 14px;
         text-align: left;
         font-size: 10pt;
     }}
@@ -65,23 +68,27 @@ def get_stylesheet() -> str:
     }}
     QPushButton#nav_button[active="true"] {{
         background-color: {c['selection']};
-        color: {c['accent']};
+        color: {c['text']};
         font-weight: 600;
+        border-left: 3px solid {c['accent']};
     }}
     QPushButton {{
         background-color: {c['accent']};
         color: #FFFFFF;
         border: none;
         border-radius: 6px;
-        padding: 7px 16px;
+        padding: 8px 16px;
         font-size: 10pt;
     }}
     QPushButton:hover {{
         background-color: {c['accent_hover']};
     }}
     QPushButton:disabled {{
-        background-color: {c['disabled']};
+        background-color: #303942;
         color: {c['muted']};
+    }}
+    QPushButton:focus, QLineEdit:focus, QComboBox:focus {{
+        border: 1px solid {c['accent']};
     }}
     QPushButton#subtle {{
         background-color: {c['panel_alt']};
@@ -112,9 +119,16 @@ def get_stylesheet() -> str:
         selection-background-color: {c['selection']};
         outline: none;
     }}
+    QTableWidget::item, QTreeWidget::item {{
+        padding: 4px 8px;
+        border: none;
+    }}
+    QTableWidget::item:hover, QTreeWidget::item:hover {{
+        background-color: {c['panel_alt_2']};
+    }}
     QTableWidget::item:selected, QTreeWidget::item:selected {{
         background-color: {c['selection']};
-        color: {c['accent']};
+        color: {c['text']};
     }}
     QHeaderView::section {{
         background-color: {c['panel_alt']};
@@ -123,6 +137,11 @@ def get_stylesheet() -> str:
         border-bottom: 1px solid {c['panel_border']};
         padding: 6px 8px;
         font-size: 9pt;
+        font-weight: 600;
+    }}
+    QTableCornerButton::section {{
+        background-color: {c['panel_alt']};
+        border: none;
     }}
     QScrollBar:vertical {{
         background: {c['bg']};
@@ -157,6 +176,9 @@ def get_stylesheet() -> str:
     }}
     QScrollArea {{
         border: none;
+        background-color: {c['bg']};
+    }}
+    QScrollArea > QWidget > QWidget {{
         background-color: {c['bg']};
     }}
     QComboBox {{
@@ -229,14 +251,17 @@ def get_stylesheet() -> str:
         border: 1px solid {c['panel_border']};
         border-radius: 6px;
         margin-top: 8px;
-        padding: 12px;
+        padding: 14px 12px 12px 12px;
         font-size: 9pt;
         background-color: {c['panel']};
     }}
     QGroupBox::title {{
         subcontrol-origin: margin;
         left: 10px;
-        padding: 0 4px;
+        padding: 0 6px;
+        color: {c['text']};
+        font-weight: 600;
+        background-color: {c['bg']};
     }}
     QTabWidget::pane {{
         border: 1px solid {c['panel_border']};
