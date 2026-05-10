@@ -201,6 +201,8 @@ Avant chaque release :
 - [Script de soutenance Ydays](docs/YDAYS_SCRIPT.md)
 - [Presentation Canva Ydays](docs/YDAYS_PRESENTATION_CANVA.md)
 - [Notes orateur Ydays](docs/YDAYS_SPEAKER_NOTES.md)
+- [Script oral 20 minutes Ydays](docs/YDAYS_20MIN_ORAL_SCRIPT.md)
+- [Diapos 20 minutes Ydays](docs/YDAYS_20MIN_SLIDE_DECK.md)
 - [Runbook demo Ydays](docs/YDAYS_DEMO_RUNBOOK.md)
 - [Troubleshooting](docs/TROUBLESHOOTING.md)
 - [Checklist de validation](docs/VALIDATION_CHECKLIST.md)
