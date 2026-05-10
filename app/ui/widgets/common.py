@@ -371,6 +371,8 @@ class _TreeAdapter:
         self._alignments = {column: Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter for column in columns}
         self._width_sync_scheduled = False
         self._updates_suspended = False
+        self._applying_column_widths = False
+        self._user_widths_active = False
 
         self._table = _ResponsiveTableWidget(self, 0, len(columns), owner)
         self._table.setAlternatingRowColors(True)
@@ -392,6 +394,7 @@ class _TreeAdapter:
         self._table.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self._table.setHorizontalHeaderLabels(list(columns))
         self._table.itemSelectionChanged.connect(self._emit_select)
+        self._table.horizontalHeader().sectionResized.connect(self._on_section_resized)
         self._width_sync_timer = QTimer(self._table)
         self._width_sync_timer.setSingleShot(True)
         self._width_sync_timer.timeout.connect(self._apply_column_widths)
@@ -573,6 +576,15 @@ class _TreeAdapter:
         if available <= 0:
             return
 
+        if self._user_widths_active:
+            self._set_column_widths(
+                {
+                    column: max(self._table.horizontalHeader().minimumSectionSize(), self._preferred_widths[column])
+                    for column in self._columns
+                }
+            )
+            return
+
         minimums = {column: self._minimum_width(self._preferred_widths[column]) for column in self._columns}
         total_minimum = sum(minimums.values())
         total_preferred = sum(self._preferred_widths.values())
@@ -598,8 +610,32 @@ class _TreeAdapter:
                     computed_widths[column] += even_extra
                 computed_widths[self._columns[-1]] += extra_room - (even_extra * (len(self._columns) - 1))
 
-        for index, column in enumerate(self._columns):
-            self._table.setColumnWidth(index, computed_widths[column])
+        self._set_column_widths(computed_widths)
+
+    def _set_column_widths(self, widths: dict[str, int]) -> None:
+        self._applying_column_widths = True
+        try:
+            for index, column in enumerate(self._columns):
+                self._table.setColumnWidth(index, widths[column])
+        finally:
+            self._applying_column_widths = False
+
+    def _on_section_resized(self, logical_index: int, _old_size: int, new_size: int) -> None:
+        if self._applying_column_widths:
+            return
+        if logical_index < 0 or logical_index >= len(self._columns):
+            return
+        if not self._user_widths_active:
+            for index, column in enumerate(self._columns):
+                self._preferred_widths[column] = max(
+                    self._table.horizontalHeader().minimumSectionSize(),
+                    self._table.columnWidth(index),
+                )
+            self._user_widths_active = True
+        self._preferred_widths[self._columns[logical_index]] = max(
+            self._table.horizontalHeader().minimumSectionSize(),
+            new_size,
+        )
 
     def _minimum_width(self, preferred: int) -> int:
         if preferred <= 120:
