@@ -89,27 +89,22 @@ class PnpDeviceManager:
         ids = [str(instance_id) for instance_id in instance_ids if str(instance_id).strip()]
         if not ids:
             return OperationResult(True, "empty", "Aucun peripherique PnP a modifier.", {"changed": [], "failed": {}})
-        changed = []
-        failed = {}
+        batch = self._toggle_devices_with_powershell(ids, enable=enable)
+        changed = batch.details.get("changed", []) if batch.details else []
+        if isinstance(changed, str):
+            changed = [changed]
+        failed = batch.details.get("failed", {}) if batch.details else {}
+        if not isinstance(failed, dict):
+            failed = {}
         pnputil_action = "/enable-device" if enable else "/disable-device"
-        for instance_id in ids:
+        for instance_id in list(failed):
             result = self._run_pnputil([pnputil_action, instance_id], timeout=45)
             if result.success:
-                changed.append(instance_id)
-            else:
-                failed[instance_id] = result.message
-        if failed:
-            fallback = self._toggle_devices_with_powershell(list(failed), enable=enable)
-            fallback_changed = fallback.details.get("changed", []) if fallback.details else []
-            if isinstance(fallback_changed, str):
-                fallback_changed = [fallback_changed]
-            for instance_id in fallback_changed:
                 if instance_id not in changed:
                     changed.append(instance_id)
                 failed.pop(instance_id, None)
-            fallback_failed = fallback.details.get("failed", {}) if fallback.details else {}
-            if isinstance(fallback_failed, dict):
-                failed.update({str(key): str(value) for key, value in fallback_failed.items()})
+            else:
+                failed[instance_id] = result.message
         if failed:
             return OperationResult(
                 False,
@@ -122,7 +117,20 @@ class PnpDeviceManager:
         return OperationResult(True, status, message, {"changed": changed, "failed": {}})
 
     def apply_policy_refresh(self) -> OperationResult:
-        return self._run_process(["gpupdate.exe", "/target:computer", "/force"], timeout=90)
+        creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+        try:
+            subprocess.Popen(
+                ["gpupdate.exe", "/target:computer", "/force"],
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                creationflags=creationflags,
+            )
+            return OperationResult(True, "started", "Rafraichissement des policies Windows lance en arriere-plan.")
+        except FileNotFoundError:
+            return OperationResult(False, "unsupported", "gpupdate.exe est introuvable sur ce poste.")
+        except OSError as exc:
+            return OperationResult(False, "error", f"Impossible de lancer gpupdate: {exc}")
 
     def disable_usb_device_ids(self) -> OperationResult:
         device_ids = ["USB\\Class_03", "USB\\Class_08", "USB\\Class_09", "USB\\Class_E0", "USB\\Class_FF"]

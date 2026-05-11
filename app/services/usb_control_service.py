@@ -158,7 +158,6 @@ class UsbControlService:
                 "Verrouillage total USB partiellement applique.",
                 {"results": results, "failures": failures, "backup": current, "missing": missing, "pnp_candidates": pnp_devices},
             )
-        class_disable = self.pnp_device_manager.disable_usb_device_ids()
         pnp_disable = self.pnp_device_manager.disable_devices(pnp_instance_ids)
         pnp_details = pnp_disable.details if pnp_disable.details else {}
         if pnp_candidates.success and not pnp_disable.success:
@@ -172,7 +171,6 @@ class UsbControlService:
                     "missing": missing,
                     "policy_result": policy_result.details,
                     "policy_refresh": policy_refresh.details,
-                    "class_disable": class_disable.details,
                     "pnp_candidates": pnp_devices,
                     "pnp_result": pnp_details,
                 },
@@ -188,7 +186,6 @@ class UsbControlService:
                 "missing": missing,
                 "policy_result": policy_result.details,
                 "policy_refresh": policy_refresh.details,
-                "class_disable": class_disable.details,
                 "pnp_candidates": pnp_devices,
                 "pnp_result": pnp_details,
                 "warning": "Les souris, claviers et hubs USB peuvent cesser de fonctionner immediatement.",
