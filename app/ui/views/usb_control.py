@@ -62,6 +62,29 @@ class USBControlView(BaseView):
         actions_layout.addStretch(1)
         layout.addWidget(actions)
 
+        lockdown = QGroupBox("Verrouillage total des ports USB", self)
+        lockdown_layout = QVBoxLayout(lockdown)
+        self.lockdown_note = QLabel(
+            "Option avancee: peut bloquer souris, clavier, hubs, stockage et autres peripheriques USB. "
+            "Prevoir un clavier/touchpad non USB ou un acces distant avant activation.",
+            lockdown,
+        )
+        self.lockdown_note.setObjectName("muted")
+        self.lockdown_note.setWordWrap(True)
+        lockdown_layout.addWidget(self.lockdown_note)
+        lockdown_actions = QHBoxLayout()
+        self.block_all_button = QPushButton("Bloquer tous les ports USB", lockdown)
+        self.block_all_button.setObjectName("danger")
+        self.restore_all_button = QPushButton("Restaurer tous les ports USB", lockdown)
+        self.restore_all_button.setObjectName("subtle")
+        self.block_all_button.clicked.connect(self._block_all)
+        self.restore_all_button.clicked.connect(self._restore_all)
+        lockdown_actions.addWidget(self.block_all_button)
+        lockdown_actions.addWidget(self.restore_all_button)
+        lockdown_actions.addStretch(1)
+        lockdown_layout.addLayout(lockdown_actions)
+        layout.addWidget(lockdown)
+
         diagnostics = QGroupBox("Diagnostic detaille", self)
         diagnostics_layout = QVBoxLayout(diagnostics)
         self.note_label = QLabel(
@@ -77,6 +100,7 @@ class USBControlView(BaseView):
 
     def refresh_data(self) -> None:
         status = self.controller.get_usb_control_status()
+        full_status = self.controller.get_full_usb_lockdown_status()
         diagnostics = self.controller.usb_diagnostics()
         is_admin = bool(diagnostics.get("is_admin"))
         demo_mode = self.controller.demo_mode
@@ -107,16 +131,24 @@ class USBControlView(BaseView):
             self.card_action.set("Lecture seule", "Le diagnostic reste disponible sans elevation.", tone="WARNING", pill_text="READ")
         self.block_button.setEnabled(not demo_mode)
         self.unblock_button.setEnabled(not demo_mode)
+        self.block_all_button.setEnabled(not demo_mode)
+        self.restore_all_button.setEnabled(not demo_mode)
 
         self.detail_text.set_text(
             "Lecture courante :\n"
             "- Message : {message}\n"
             "- Statut : {status_value}\n"
             "- Details : {details}\n\n"
+            "Verrouillage total USB :\n"
+            "- Etat : {full_status}\n"
+            "- Message : {full_message}\n"
+            "- Details : {full_details}\n\n"
             "Ce que USBSTOR bloque :\n"
             "- Le stockage USB de type cle, disque externe ou support de masse.\n\n"
             "Ce que USBSTOR ne bloque pas :\n"
             "- Les souris, claviers, receivers HID, hubs ou la plupart des peripheriques non stockage.\n\n"
+            "Ce que le verrouillage total peut bloquer :\n"
+            "- Les controleurs et hubs USB Windows, donc potentiellement souris, clavier, stockage et adaptateurs.\n\n"
             "Pourquoi admin est requis :\n"
             "- WireWall doit modifier une cle registre Windows protegee puis relire le resultat.\n\n"
             "Pourquoi une reinsertion peut etre necessaire :\n"
@@ -125,6 +157,9 @@ class USBControlView(BaseView):
                 message=status.message,
                 status_value=status.status,
                 details=status.details,
+                full_status=full_status.status,
+                full_message=full_status.message,
+                full_details=full_status.details,
                 diagnostic=diagnostics,
             )
         )
@@ -163,6 +198,48 @@ class USBControlView(BaseView):
             return
         self.run_action(
             self.controller.unblock_usb_storage,
+            success_message=lambda result: result.message,
+            success_level=lambda result: "OK" if result.success else "ERROR",
+            refresh=True,
+        )
+
+    def _block_all(self) -> None:
+        if self.controller.demo_mode:
+            self.app.set_status("Mode demo actif: aucun verrouillage USB total reel n'est applique.", "WARNING")
+            return
+        diagnostics = self.controller.usb_diagnostics()
+        if not diagnostics.get("is_admin"):
+            self.app.set_status("Cette action requiert une session administrateur.", "WARNING")
+            self.refresh_data()
+            return
+        message = (
+            "Bloquer TOUS les ports USB Windows ?\n\n"
+            "Cette action peut couper souris, clavier, hubs, disque USB, adaptateurs et certains appareils internes.\n"
+            "Un redemarrage peut etre necessaire, et la restauration peut etre difficile sans clavier/touchpad non USB.\n\n"
+            "Continuer seulement si tu as un moyen de reprendre la main."
+        )
+        if not self._confirm(message):
+            return
+        self.run_action(
+            self.controller.block_all_usb_ports,
+            success_message=lambda result: result.message,
+            success_level=lambda result: "WARNING" if result.success else "ERROR",
+            refresh=True,
+        )
+
+    def _restore_all(self) -> None:
+        if self.controller.demo_mode:
+            self.app.set_status("Mode demo actif: aucune restauration USB totale reelle n'est appliquee.", "WARNING")
+            return
+        diagnostics = self.controller.usb_diagnostics()
+        if not diagnostics.get("is_admin"):
+            self.app.set_status("Cette action requiert une session administrateur.", "WARNING")
+            self.refresh_data()
+            return
+        if not self._confirm("Restaurer les services USB Windows sauvegardes par WireWall ?"):
+            return
+        self.run_action(
+            self.controller.restore_all_usb_ports,
             success_message=lambda result: result.message,
             success_level=lambda result: "OK" if result.success else "ERROR",
             refresh=True,

@@ -26,6 +26,7 @@ def test_glossary_contains_core_demo_terms() -> None:
         "Bus / Address",
         "PyUSB / libusb",
         "USBSTOR",
+        "Verrouillage total USB",
         "Baseline",
         "Incident",
         "Suggestion supervisee",

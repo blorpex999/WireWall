@@ -20,6 +20,14 @@
 - Selon le contexte Windows, une reinsertion du peripherique ou une nouvelle session peut etre necessaire.
 - WireWall demande maintenant une session admin au lancement ; si l'UAC est refusee, l'application ne demarre pas.
 
+## Verrouillage total USB
+
+- Le verrouillage total agit sur des services Windows de controle/hub USB (`USBXHCI`, `USBHUB3`, `usbhub`, `UCX01000` si presents).
+- Il peut bloquer souris, clavier, hubs, stockage, adaptateurs et certains peripheriques internes relies en USB.
+- WireWall sauvegarde les valeurs de demarrage originales avant blocage, puis propose une restauration.
+- Un redemarrage peut etre necessaire pour appliquer ou annuler pleinement l'etat.
+- Cette option reste dangereuse sur un poste sans clavier/touchpad non USB ou sans acces distant.
+
 ## Ollama
 
 - Ollama n'est pas embarque avec WireWall.

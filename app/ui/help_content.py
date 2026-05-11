@@ -31,10 +31,10 @@ SCREEN_HELP: dict[str, dict[str, object]] = {
     "usb_control": {
         "button": "Comprendre le controle USB",
         "sections": [
-            ("Ce que montre l'ecran", "Etat de USBSTOR, niveau de droits et capacite reelle d'agir sur le poste Windows."),
-            ("Observe reellement", "WireWall lit et ecrit la cle USBSTOR puis relit le resultat pour eviter un faux succes."),
+            ("Ce que montre l'ecran", "Etat USBSTOR, verrouillage total USB, niveau de droits et capacite reelle d'agir sur Windows."),
+            ("Observe reellement", "WireWall lit/ecrit USBSTOR et des services USB Windows, puis relit le resultat pour eviter un faux succes."),
             ("Deduit ou calcule", "La capacite d'action depend du mode reel/demo, des droits admin et du retour registre."),
-            ("A dire en soutenance", "USBSTOR bloque le stockage USB, pas tous les peripheriques; une reinsertion peut rester necessaire."),
+            ("A dire en soutenance", "USBSTOR bloque le stockage; le verrouillage total agit plus bas et peut aussi couper souris/clavier USB."),
         ],
     },
     "ai_analysis": {
@@ -68,6 +68,7 @@ GLOSSARY: list[tuple[str, str]] = [
     ("PyUSB / libusb", "Couche de lecture USB en espace utilisateur. Ce n'est pas un driver noyau Windows."),
     ("Snapshot utilisateur", "Photo de l'etat USB a un instant T, comparee ensuite pour detecter les changements."),
     ("USBSTOR", "Service Windows qui controle le stockage USB. Il ne bloque pas les claviers, souris ou hubs."),
+    ("Verrouillage total USB", "Action admin avancee sur les services controleur/hub USB Windows. Elle peut bloquer tous les peripheriques USB et demander un redemarrage."),
     ("Whitelist / Blacklist", "Listes de confiance ou de refus basees sur VID:PID ou numero de serie."),
     ("Baseline", "Memoire locale d'usage: nouveau, rare, connu ou en deviation par rapport aux habitudes observees."),
     ("Incident", "Traitement analyste d'une alerte: statut, decision, commentaire et resolution."),
@@ -84,7 +85,7 @@ FLOW_STEPS: list[tuple[str, str]] = [
 
 HONEST_LIMITS: list[str] = [
     "Pas d'interception noyau: WireWall reste un outil de supervision utilisateur documente.",
-    "USBSTOR agit sur le stockage USB uniquement et peut demander une reinsertion du support.",
+    "USBSTOR agit sur le stockage USB uniquement; le verrouillage total USB est plus risqué et peut couper les peripheriques d'entree.",
     "L'IA depend d'Ollama local et peut etre absente sans bloquer le reste de l'application.",
     "Certaines metadonnees USB peuvent manquer selon le materiel, le pilote ou les droits.",
 ]

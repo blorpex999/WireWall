@@ -249,6 +249,19 @@ class AppController:
             return OperationResult(False, "demo", "Mode demo actif: aucune modification USBSTOR reelle n'est appliquee.")
         return self.container.usb_control_service.unblock_storage()
 
+    def get_full_usb_lockdown_status(self):
+        return self.container.usb_control_service.get_full_lockdown_status()
+
+    def block_all_usb_ports(self):
+        if self.demo_mode:
+            return OperationResult(False, "demo", "Mode demo actif: aucun verrouillage USB total reel n'est applique.")
+        return self.container.usb_control_service.block_all_usb_ports()
+
+    def restore_all_usb_ports(self):
+        if self.demo_mode:
+            return OperationResult(False, "demo", "Mode demo actif: aucune restauration USB totale reelle n'est appliquee.")
+        return self.container.usb_control_service.restore_all_usb_ports()
+
     def relaunch_admin(self) -> bool:
         return relaunch_as_admin()
 
