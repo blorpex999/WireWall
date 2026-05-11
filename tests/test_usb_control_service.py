@@ -11,6 +11,7 @@ class FakeRegistry:
         self.services = {"USBXHCI": 3, "USBHUB3": 3, "usbhub": 3, "UCX01000": 3}
         self.backup = {}
         self.pnp_backup = []
+        self.calls = []
 
     def get_usbstor_start(self):
         return OperationResult(True, self.status, "ok", {"start_value": 3 if self.status == "enabled" else 4})
@@ -25,6 +26,7 @@ class FakeRegistry:
         return OperationResult(True, "read", "ok", {"service": service_name, "start_value": self.services[service_name]})
 
     def set_service_start(self, service_name: str, value: int):
+        self.calls.append(("set_service_start", service_name, value))
         if service_name not in self.services:
             return OperationResult(False, "not_found", "missing")
         self.services[service_name] = value
@@ -57,6 +59,7 @@ class FakeRegistry:
         )
 
     def restore_usb_lockdown_policies(self):
+        self.calls.append(("restore_usb_lockdown_policies",))
         return OperationResult(True, "restored", "restored", {"backup_used": True})
 
     def load_usb_lockdown_policy_backup(self):
@@ -71,6 +74,7 @@ class FakePnpDeviceManager:
         ]
         self.disabled = []
         self.enabled = []
+        self.calls = []
 
     def list_lockdown_candidates(self):
         return OperationResult(True, "ok", "ok", {"devices": self.devices})
@@ -80,6 +84,7 @@ class FakePnpDeviceManager:
         return OperationResult(True, "disabled", "disabled", {"changed": self.disabled, "failed": {}})
 
     def enable_devices(self, instance_ids: list[str]):
+        self.calls.append(("enable_devices",))
         self.enabled = list(instance_ids)
         return OperationResult(True, "enabled", "enabled", {"changed": self.enabled, "failed": {}})
 
@@ -87,6 +92,7 @@ class FakePnpDeviceManager:
         return OperationResult(True, "ok", "ok", {"output": "ok"})
 
     def repair_usb_stack(self):
+        self.calls.append(("repair_usb_stack",))
         return OperationResult(True, "repaired", "repaired", {"changed": ["PCI\\USB"], "failed": {}})
 
     def disable_usb_device_ids(self):
@@ -128,3 +134,5 @@ def test_usb_control_full_lockdown_saves_and_restores_services(monkeypatch) -> N
     assert registry.services["USBXHCI"] == 3
     assert registry.services["USBHUB3"] == 2
     assert pnp.enabled == [r"USBSTOR\DISK&VEN_TEST\123", r"HID\VID_046D&PID_C077\456"]
+    assert registry.calls.index(("set_service_start", "USBXHCI", 3)) < registry.calls.index(("restore_usb_lockdown_policies",))
+    assert pnp.calls == [("repair_usb_stack",), ("enable_devices",)]

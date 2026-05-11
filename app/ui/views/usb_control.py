@@ -239,12 +239,22 @@ class USBControlView(BaseView):
             self.app.set_status("Cette action requiert une session administrateur.", "WARNING")
             self.refresh_data()
             return
-        if not self._confirm("Restaurer les services USB Windows et reactiver les peripheriques PnP sauvegardes par WireWall ?"):
+        message = (
+            "Restaurer les ports USB Windows ?\n\n"
+            "WireWall va retirer les policies de blocage, remettre les services USB, reactiver les peripheriques PnP et demander a Windows "
+            "de relancer la pile USB avec les options Microsoft qui autorisent un redemarrage si Windows l'exige.\n\n"
+            "Si un controleur USB est bloque par le pilote, Windows peut redemarrer ou demander un redemarrage pour terminer."
+        )
+        if not self._confirm(message):
             return
         self.run_action(
             self.controller.restore_all_usb_ports,
-            success_message=lambda result: result.message,
-            success_level=lambda result: "OK" if result.success else "ERROR",
+            success_message=lambda result: (
+                f"{result.message} Redemarrage Windows recommande."
+                if result.details.get("reboot_requested")
+                else result.message
+            ),
+            success_level=lambda result: "WARNING" if result.details.get("reboot_requested") else ("OK" if result.success else "ERROR"),
             refresh=True,
         )
 

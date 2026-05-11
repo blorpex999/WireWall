@@ -81,24 +81,30 @@ class PnpDeviceManager:
         return OperationResult(True, "ok", f"{len(devices)} peripheriques USB actifs detectes.", {"devices": devices})
 
     def disable_devices(self, instance_ids: list[str]) -> OperationResult:
-        return self._toggle_devices(instance_ids, enable=False)
+        return self._toggle_devices(instance_ids, enable=False, allow_reboot=True)
 
     def enable_devices(self, instance_ids: list[str]) -> OperationResult:
-        return self._toggle_devices(instance_ids, enable=True)
+        return self._toggle_devices(instance_ids, enable=True, allow_reboot=True)
 
-    def _toggle_devices(self, instance_ids: list[str], *, enable: bool) -> OperationResult:
+    def _toggle_devices(self, instance_ids: list[str], *, enable: bool, allow_reboot: bool = False) -> OperationResult:
         ids = [str(instance_id) for instance_id in instance_ids if str(instance_id).strip()]
         if not ids:
             return OperationResult(True, "empty", "Aucun peripherique PnP a modifier.", {"changed": [], "failed": {}})
         changed = []
         failed = {}
+        reboot_requested = False
         pnputil_action = "/enable-device" if enable else "/disable-device"
-        pnputil_extra = [] if enable else ["/force"]
+        pnputil_extra = []
+        if allow_reboot:
+            pnputil_extra.append("/reboot")
+        if not enable:
+            pnputil_extra.append("/force")
         for instance_id in ids:
             result = self._run_pnputil([pnputil_action, instance_id, *pnputil_extra], timeout=45)
             if result.success:
                 if instance_id not in changed:
                     changed.append(instance_id)
+                reboot_requested = reboot_requested or self._mentions_reboot(result)
             else:
                 failed[instance_id] = result.message
         if failed:
@@ -118,11 +124,11 @@ class PnpDeviceManager:
                 False,
                 "partial",
                 "Certains peripheriques USB PnP n'ont pas pu etre modifies.",
-                {"changed": changed, "failed": failed},
+                {"changed": changed, "failed": failed, "reboot_requested": reboot_requested},
             )
         status = "enabled" if enable else "disabled"
         message = "Peripheriques USB PnP restaures." if enable else "Peripheriques USB PnP desactives."
-        return OperationResult(True, status, message, {"changed": changed, "failed": {}})
+        return OperationResult(True, status, message, {"changed": changed, "failed": {}, "reboot_requested": reboot_requested})
 
     def apply_policy_refresh(self) -> OperationResult:
         return self._run_process(["gpupdate.exe", "/target:computer", "/force"], timeout=90)
@@ -166,26 +172,65 @@ foreach ($device in $devices) {
         failed = parsed.get("failed") or {}
         if not isinstance(failed, dict):
             failed = {}
+        restart = self.restart_usb_stack()
         scan = self._run_pnputil(["/scan-devices"], timeout=90)
         return OperationResult(
             True,
             "repaired" if not failed else "partial",
             "Reparation de la pile USB demandee.",
-            {"changed": changed, "failed": failed, "scan": scan.details, "scan_status": scan.status},
+            {
+                "changed": changed,
+                "failed": failed,
+                "restart": restart.details,
+                "restart_status": restart.status,
+                "scan": scan.details,
+                "scan_status": scan.status,
+                "reboot_requested": self._mentions_reboot(restart) or self._mentions_reboot(scan),
+            },
+        )
+
+    def restart_usb_stack(self) -> OperationResult:
+        commands = [
+            ["pnputil.exe", "/restart-device", "/class", "USB", "/reboot"],
+            ["pnputil.exe", "/restart-device", "/class", "USBDevice", "/reboot"],
+        ]
+        changed = []
+        failed = {}
+        reboot_requested = False
+        for command in commands:
+            result = self._run_process(command, timeout=90)
+            label = " ".join(command[1:])
+            if result.success:
+                changed.append(label)
+                reboot_requested = reboot_requested or self._mentions_reboot(result)
+            else:
+                failed[label] = result.message
+        return OperationResult(
+            not failed,
+            "restarted" if not failed else "partial",
+            "Redemarrage PnP de la pile USB demande.",
+            {"changed": changed, "failed": failed, "reboot_requested": reboot_requested},
         )
 
     def disable_usb_device_ids(self) -> OperationResult:
         device_ids = ["USB\\Class_03", "USB\\Class_08", "USB\\Class_09", "USB\\Class_E0", "USB\\Class_FF"]
         changed = []
         failed = {}
+        reboot_requested = False
         for device_id in device_ids:
-            result = self._run_pnputil(["/disable-device", "/deviceid", device_id, "/force"], timeout=60)
+            result = self._run_pnputil(["/disable-device", "/deviceid", device_id, "/reboot", "/force"], timeout=60)
             if result.success:
                 changed.append(device_id)
+                reboot_requested = reboot_requested or self._mentions_reboot(result)
             else:
                 failed[device_id] = result.message
         status = "disabled" if not failed else "partial"
-        return OperationResult(not failed, status, "Classes USB PnP traitees.", {"changed": changed, "failed": failed})
+        return OperationResult(
+            not failed,
+            status,
+            "Classes USB PnP traitees.",
+            {"changed": changed, "failed": failed, "reboot_requested": reboot_requested},
+        )
 
     def _toggle_devices_with_powershell(self, instance_ids: list[str], *, enable: bool) -> OperationResult:
         action = "Enable-PnpDevice" if enable else "Disable-PnpDevice"
@@ -242,6 +287,17 @@ foreach ($id in $ids) {{
                 return OperationResult(True, "ok", output, {"returncode": completed.returncode, "output": output})
             return OperationResult(False, "error", output or f"{command[0]} a echoue.", {"returncode": completed.returncode})
         return OperationResult(True, "ok", output or f"{command[0]} termine.", {"returncode": completed.returncode, "output": output})
+
+    @staticmethod
+    def _mentions_reboot(result: OperationResult) -> bool:
+        text = " ".join(
+            [
+                result.message or "",
+                str(result.details.get("output", "")) if result.details else "",
+                str(result.details.get("stdout", "")) if result.details else "",
+            ]
+        ).lower()
+        return any(marker in text for marker in ("reboot", "restart", "redemarrage", "redémarrage"))
 
     @staticmethod
     def _disable_priority(instance_id: str) -> int:

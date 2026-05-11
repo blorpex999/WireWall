@@ -215,9 +215,6 @@ class UsbControlService:
         target_values = backup.details.get("backup", {}) if backup.success else dict(USB_LOCKDOWN_SERVICES)
         if target_values and all(int(value) == 4 for value in target_values.values()):
             target_values = dict(USB_LOCKDOWN_SERVICES)
-        policy_restore = self.registry_manager.restore_usb_lockdown_policies()
-        policy_refresh = self.pnp_device_manager.apply_policy_refresh()
-        stack_repair = self.pnp_device_manager.repair_usb_stack()
         results = {}
         failures = {}
         for service_name, start_value in target_values.items():
@@ -225,14 +222,20 @@ class UsbControlService:
             results[service_name] = result.status
             if not result.success:
                 failures[service_name] = result.message
+        policy_restore = self.registry_manager.restore_usb_lockdown_policies()
+        policy_refresh = self.pnp_device_manager.apply_policy_refresh()
+        stack_repair = self.pnp_device_manager.repair_usb_stack()
         pnp_backup = self.registry_manager.load_usb_lockdown_pnp_backup()
         pnp_instance_ids = pnp_backup.details.get("instance_ids", []) if pnp_backup.success else []
         pnp_restore = self.pnp_device_manager.enable_devices(pnp_instance_ids)
+        reboot_requested = bool(
+            stack_repair.details.get("reboot_requested") if stack_repair.details else False
+        ) or bool(pnp_restore.details.get("reboot_requested") if pnp_restore.details else False)
         if failures:
             return OperationResult(
                 False,
                 "partial",
-                "Restauration USB partiellement appliquee.",
+                "Restauration USB partiellement appliquee. Redemarre Windows si les ports ne reviennent pas.",
                 {
                     "results": results,
                     "failures": failures,
@@ -242,13 +245,14 @@ class UsbControlService:
                     "stack_repair": stack_repair.details,
                     "pnp_backup_used": pnp_backup.success,
                     "pnp_result": pnp_restore.details,
+                    "reboot_requested": reboot_requested,
                 },
             )
         if pnp_backup.success and not pnp_restore.success:
             return OperationResult(
                 False,
                 "partial",
-                "Services USB restaures, mais certains peripheriques PnP n'ont pas pu etre reactives.",
+                "Services USB restaures, mais certains peripheriques PnP n'ont pas pu etre reactives. Redemarrage Windows recommande.",
                 {
                     "results": results,
                     "backup_used": backup.success,
@@ -257,12 +261,13 @@ class UsbControlService:
                     "stack_repair": stack_repair.details,
                     "pnp_backup_used": True,
                     "pnp_result": pnp_restore.details,
+                    "reboot_requested": True,
                 },
             )
         return OperationResult(
             True,
             "enabled",
-            "Ports USB restaures et peripheriques PnP reactives. Un redemarrage peut rester necessaire.",
+            "Ports USB restaures, policies retirees et pile USB relancee. Redemarre Windows si un controleur reste bloque.",
             {
                 "action": "restore_all_usb",
                 "results": results,
@@ -272,6 +277,7 @@ class UsbControlService:
                 "stack_repair": stack_repair.details,
                 "pnp_backup_used": pnp_backup.success,
                 "pnp_result": pnp_restore.details,
+                "reboot_requested": reboot_requested,
             },
         )
 
