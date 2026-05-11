@@ -187,6 +187,30 @@ class AppController:
     def list_events(self, search: str = "", severity: str = ""):
         return self.container.event_repo.list_recent(search=search, severity=severity, demo_mode=self.demo_mode)
 
+    def list_notification_events(self, period: str = "24h"):
+        cutoffs = {
+            "1h": hours_ago(1),
+            "24h": hours_ago(24),
+            "7d": days_ago(7),
+        }
+        cutoff = parse_timestamp(cutoffs.get(period, cutoffs["24h"]))
+        events = self.container.event_repo.list_recent(limit=500, demo_mode=self.demo_mode)
+        notification_types = {
+            "connected",
+            "disconnected",
+            "scan_error",
+            "usb_attack_simulation_marker_detected",
+        }
+        important_levels = {"WARNING", "HIGH", "CRITICAL", "ERROR"}
+        filtered = []
+        for event in events:
+            occurred_at = parse_timestamp(event.occurred_at)
+            if cutoff is not None and occurred_at is not None and occurred_at < cutoff:
+                continue
+            if event.event_type in notification_types or event.severity in important_levels or event.level in important_levels:
+                filtered.append(event)
+        return filtered
+
     def list_policies(self, policy_type: str = "", query: str = ""):
         return self.container.policy_service.list_entries(policy_type=policy_type, query=query)
 

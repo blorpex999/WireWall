@@ -7,17 +7,23 @@ import sys
 from pathlib import Path
 
 from PyQt6.QtCore import QTimer, Qt
-from PyQt6.QtGui import QCloseEvent, QIcon, QPixmap, QResizeEvent
+from PyQt6.QtGui import QColor, QCloseEvent, QIcon, QPixmap, QResizeEvent
 from PyQt6.QtWidgets import (
+    QAbstractItemView,
     QApplication,
     QCheckBox,
+    QComboBox,
+    QDialog,
     QFrame,
+    QHeaderView,
     QHBoxLayout,
     QLabel,
     QMainWindow,
     QPushButton,
     QStackedWidget,
     QSystemTrayIcon,
+    QTableWidget,
+    QTableWidgetItem,
     QVBoxLayout,
     QWidget,
 )
@@ -36,10 +42,108 @@ from app.ui.views.settings import SettingsView
 from app.ui.views.usb_control import USBControlView
 from app.ui.widgets.common import StatusBar, StatusPill
 from app.utils.resources import asset_path
+from app.utils.datetime import format_for_ui
+from app.utils.ui import severity_color
 from app.utils.windows import WindowsDeviceNotificationFilter
 from app.version import __version__
 
 LOGGER = logging.getLogger(__name__)
+
+
+class NotificationHistoryDialog(QDialog):
+    PERIODS = {
+        "Derniere heure": "1h",
+        "24h": "24h",
+        "Semaine": "7d",
+    }
+
+    def __init__(self, parent: QWidget, controller: AppController) -> None:
+        super().__init__(parent)
+        self.controller = controller
+        self.setWindowTitle("Notifications WireWall")
+        self.resize(820, 520)
+        self.setMinimumSize(680, 420)
+        self.setModal(False)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(16, 16, 16, 16)
+        layout.setSpacing(12)
+
+        header = QHBoxLayout()
+        header.setContentsMargins(0, 0, 0, 0)
+        header.setSpacing(10)
+        layout.addLayout(header)
+
+        title_box = QVBoxLayout()
+        title_box.setContentsMargins(0, 0, 0, 0)
+        title_box.setSpacing(3)
+        header.addLayout(title_box, 1)
+
+        title = QLabel("Notifications", self)
+        title.setObjectName("title")
+        title_box.addWidget(title)
+
+        self.summary_label = QLabel("", self)
+        self.summary_label.setObjectName("muted")
+        title_box.addWidget(self.summary_label)
+
+        self.period_filter = QComboBox(self)
+        self.period_filter.addItems(self.PERIODS.keys())
+        self.period_filter.setCurrentText("24h")
+        self.period_filter.currentTextChanged.connect(lambda _value: self.refresh())
+        header.addWidget(self.period_filter, 0, Qt.AlignmentFlag.AlignRight)
+
+        self.table = QTableWidget(0, 4, self)
+        self.table.setHorizontalHeaderLabels(["Heure", "Type", "Niveau", "Message"])
+        self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self.table.verticalHeader().setVisible(False)
+        self.table.setAlternatingRowColors(True)
+        self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+        self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
+        self.table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
+        self.table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
+        layout.addWidget(self.table, 1)
+
+        footer = QHBoxLayout()
+        footer.setContentsMargins(0, 0, 0, 0)
+        footer.addStretch(1)
+        refresh_button = QPushButton("Actualiser", self)
+        refresh_button.setObjectName("subtle")
+        refresh_button.clicked.connect(self.refresh)
+        footer.addWidget(refresh_button)
+        close_button = QPushButton("Fermer", self)
+        close_button.clicked.connect(self.close)
+        footer.addWidget(close_button)
+        layout.addLayout(footer)
+
+    def refresh(self) -> None:
+        period = self.PERIODS.get(self.period_filter.currentText(), "24h")
+        events = self.controller.list_notification_events(period)
+        self.table.setRowCount(len(events))
+        for row, event in enumerate(events):
+            values = [
+                format_for_ui(event.occurred_at),
+                self._event_type_label(event.event_type),
+                event.severity,
+                event.summary,
+            ]
+            for column, value in enumerate(values):
+                item = QTableWidgetItem(str(value))
+                item.setToolTip(str(value))
+                if column == 2:
+                    item.setForeground(QColor(severity_color(event.severity)))
+                self.table.setItem(row, column, item)
+        self.summary_label.setText(f"{len(events)} notification(s) sur la periode selectionnee.")
+
+    def _event_type_label(self, event_type: str) -> str:
+        return {
+            "connected": "Connexion",
+            "disconnected": "Deconnexion",
+            "scan_error": "Monitoring",
+            "usb_attack_simulation_marker_detected": "Simulation",
+        }.get(event_type, event_type.replace("_", " ").capitalize())
 
 
 class WireWallMainWindow(QMainWindow):
@@ -54,6 +158,7 @@ class WireWallMainWindow(QMainWindow):
         self._usb_filter: WindowsDeviceNotificationFilter | None = None
         self._tray_icon: QSystemTrayIcon | None = None
         self._notification_toasts: list[QFrame] = []
+        self._notification_dialog: NotificationHistoryDialog | None = None
         self._repaint_scheduled = False
         self._force_repaint_running = False
         self._is_closing = False
@@ -132,6 +237,7 @@ class WireWallMainWindow(QMainWindow):
         self.controller.request_health_refresh()
         self.controller.request_brain_refresh()
         self.set_status("WireWall initialise.", "OK")
+        self._refresh_notification_button()
         QTimer.singleShot(150, self._notify_view_resize)
 
     def _build_sidebar(self, parent: QWidget) -> QFrame:
@@ -182,6 +288,12 @@ class WireWallMainWindow(QMainWindow):
         self.demo_toggle.setChecked(self.controller.demo_mode)
         self.demo_toggle.toggled.connect(self._toggle_demo_mode)
         layout.addWidget(self.demo_toggle)
+
+        self.notifications_button = QPushButton("Notifications", sidebar)
+        self.notifications_button.setObjectName("subtle")
+        self.notifications_button.setToolTip("Voir l'historique des notifications WireWall.")
+        self.notifications_button.clicked.connect(self._show_notification_history)
+        layout.addWidget(self.notifications_button)
 
         for key, label, _view_class in self.view_specs:
             button = QPushButton(label, sidebar)
@@ -280,6 +392,18 @@ class WireWallMainWindow(QMainWindow):
         window.raise_()
         window.activateWindow()
 
+    def _show_notification_history(self) -> None:
+        if self._notification_dialog is None:
+            self._notification_dialog = NotificationHistoryDialog(self, self.controller)
+            self._notification_dialog.finished.connect(lambda _code: self._forget_notification_dialog())
+        self._notification_dialog.refresh()
+        self._notification_dialog.show()
+        self._notification_dialog.raise_()
+        self._notification_dialog.activateWindow()
+
+    def _forget_notification_dialog(self) -> None:
+        self._notification_dialog = None
+
     def _forget_investigation_window(self, window: QWidget) -> None:
         try:
             self._investigation_windows.remove(window)
@@ -350,6 +474,7 @@ class WireWallMainWindow(QMainWindow):
                 payload = event["payload"]
                 self.controller.request_brain_refresh()
                 refresh_views.update({"dashboard", "devices", "history", "alerts"})
+                self._refresh_notification_button()
                 if payload.get("event_type") in {"connected", "disconnected"}:
                     self._notify_user(
                         payload.get("title", "Evenement appareil"),
@@ -376,6 +501,7 @@ class WireWallMainWindow(QMainWindow):
                 self.controller.request_brain_refresh()
                 self.set_status(payload.get("message", "Nouvelle alerte."), payload.get("severity", "WARNING"))
                 refresh_views.update({"dashboard", "alerts"})
+                self._refresh_notification_button()
                 self._notify_user(
                     payload.get("title", "Alerte WireWall"),
                     payload.get("message", "Nouvelle alerte."),
@@ -385,16 +511,19 @@ class WireWallMainWindow(QMainWindow):
                 message = event["payload"].get("message", "Erreur de monitoring.")
                 self.set_status(message, "ERROR")
                 self._notify_user("Erreur de monitoring", message, "ERROR")
+                self._refresh_notification_button()
                 refresh_views.add("dashboard")
             elif event_type == "monitor_warning":
                 message = event["payload"].get("message", "Degradation du monitoring USB.")
                 self.set_status(message, "WARNING")
                 self._notify_user("Attention WireWall", message, "WARNING")
+                self._refresh_notification_button()
                 refresh_views.add("dashboard")
             elif event_type == "background_task_error":
                 message = event["payload"].get("message", "Erreur de tache de fond.")
                 self.set_status(message, "ERROR")
                 self._notify_user("Erreur de tache de fond", message, "ERROR")
+                self._refresh_notification_button()
                 task_name = event["payload"].get("task")
                 if task_name == "ai_analysis":
                     refresh_views.add("ai_analysis")
@@ -409,6 +538,14 @@ class WireWallMainWindow(QMainWindow):
             if self.current_view_key is not None and self.current_view_key != "dashboard" and self.current_view_key in refresh_views:
                 self._refresh_view(self.current_view_key)
             self.request_repaint()
+        if self._notification_dialog is not None and self._notification_dialog.isVisible():
+            self._notification_dialog.refresh()
+
+    def _refresh_notification_button(self) -> None:
+        if not hasattr(self, "notifications_button"):
+            return
+        count = len(self.controller.list_notification_events("24h"))
+        self.notifications_button.setText(f"Notifications ({count})" if count else "Notifications")
 
     def _refresh_view(self, key: str) -> None:
         try:

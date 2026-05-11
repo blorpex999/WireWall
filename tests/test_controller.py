@@ -5,7 +5,7 @@ from types import SimpleNamespace
 import pytest
 
 from app.config.defaults import build_default_settings
-from app.models.entities import HealthStatus
+from app.models.entities import DeviceEvent, HealthStatus
 from app.ui.controller import AppController
 from app.utils.datetime import utc_now
 
@@ -139,6 +139,28 @@ def test_controller_request_health_refresh_passes_real_mode() -> None:
 
     assert controller.request_health_refresh() is True
     assert calls == [False]
+
+
+def test_controller_lists_notification_events_by_period() -> None:
+    settings = build_default_settings()
+    settings.mode = "real"
+    now = utc_now()
+
+    class FakeEventRepo:
+        def list_recent(self, limit=500, demo_mode=False):
+            assert limit == 500
+            assert demo_mode is False
+            return [
+                DeviceEvent(now, "connected", "dev-1", "Device connected", "LOW", demo_mode=False),
+                DeviceEvent(now, "snapshot_updated", None, "Snapshot refreshed", "LOW", demo_mode=False),
+                DeviceEvent(now, "scan_error", None, "Scan failed", "WARNING", demo_mode=False),
+            ]
+
+    controller = AppController(SimpleNamespace(settings=settings, event_repo=FakeEventRepo()))
+
+    events = controller.list_notification_events("24h")
+
+    assert [event.event_type for event in events] == ["connected", "scan_error"]
 
 
 def test_controller_request_health_refresh_passes_demo_mode() -> None:
