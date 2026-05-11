@@ -16,6 +16,8 @@ SERVICES_REG_ROOT = r"SYSTEM\CurrentControlSet\Services"
 WIREWALL_REG_PATH = r"SOFTWARE\WireWall"
 DEVICE_INSTALL_RESTRICTIONS_PATH = r"SOFTWARE\Policies\Microsoft\Windows\DeviceInstall\Restrictions"
 DENY_DEVICE_CLASSES_PATH = rf"{DEVICE_INSTALL_RESTRICTIONS_PATH}\DenyDeviceClasses"
+DENY_DEVICE_IDS_PATH = rf"{DEVICE_INSTALL_RESTRICTIONS_PATH}\DenyDeviceIDs"
+DENY_INSTANCE_IDS_PATH = rf"{DEVICE_INSTALL_RESTRICTIONS_PATH}\DenyInstanceIDs"
 REMOVABLE_STORAGE_DEVICES_PATH = r"SOFTWARE\Policies\Microsoft\Windows\RemovableStorageDevices"
 USB_LOCKDOWN_BACKUP_VALUE = "UsbPortLockdownServiceStarts"
 USB_LOCKDOWN_PNP_BACKUP_VALUE = "UsbPortLockdownPnpInstanceIds"
@@ -136,24 +138,38 @@ class RegistryManager:
         except (OSError, ValueError, TypeError) as exc:
             return OperationResult(False, "error", f"Sauvegarde WireWall PnP illisible: {exc}")
 
-    def apply_usb_lockdown_policies(self, class_guids: list[str]) -> OperationResult:
+    def apply_usb_lockdown_policies(
+        self,
+        class_guids: list[str],
+        device_ids: list[str] | None = None,
+        instance_ids: list[str] | None = None,
+    ) -> OperationResult:
         if winreg is None:
             return OperationResult(False, "unsupported", "Le registre Windows n'est pas disponible.")
         backup = self._read_policy_backup()
         classes = [str(guid).strip() for guid in class_guids if str(guid).strip()]
+        devices = [str(device_id).strip() for device_id in (device_ids or []) if str(device_id).strip()]
+        instances = [str(instance_id).strip() for instance_id in (instance_ids or []) if str(instance_id).strip()]
         try:
             self._write_policy_backup(backup)
             with winreg.CreateKeyEx(winreg.HKEY_LOCAL_MACHINE, DEVICE_INSTALL_RESTRICTIONS_PATH, 0, winreg.KEY_SET_VALUE) as key:
                 winreg.SetValueEx(key, "DenyDeviceClasses", 0, winreg.REG_DWORD, 1)
                 winreg.SetValueEx(key, "DenyDeviceClassesRetroactive", 0, winreg.REG_DWORD, 1)
+                winreg.SetValueEx(key, "DenyDeviceIDs", 0, winreg.REG_DWORD, 1)
+                winreg.SetValueEx(key, "DenyDeviceIDsRetroactive", 0, winreg.REG_DWORD, 1)
+                winreg.SetValueEx(key, "DenyInstanceIDs", 0, winreg.REG_DWORD, 1)
+                winreg.SetValueEx(key, "DenyInstanceIDsRetroactive", 0, winreg.REG_DWORD, 1)
                 winreg.SetValueEx(key, "DenyRemovableDevices", 0, winreg.REG_DWORD, 1)
+                winreg.SetValueEx(key, "DenyRemovableDevicesRetroactive", 0, winreg.REG_DWORD, 1)
                 winreg.SetValueEx(key, "AllowDenyLayered", 0, winreg.REG_DWORD, 1)
             with winreg.CreateKeyEx(winreg.HKEY_LOCAL_MACHINE, DENY_DEVICE_CLASSES_PATH, 0, winreg.KEY_SET_VALUE) as key:
                 for index, class_guid in enumerate(classes, start=1):
                     winreg.SetValueEx(key, str(index), 0, winreg.REG_SZ, class_guid)
+            self._write_string_values(DENY_DEVICE_IDS_PATH, devices)
+            self._write_string_values(DENY_INSTANCE_IDS_PATH, instances)
             with winreg.CreateKeyEx(winreg.HKEY_LOCAL_MACHINE, REMOVABLE_STORAGE_DEVICES_PATH, 0, winreg.KEY_SET_VALUE) as key:
                 winreg.SetValueEx(key, "Deny_All", 0, winreg.REG_DWORD, 1)
-            return OperationResult(True, "applied", "Policies Windows USB appliquees.", {"classes": classes})
+            return OperationResult(True, "applied", "Policies Windows USB appliquees.", {"classes": classes, "device_ids": devices, "instance_ids": instances})
         except PermissionError:
             return OperationResult(False, "permission_denied", "Privileges administrateur requis pour appliquer les policies USB.")
         except OSError as exc:
@@ -167,10 +183,17 @@ class RegistryManager:
         try:
             self._restore_policy_dword(DEVICE_INSTALL_RESTRICTIONS_PATH, "DenyDeviceClasses", backup)
             self._restore_policy_dword(DEVICE_INSTALL_RESTRICTIONS_PATH, "DenyDeviceClassesRetroactive", backup)
+            self._restore_policy_dword(DEVICE_INSTALL_RESTRICTIONS_PATH, "DenyDeviceIDs", backup)
+            self._restore_policy_dword(DEVICE_INSTALL_RESTRICTIONS_PATH, "DenyDeviceIDsRetroactive", backup)
+            self._restore_policy_dword(DEVICE_INSTALL_RESTRICTIONS_PATH, "DenyInstanceIDs", backup)
+            self._restore_policy_dword(DEVICE_INSTALL_RESTRICTIONS_PATH, "DenyInstanceIDsRetroactive", backup)
             self._restore_policy_dword(DEVICE_INSTALL_RESTRICTIONS_PATH, "DenyRemovableDevices", backup)
+            self._restore_policy_dword(DEVICE_INSTALL_RESTRICTIONS_PATH, "DenyRemovableDevicesRetroactive", backup)
             self._restore_policy_dword(DEVICE_INSTALL_RESTRICTIONS_PATH, "AllowDenyLayered", backup)
             self._restore_policy_dword(REMOVABLE_STORAGE_DEVICES_PATH, "Deny_All", backup)
-            self._restore_deny_device_classes(backup)
+            self._restore_string_value_key(DENY_DEVICE_CLASSES_PATH, backup, "deny_device_classes")
+            self._restore_string_value_key(DENY_DEVICE_IDS_PATH, backup, "deny_device_ids")
+            self._restore_string_value_key(DENY_INSTANCE_IDS_PATH, backup, "deny_instance_ids")
             return OperationResult(True, "restored", "Policies Windows USB restaurees.", {"backup_used": backup_result.success})
         except PermissionError:
             return OperationResult(False, "permission_denied", "Privileges administrateur requis pour restaurer les policies USB.")
@@ -200,11 +223,23 @@ class RegistryManager:
             "dwords": {
                 DEVICE_INSTALL_RESTRICTIONS_PATH: self._read_dwords(
                     DEVICE_INSTALL_RESTRICTIONS_PATH,
-                    ["DenyDeviceClasses", "DenyDeviceClassesRetroactive", "DenyRemovableDevices", "AllowDenyLayered"],
+                    [
+                        "DenyDeviceClasses",
+                        "DenyDeviceClassesRetroactive",
+                        "DenyDeviceIDs",
+                        "DenyDeviceIDsRetroactive",
+                        "DenyInstanceIDs",
+                        "DenyInstanceIDsRetroactive",
+                        "DenyRemovableDevices",
+                        "DenyRemovableDevicesRetroactive",
+                        "AllowDenyLayered",
+                    ],
                 ),
                 REMOVABLE_STORAGE_DEVICES_PATH: self._read_dwords(REMOVABLE_STORAGE_DEVICES_PATH, ["Deny_All"]),
             },
             "deny_device_classes": self._read_string_values(DENY_DEVICE_CLASSES_PATH),
+            "deny_device_ids": self._read_string_values(DENY_DEVICE_IDS_PATH),
+            "deny_instance_ids": self._read_string_values(DENY_INSTANCE_IDS_PATH),
         }
 
     def _write_policy_backup(self, backup: dict[str, object]) -> None:
@@ -242,6 +277,17 @@ class RegistryManager:
             pass
         return values
 
+    def _write_string_values(self, path: str, values: list[str]) -> None:
+        existing = self._read_string_values(path)
+        with winreg.CreateKeyEx(winreg.HKEY_LOCAL_MACHINE, path, 0, winreg.KEY_SET_VALUE) as key:
+            for value_name in existing:
+                try:
+                    winreg.DeleteValue(key, value_name)
+                except FileNotFoundError:
+                    pass
+            for index, value in enumerate(values, start=1):
+                winreg.SetValueEx(key, str(index), 0, winreg.REG_SZ, value)
+
     def _restore_policy_dword(self, path: str, value_name: str, backup: dict[str, object]) -> None:
         dwords = backup.get("dwords", {}) if isinstance(backup.get("dwords", {}), dict) else {}
         path_values = dwords.get(path, {}) if isinstance(dwords.get(path, {}), dict) else {}
@@ -255,21 +301,21 @@ class RegistryManager:
             else:
                 winreg.SetValueEx(key, value_name, 0, winreg.REG_DWORD, int(original))
 
-    def _restore_deny_device_classes(self, backup: dict[str, object]) -> None:
+    def _restore_string_value_key(self, path: str, backup: dict[str, object], backup_key: str) -> None:
         try:
-            winreg.DeleteKey(winreg.HKEY_LOCAL_MACHINE, DENY_DEVICE_CLASSES_PATH)
+            winreg.DeleteKey(winreg.HKEY_LOCAL_MACHINE, path)
         except FileNotFoundError:
             pass
         except OSError:
-            with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, DENY_DEVICE_CLASSES_PATH, 0, winreg.KEY_SET_VALUE | winreg.KEY_READ) as key:
-                for value_name in list(self._read_string_values(DENY_DEVICE_CLASSES_PATH)):
+            with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, path, 0, winreg.KEY_SET_VALUE | winreg.KEY_READ) as key:
+                for value_name in list(self._read_string_values(path)):
                     try:
                         winreg.DeleteValue(key, value_name)
                     except FileNotFoundError:
                         pass
-        original_values = backup.get("deny_device_classes", {})
+        original_values = backup.get(backup_key, {})
         if isinstance(original_values, dict) and original_values:
-            with winreg.CreateKeyEx(winreg.HKEY_LOCAL_MACHINE, DENY_DEVICE_CLASSES_PATH, 0, winreg.KEY_SET_VALUE) as key:
+            with winreg.CreateKeyEx(winreg.HKEY_LOCAL_MACHINE, path, 0, winreg.KEY_SET_VALUE) as key:
                 for name, value in original_values.items():
                     winreg.SetValueEx(key, str(name), 0, winreg.REG_SZ, str(value))
 

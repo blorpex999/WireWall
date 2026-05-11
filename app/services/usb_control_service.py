@@ -23,6 +23,16 @@ USB_LOCKDOWN_CLASS_GUIDS = [
     "{eec5ad98-8080-425f-922a-dabf3de3f69a}",  # WPD portable devices
 ]
 
+USB_LOCKDOWN_DEVICE_IDS = [
+    "USB\\Composite",
+    "USB\\Class_03",
+    "USB\\Class_08",
+    "USB\\Class_09",
+    "USB\\Class_E0",
+    "USB\\Class_FF",
+    "USBSTOR\\Disk",
+]
+
 
 class UsbControlService:
     def __init__(self, registry_manager: RegistryManager, pnp_device_manager: PnpDeviceManager | None = None) -> None:
@@ -139,7 +149,11 @@ class UsbControlService:
         pnp_backup = self.registry_manager.save_usb_lockdown_pnp_backup(pnp_instance_ids)
         if not pnp_backup.success:
             return pnp_backup
-        policy_result = self.registry_manager.apply_usb_lockdown_policies(USB_LOCKDOWN_CLASS_GUIDS)
+        policy_result = self.registry_manager.apply_usb_lockdown_policies(
+            USB_LOCKDOWN_CLASS_GUIDS,
+            USB_LOCKDOWN_DEVICE_IDS,
+            pnp_instance_ids,
+        )
         if not policy_result.success:
             return policy_result
         policy_refresh = self.pnp_device_manager.apply_policy_refresh()
@@ -158,6 +172,7 @@ class UsbControlService:
                 "Verrouillage total USB partiellement applique.",
                 {"results": results, "failures": failures, "backup": current, "missing": missing, "pnp_candidates": pnp_devices},
             )
+        class_disable = self.pnp_device_manager.disable_usb_device_ids()
         pnp_disable = self.pnp_device_manager.disable_devices(pnp_instance_ids)
         pnp_details = pnp_disable.details if pnp_disable.details else {}
         if pnp_candidates.success and not pnp_disable.success:
@@ -171,6 +186,7 @@ class UsbControlService:
                     "missing": missing,
                     "policy_result": policy_result.details,
                     "policy_refresh": policy_refresh.details,
+                    "class_disable": class_disable.details,
                     "pnp_candidates": pnp_devices,
                     "pnp_result": pnp_details,
                 },
@@ -186,6 +202,7 @@ class UsbControlService:
                 "missing": missing,
                 "policy_result": policy_result.details,
                 "policy_refresh": policy_refresh.details,
+                "class_disable": class_disable.details,
                 "pnp_candidates": pnp_devices,
                 "pnp_result": pnp_details,
                 "warning": "Les souris, claviers et hubs USB peuvent cesser de fonctionner immediatement.",

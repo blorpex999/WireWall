@@ -48,8 +48,13 @@ class FakeRegistry:
             return OperationResult(False, "not_found", "missing")
         return OperationResult(True, "loaded", "loaded", {"instance_ids": self.pnp_backup})
 
-    def apply_usb_lockdown_policies(self, class_guids: list[str]):
-        return OperationResult(True, "applied", "applied", {"classes": class_guids})
+    def apply_usb_lockdown_policies(self, class_guids: list[str], device_ids=None, instance_ids=None):
+        return OperationResult(
+            True,
+            "applied",
+            "applied",
+            {"classes": class_guids, "device_ids": device_ids or [], "instance_ids": instance_ids or []},
+        )
 
     def restore_usb_lockdown_policies(self):
         return OperationResult(True, "restored", "restored", {"backup_used": True})
