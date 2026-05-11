@@ -173,8 +173,23 @@ class UsbEnumerator:
                 "Select-Object FriendlyName,InstanceId,Class | ConvertTo-Json -Compress"
             ),
         ]
+        startupinfo = None
+        creationflags = 0
+        if sys.platform == "win32":
+            startupinfo = subprocess.STARTUPINFO()
+            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+            startupinfo.wShowWindow = subprocess.SW_HIDE
+            creationflags = subprocess.CREATE_NO_WINDOW
         try:
-            completed = subprocess.run(command, capture_output=True, text=True, timeout=2.5, check=False)
+            completed = subprocess.run(
+                command,
+                capture_output=True,
+                text=True,
+                timeout=2.5,
+                check=False,
+                startupinfo=startupinfo,
+                creationflags=creationflags,
+            )
         except Exception:
             LOGGER.debug("Indices Windows PnP indisponibles.", exc_info=True)
             return {}
