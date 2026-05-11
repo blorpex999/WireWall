@@ -15,12 +15,6 @@ USB_LOCKDOWN_SERVICES = {
 USB_LOCKDOWN_CLASS_GUIDS = [
     "{36fc9e60-c465-11cf-8056-444553540000}",  # USB host controllers and hubs
     "{88bae032-5a81-49f0-bc3d-a4ff138216d6}",  # USBDevice
-    "{745a17a0-74d3-11d0-b6fe-00a0c90f57da}",  # HIDClass
-    "{4d36e96b-e325-11ce-bfc1-08002be10318}",  # Keyboard
-    "{4d36e96f-e325-11ce-bfc1-08002be10318}",  # Mouse
-    "{4d36e967-e325-11ce-bfc1-08002be10318}",  # DiskDrive
-    "{4d36e97b-e325-11ce-bfc1-08002be10318}",  # SCSIAdapter / UASP storage
-    "{eec5ad98-8080-425f-922a-dabf3de3f69a}",  # WPD portable devices
 ]
 
 USB_LOCKDOWN_DEVICE_IDS = [
@@ -223,6 +217,7 @@ class UsbControlService:
             target_values = dict(USB_LOCKDOWN_SERVICES)
         policy_restore = self.registry_manager.restore_usb_lockdown_policies()
         policy_refresh = self.pnp_device_manager.apply_policy_refresh()
+        stack_repair = self.pnp_device_manager.repair_usb_stack()
         results = {}
         failures = {}
         for service_name, start_value in target_values.items():
@@ -244,6 +239,7 @@ class UsbControlService:
                     "backup_used": backup.success,
                     "policy_restore": policy_restore.details,
                     "policy_refresh": policy_refresh.details,
+                    "stack_repair": stack_repair.details,
                     "pnp_backup_used": pnp_backup.success,
                     "pnp_result": pnp_restore.details,
                 },
@@ -258,6 +254,7 @@ class UsbControlService:
                     "backup_used": backup.success,
                     "policy_restore": policy_restore.details,
                     "policy_refresh": policy_refresh.details,
+                    "stack_repair": stack_repair.details,
                     "pnp_backup_used": True,
                     "pnp_result": pnp_restore.details,
                 },
@@ -272,6 +269,7 @@ class UsbControlService:
                 "backup_used": backup.success,
                 "policy_restore": policy_restore.details,
                 "policy_refresh": policy_refresh.details,
+                "stack_repair": stack_repair.details,
                 "pnp_backup_used": pnp_backup.success,
                 "pnp_result": pnp_restore.details,
             },

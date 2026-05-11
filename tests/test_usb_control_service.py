@@ -86,6 +86,9 @@ class FakePnpDeviceManager:
     def apply_policy_refresh(self):
         return OperationResult(True, "ok", "ok", {"output": "ok"})
 
+    def repair_usb_stack(self):
+        return OperationResult(True, "repaired", "repaired", {"changed": ["PCI\\USB"], "failed": {}})
+
     def disable_usb_device_ids(self):
         return OperationResult(True, "disabled", "disabled", {"changed": ["USB\\Class_08"], "failed": {}})
 

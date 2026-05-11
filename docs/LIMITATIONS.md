@@ -24,11 +24,13 @@
 
 - Le verrouillage total applique des policies Microsoft dans `HKLM\SOFTWARE\Policies\Microsoft\Windows\DeviceInstall\Restrictions` avec application retroactive aux peripheriques deja installes.
 - Il renseigne les listes `DenyDeviceClasses`, `DenyDeviceIDs` et `DenyInstanceIDs` pour couvrir a la fois familles USB, peripheriques futurs et peripheriques deja observes.
+- Les classes Windows trop larges comme `DiskDrive`, `Mouse` ou `Keyboard` ne sont pas bloquees globalement: WireWall cible plutot les IDs USB observes pour eviter de casser des peripheriques internes.
 - Il active aussi `HKLM\SOFTWARE\Policies\Microsoft\Windows\RemovableStorageDevices\Deny_All` pour refuser l'acces aux stockages amovibles.
 - Le verrouillage total agit sur des services Windows de controle/hub USB (`USBXHCI`, `USBHUB3`, `usbhub`, `UCX01000` si presents).
 - Il desactive aussi les peripheriques USB deja presents via `pnputil`/`Disable-PnpDevice` (`USB`, `USBSTOR`, `HID\VID...`) pour rendre l'action visible sans attendre un redemarrage quand Windows l'autorise.
 - Il peut bloquer souris, clavier, hubs, stockage, adaptateurs et certains peripheriques internes relies en USB.
 - WireWall sauvegarde les valeurs de demarrage originales, les policies preexistantes et les IDs PnP modifies avant blocage, puis propose une restauration.
+- La restauration relance aussi une reparation de pile USB: activation des devices USB/HID observes et `pnputil /scan-devices`.
 - `gpupdate` est execute pendant l'action pour privilegier la fiabilite; WireWall ne declenche jamais de redemarrage automatique, meme si certains pilotes peuvent demander un redemarrage manuel pour appliquer ou annuler pleinement l'etat.
 - Cette option reste dangereuse sur un poste sans clavier/touchpad non USB ou sans acces distant.
 

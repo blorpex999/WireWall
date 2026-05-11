@@ -9,6 +9,7 @@ from app.models.entities import OperationResult
 USB_PNP_QUERY = r"""
 $ErrorActionPreference = 'Stop'
 $devices = Get-PnpDevice -PresentOnly | Where-Object {
+    $_.Class -eq 'USB' -or
     $_.InstanceId -like 'USB\*' -or
     $_.InstanceId -like 'USBSTOR\*' -or
     $_.InstanceId -like 'HID\VID_*'
@@ -126,6 +127,53 @@ class PnpDeviceManager:
     def apply_policy_refresh(self) -> OperationResult:
         return self._run_process(["gpupdate.exe", "/target:computer", "/force"], timeout=90)
 
+    def repair_usb_stack(self) -> OperationResult:
+        script = r"""
+$ErrorActionPreference = 'Continue'
+$classes = @('USB', 'USBDevice', 'HIDClass', 'Mouse', 'Keyboard', 'SCSIAdapter', 'DiskDrive', 'WPD')
+$devices = Get-PnpDevice | Where-Object {
+    $classes -contains $_.Class -and (
+        $_.Class -eq 'USB' -or
+        $_.InstanceId -like 'USB\*' -or
+        $_.InstanceId -like 'USBSTOR\*' -or
+        $_.InstanceId -like 'HID\VID_*' -or
+        $_.FriendlyName -like '*USB*'
+    )
+}
+$changed = @()
+$failed = @{}
+foreach ($device in $devices) {
+    try {
+        Enable-PnpDevice -InstanceId $device.InstanceId -Confirm:$false -ErrorAction Stop
+        $changed += $device.InstanceId
+    } catch {
+        $failed[$device.InstanceId] = $_.Exception.Message
+    }
+}
+[PSCustomObject]@{ changed = $changed; failed = $failed } | ConvertTo-Json -Compress
+"""
+        result = self._run_powershell(script, timeout=120)
+        if not result.success:
+            return result
+        raw = str(result.details.get("stdout") or "").strip()
+        try:
+            parsed = json.loads(raw) if raw else {}
+        except ValueError as exc:
+            return OperationResult(False, "parse_error", f"Retour reparation USB illisible: {exc}", {"raw": raw})
+        changed = parsed.get("changed") or []
+        if isinstance(changed, str):
+            changed = [changed]
+        failed = parsed.get("failed") or {}
+        if not isinstance(failed, dict):
+            failed = {}
+        scan = self._run_pnputil(["/scan-devices"], timeout=90)
+        return OperationResult(
+            True,
+            "repaired" if not failed else "partial",
+            "Reparation de la pile USB demandee.",
+            {"changed": changed, "failed": failed, "scan": scan.details, "scan_status": scan.status},
+        )
+
     def disable_usb_device_ids(self) -> OperationResult:
         device_ids = ["USB\\Class_03", "USB\\Class_08", "USB\\Class_09", "USB\\Class_E0", "USB\\Class_FF"]
         changed = []
@@ -190,6 +238,8 @@ foreach ($id in $ids) {{
             return OperationResult(False, "timeout", f"Commande trop longue: {command[0]}.")
         output = "\n".join(part.strip() for part in (completed.stdout, completed.stderr) if part and part.strip())
         if completed.returncode != 0:
+            if "already enabled" in output.lower():
+                return OperationResult(True, "ok", output, {"returncode": completed.returncode, "output": output})
             return OperationResult(False, "error", output or f"{command[0]} a echoue.", {"returncode": completed.returncode})
         return OperationResult(True, "ok", output or f"{command[0]} termine.", {"returncode": completed.returncode, "output": output})
 
