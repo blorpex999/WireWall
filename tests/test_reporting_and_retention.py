@@ -17,6 +17,7 @@ from app.models.entities import (
 from app.services.policy_service import PolicyService
 from app.services.report_service import ReportService
 from app.services.retention_service import RetentionService
+from app.services.integrity_service import IntegrityVerificationService
 from app.utils.datetime import days_ago, hours_ago, utc_now
 
 
@@ -432,6 +433,72 @@ def test_report_service_persists_export_hash_and_chain(workspace_tmp_dir, reposi
     assert audit.file_sha256
     assert audit.chain_hash
     assert audit.config_summary["recommendation_mode"] == settings.recommendation_mode
+    assert audit.config_summary["context_hash"]
+    assert audit.config_summary["event_chain_hash"]
+
+
+def test_integrity_service_verifies_export_chain(workspace_tmp_dir, repositories) -> None:
+    settings = build_default_settings()
+    device_repo = repositories["device_repo"]
+    event_repo = repositories["event_repo"]
+    policy_service = PolicyService(repositories["policy_repo"], device_repo)
+    event_repo.add(
+        DeviceEvent(
+            occurred_at=utc_now(),
+            event_type="connected",
+            device_key="known-device",
+            summary="known device connected",
+            severity="LOW",
+            source="test",
+        )
+    )
+    service = ReportService(
+        exports_dir=workspace_tmp_dir,
+        device_repo=device_repo,
+        event_repo=event_repo,
+        policy_service=policy_service,
+        alert_repo=repositories["alert_repo"],
+        health_repo=repositories["health_repo"],
+        ai_analysis_repo=repositories["ai_repo"],
+        brain_snapshot_repo=repositories["brain_repo"],
+        report_audit_repo=repositories["report_audit_repo"],
+        settings_getter=lambda: settings,
+    )
+    service.export_json(False, str(workspace_tmp_dir / "audit.json"))
+
+    result = IntegrityVerificationService(repositories["report_audit_repo"], event_repo).verify(False)
+
+    assert result.success is True
+    assert result.status == "integrity_ok"
+    assert result.details["audit_count"] == 1
+    assert result.details["event_chain"]["status"] == "ok"
+
+
+def test_integrity_service_detects_modified_export(workspace_tmp_dir, repositories) -> None:
+    settings = build_default_settings()
+    device_repo = repositories["device_repo"]
+    event_repo = repositories["event_repo"]
+    policy_service = PolicyService(repositories["policy_repo"], device_repo)
+    service = ReportService(
+        exports_dir=workspace_tmp_dir,
+        device_repo=device_repo,
+        event_repo=event_repo,
+        policy_service=policy_service,
+        alert_repo=repositories["alert_repo"],
+        health_repo=repositories["health_repo"],
+        ai_analysis_repo=repositories["ai_repo"],
+        brain_snapshot_repo=repositories["brain_repo"],
+        report_audit_repo=repositories["report_audit_repo"],
+        settings_getter=lambda: settings,
+    )
+    target = service.export_json(False, str(workspace_tmp_dir / "audit.json"))
+    target.write_text(target.read_text(encoding="utf-8") + "\nmodified\n", encoding="utf-8")
+
+    result = IntegrityVerificationService(repositories["report_audit_repo"], event_repo).verify(False)
+
+    assert result.success is False
+    assert result.status == "integrity_failed"
+    assert result.details["files"][0]["status"] == "modified"
 
 
 def test_report_service_csv_sanitizes_formula_cells(workspace_tmp_dir, repositories) -> None:

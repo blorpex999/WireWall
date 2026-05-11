@@ -34,6 +34,9 @@ class USBDevice:
 
     @property
     def display_name(self) -> str:
+        friendly_name = self.metadata.get("friendly_name")
+        if friendly_name:
+            return str(friendly_name)
         label = f"{self.vendor_name} {self.product_name}".strip()
         return label if label else "Périphérique USB"
 

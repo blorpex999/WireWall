@@ -265,7 +265,12 @@ class ReportService:
             file_path=str(target),
             file_sha256=file_sha,
             chain_hash=chain_hash,
-            config_summary=context["settings"],
+            config_summary={
+                **context["settings"],
+                "context_hash": context["context_hash"],
+                "event_chain_hash": context["event_chain_hash"],
+                "previous_audit_chain_hash": previous.chain_hash if previous else "",
+            },
             demo_mode=demo_mode,
         )
         self.report_audit_repo.add(audit)

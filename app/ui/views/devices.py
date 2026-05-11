@@ -45,6 +45,7 @@ class DevicesView(BaseView):
         "Hub": "hub",
         "Imagerie": "imaging",
         "Communication": "communication",
+        "Audio/video": "audio_video",
         "Specifique constructeur": "vendor_specific",
         "Inconnu": "unknown",
     }
@@ -182,6 +183,7 @@ class DevicesView(BaseView):
             "vidpid": LabeledValue(metrics, "VID:PID"),
             "serial": LabeledValue(metrics, "Numero de serie"),
             "category": LabeledValue(metrics, "Categorie"),
+            "description": LabeledValue(metrics, "Description"),
             "confidence": LabeledValue(metrics, "Confiance"),
             "backend": LabeledValue(metrics, "Backend"),
             "status": LabeledValue(metrics, "Etat"),
@@ -198,16 +200,17 @@ class DevicesView(BaseView):
             ("vidpid", 0, 1),
             ("serial", 1, 0),
             ("category", 1, 1),
-            ("confidence", 2, 0),
-            ("backend", 2, 1),
-            ("status", 3, 0),
-            ("bus", 3, 1),
-            ("trust", 4, 0),
-            ("seen", 4, 1),
-            ("decision", 5, 0),
-            ("variation", 5, 1),
-            ("source", 6, 0),
-            ("score", 6, 1),
+            ("description", 2, 0),
+            ("confidence", 2, 1),
+            ("backend", 3, 0),
+            ("status", 3, 1),
+            ("bus", 4, 0),
+            ("trust", 4, 1),
+            ("seen", 5, 0),
+            ("decision", 5, 1),
+            ("variation", 6, 0),
+            ("source", 6, 1),
+            ("score", 7, 0),
         ]
         for key, row, column in positions:
             metrics_layout.addWidget(self.values[key], row, column)
@@ -281,6 +284,7 @@ class DevicesView(BaseView):
         if device is None:
             self._clear_selection_state()
             return
+        previous_key = self._selected_device_key
         self._selected_device_key = device.device_key
         self.status_badge.set(device_status_text(device.status), device.status)
         self.trust_badge.set(trust_state_text(device.trust_state).upper(), trust_state_tone(device.trust_state))
@@ -289,6 +293,7 @@ class DevicesView(BaseView):
         self.values["vidpid"].set(device.vid_pid)
         self.values["serial"].set(device.serial_number or "Non disponible")
         self.values["category"].set(category_text(device.category))
+        self.values["description"].set(device.metadata.get("description", "Description non disponible."))
         self.values["confidence"].set(f"{device.confidence:.0%}")
         self.values["backend"].set(device.source_backend)
         self.values["status"].set(device_status_text(device.status))
@@ -315,6 +320,8 @@ class DevicesView(BaseView):
             "- Classe USB : {usb_class}\n"
             "- Bus / Adresse : {bus_address}\n"
             "- Source backend : {backend}\n"
+            "- Description : {description}\n"
+            "- Indices : {hints}\n"
             "- Metadata brutes : {metadata}\n\n"
             "Interpretation WireWall :\n"
             "- Source d'identification : {source}\n"
@@ -328,6 +335,8 @@ class DevicesView(BaseView):
                 usb_class=device.usb_class if device.usb_class is not None else "-",
                 bus_address=f"{device.bus or '-'} / {device.address or '-'}",
                 backend=device.source_backend,
+                description=device.metadata.get("description", "Description non disponible."),
+                hints=", ".join(device.metadata.get("identity_hints", [])) or "Aucun indice supplementaire",
                 source=device.identification_source,
                 trust=trust_state_text(device.trust_state),
                 score=f"{device.risk_level} ({device.risk_score})",
@@ -337,7 +346,8 @@ class DevicesView(BaseView):
                 history="\n".join(history_lines),
             )
         )
-        self.detail_page.scroll_to_top()
+        if self._selected_device_key != previous_key:
+            self.detail_page.scroll_to_top()
         self.whitelist_button.setEnabled(True)
         self.blacklist_button.setEnabled(True)
 

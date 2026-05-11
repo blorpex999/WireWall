@@ -27,6 +27,8 @@ class AppController:
         return str(self.settings.mode).lower() == "demo"
 
     def start_services(self) -> None:
+        if hasattr(self.container, "health_service"):
+            self.container.health_service.run_all(self.demo_mode)
         if not self.demo_mode:
             self.container.ollama_runtime_service.ensure_started()
         self.container.usb_monitor.start()
@@ -252,6 +254,23 @@ class AppController:
     def get_health_statuses(self):
         return self.container.health_repo.list_all()
 
+    def verify_integrity(self):
+        result = self.container.integrity_service.verify(self.demo_mode)
+        status = "ok" if result.success and result.status == "integrity_ok" else "warning"
+        if not result.success:
+            status = "error"
+        self.container.health_repo.replace_all(
+            [
+                HealthStatus(
+                    component="integrity",
+                    status=status,
+                    details=result.message,
+                    checked_at=utc_now(),
+                )
+            ]
+        )
+        return result
+
     def get_ollama_health_status(self) -> HealthStatus:
         return self.container.health_repo.get("ollama") or HealthStatus(
             component="ollama",
@@ -302,6 +321,26 @@ class AppController:
                 label="Dossier exports",
                 health_status=health_map.get("exports"),
                 fallback_action="Choisir un dossier d'export accessible.",
+            ),
+            self._build_health_precheck(
+                key="reliability",
+                label="Fiabilite globale",
+                health_status=health_map.get("reliability"),
+                blocking_on=("error",),
+                fallback_action="Relancer le diagnostic de sante et corriger les composants en erreur.",
+            ),
+            self._build_health_precheck(
+                key="degraded_mode",
+                label="Mode degrade",
+                health_status=health_map.get("degraded_mode"),
+                fallback_action="WireWall reste exploitable, mais certaines capacites sont limitees.",
+            ),
+            self._build_health_precheck(
+                key="integrity",
+                label="Integrite audit",
+                health_status=health_map.get("integrity"),
+                blocking_on=("error",),
+                fallback_action="Lancer une verification d'integrite depuis Parametres ou exporter un nouveau rapport.",
             ),
             self._build_health_precheck(
                 key="admin",

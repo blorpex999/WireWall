@@ -6,6 +6,8 @@ from typing import Any, Callable
 from PyQt6.QtCore import QTimer
 from PyQt6.QtWidgets import QWidget
 
+from app.ui.widgets.common import ScrollablePage
+
 LOGGER = logging.getLogger(__name__)
 
 
@@ -45,9 +47,16 @@ class BaseView(QWidget):
     def _run_scheduled_refresh(self) -> None:
         self._scheduled_refresh_timer = None
         try:
-            self.refresh_data()
+            self.refresh_preserving_scroll()
         except Exception:
             LOGGER.exception("Erreur dans refresh_data() de %s.", self.__class__.__name__)
+
+    def refresh_preserving_scroll(self) -> None:
+        pages = self.findChildren(ScrollablePage)
+        states = [(page, page.capture_scroll_state()) for page in pages]
+        self.refresh_data()
+        for page, state in states:
+            page.restore_scroll_state(state)
 
     def run_action(
         self,
@@ -76,7 +85,7 @@ class BaseView(QWidget):
             return None
 
         if refresh:
-            self.refresh_data()
+            self.refresh_preserving_scroll()
         if success_message:
             message = success_message(result) if callable(success_message) else success_message
             level = success_level(result) if callable(success_level) else success_level

@@ -48,11 +48,22 @@ def test_health_service_persists_component_statuses(temp_db, repositories, works
     statuses = service.run_all()
 
     components = {status.component for status in statuses}
-    assert components == {"usb_backend", "database", "admin", "usbstor", "ollama", "logs", "exports"}
+    assert components == {
+        "usb_backend",
+        "database",
+        "admin",
+        "usbstor",
+        "ollama",
+        "logs",
+        "exports",
+        "degraded_mode",
+        "reliability",
+    }
 
     stored = repositories["health_repo"].list_all()
-    assert len(stored) == 7
+    assert len(stored) == 9
     assert any(status.component == "database" and status.status == "ok" for status in stored)
+    assert any(status.component == "reliability" for status in stored)
     assert fake_ollama.calls == [False]
 
 

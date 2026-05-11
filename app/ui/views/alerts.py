@@ -316,6 +316,7 @@ class AlertsView(BaseView):
         if alert is None:
             self._clear_selection_state()
             return
+        previous_key = self._selected_alert_key
         self._selected_alert_key = self._alert_key(alert)
         case = self.controller.get_alert_case(alert.id) if alert.id is not None else None
         assessment = self.controller.get_assessment_for_alert(alert.id) if alert.id is not None else None
@@ -354,7 +355,8 @@ class AlertsView(BaseView):
         self.save_case_button.setEnabled(alert.id is not None)
         self.ack_button.setEnabled(not alert.acknowledged)
         self._sync_context_actions()
-        self.detail_page.scroll_to_top()
+        if self._selected_alert_key != previous_key:
+            self.detail_page.scroll_to_top()
 
     def _clear_selection_state(self) -> None:
         self._selected_alert_key = None

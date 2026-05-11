@@ -95,6 +95,34 @@ def test_monitor_connect_disconnect_pipeline(repositories) -> None:
     assert any(event.event_type == "disconnected" for event in events)
 
 
+def test_monitor_disconnects_stale_connected_device_on_first_scan(repositories) -> None:
+    stale_device = USBDevice(
+        device_key="05AC:12A8:STALE",
+        vid=0x05AC,
+        pid=0x12A8,
+        vendor_name="Apple",
+        product_name="Apple iPhone",
+        serial_number="STALE",
+        category="communication",
+        status="connected",
+        demo_mode=True,
+    )
+    repositories["device_repo"].upsert(stale_device)
+    monitor, _bus = build_monitor(
+        repositories,
+        [EnumerationResult(True, [], "ok", {})],
+    )
+
+    assert monitor.scan_once() is True
+
+    stored = repositories["device_repo"].get(stale_device.device_key)
+    events = repositories["event_repo"].list_recent(demo_mode=True)
+
+    assert stored is not None
+    assert stored.status == "disconnected"
+    assert any(event.event_type == "disconnected" and event.device_key == stale_device.device_key for event in events)
+
+
 def test_monitor_keeps_snapshot_when_enumeration_fails(repositories) -> None:
     device = USBDevice(
         device_key="1234:5678:TEST",

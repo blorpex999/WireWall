@@ -78,6 +78,14 @@ class SettingsView(BaseView):
         self.db_path_label.setObjectName("muted")
         self.db_path_label.setWordWrap(True)
         paths_layout.addWidget(self.db_path_label, 1, 1)
+        self.integrity_button = QPushButton("Verifier l'integrite des audits", paths)
+        self.integrity_button.setObjectName("subtle")
+        self.integrity_button.clicked.connect(self._verify_integrity)
+        paths_layout.addWidget(self.integrity_button, 2, 0, 1, 2)
+        self.integrity_label = QLabel("", paths)
+        self.integrity_label.setObjectName("muted")
+        self.integrity_label.setWordWrap(True)
+        paths_layout.addWidget(self.integrity_label, 3, 0, 1, 2)
         self.content_layout.addWidget(paths, 2, 1)
 
         footer = QWidget(self.content)
@@ -117,6 +125,8 @@ class SettingsView(BaseView):
             else:
                 widget.setChecked(bool(getattr(settings, field_name)))
         self.db_path_label.setText(str(self.controller.get_database_path()))
+        integrity = next((status for status in self.controller.get_health_statuses() if status.component == "integrity"), None)
+        self.integrity_label.setText(integrity.details if integrity else "Aucune verification d'integrite lancee.")
         self.page.force_layout()
 
     def _save(self) -> None:
@@ -145,6 +155,16 @@ class SettingsView(BaseView):
         if notice is None:
             return base_message
         return f"{base_message} | {notice[0]}"
+
+    def _verify_integrity(self) -> None:
+        result = self.run_action(
+            lambda: self.controller.verify_integrity(),
+            success_message=lambda value: value.message,
+            success_level=lambda value: "OK" if value.success and value.status == "integrity_ok" else "WARNING",
+            refresh=True,
+        )
+        if result is not None:
+            self.integrity_label.setText(result.message)
 
     def _add_entry_field(self, layout: QGridLayout, row: int, label: str, field_name: str) -> None:
         layout.addWidget(QLabel(label), row, 0)

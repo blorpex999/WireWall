@@ -201,12 +201,33 @@ class ScrollablePage(QScrollArea):
         self.body_layout.setSpacing(0)
         self.setWidget(self.body)
 
+    def capture_scroll_state(self) -> tuple[int, int]:
+        bar = self.verticalScrollBar()
+        return bar.value(), bar.maximum()
+
+    def restore_scroll_state(self, state: tuple[int, int]) -> None:
+        value, old_maximum = state
+
+        def apply() -> None:
+            bar = self.verticalScrollBar()
+            if old_maximum > 0 and bar.maximum() != old_maximum:
+                ratio = value / old_maximum
+                bar.setValue(int(bar.maximum() * ratio))
+                return
+            bar.setValue(min(value, bar.maximum()))
+
+        apply()
+        QTimer.singleShot(0, apply)
+        QTimer.singleShot(30, apply)
+
     def force_layout(self) -> None:
+        scroll_state = self.capture_scroll_state()
         self.body_layout.activate()
         self.body.adjustSize()
         self.body.updateGeometry()
         self.updateGeometry()
         self.viewport().update()
+        self.restore_scroll_state(scroll_state)
 
     def scroll_to_top(self) -> None:
         self.verticalScrollBar().setValue(0)

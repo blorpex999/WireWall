@@ -216,6 +216,7 @@ class AIAnalysisView(BaseView):
         if analysis is None:
             self._clear_selection_state()
             return
+        previous_key = self._selected_analysis_key
         self._selected_analysis_key = self._analysis_key(analysis)
         self.level_badge.set(analysis.global_level, analysis.global_level)
         self.values["date"].set(format_for_ui(analysis.created_at))
@@ -227,7 +228,8 @@ class AIAnalysisView(BaseView):
         self.recommendations_text.set_text(
             "\n- ".join(["Recommandations"] + (analysis.recommendations or ["Aucune recommandation detaillee."]))
         )
-        self.detail_page.scroll_to_top()
+        if self._selected_analysis_key != previous_key:
+            self.detail_page.scroll_to_top()
 
     def _clear_selection_state(self) -> None:
         self._selected_analysis_key = None

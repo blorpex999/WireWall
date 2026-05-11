@@ -37,6 +37,7 @@ from app.services.demo_threat_marker import DemoThreatMarkerScanner
 from app.services.event_bus import EventBus
 from app.services.health_service import HealthCheckService
 from app.services.incident_service import IncidentService
+from app.services.integrity_service import IntegrityVerificationService
 from app.services.ollama_service import OllamaService
 from app.services.ollama_runtime_service import OllamaRuntimeService
 from app.services.policy_service import PolicyService
@@ -90,6 +91,7 @@ class ApplicationContainer:
     ollama_runtime_service: OllamaRuntimeService
     report_service: ReportService
     health_service: HealthCheckService
+    integrity_service: IntegrityVerificationService
     usb_monitor: UsbMonitorService
     demo_data_service: DemoDataService
 
@@ -219,6 +221,7 @@ def build_container(config_path: str | None = None) -> ApplicationContainer:
         health_repo=health_repo,
         exports_dir_getter=lambda: report_service.exports_dir,
     )
+    integrity_service = IntegrityVerificationService(report_audit_repo, event_repo)
     retention_service = RetentionService(
         event_repo,
         alert_repo,
@@ -270,6 +273,7 @@ def build_container(config_path: str | None = None) -> ApplicationContainer:
                 )
             )
             event_bus.publish("monitor_warning", {"message": result.message, "details": result.details})
+    health_service.run_all(demo_mode)
     brain_service.refresh(demo_mode, settings.recommendation_mode)
 
     if runtime_recovered:
@@ -312,6 +316,7 @@ def build_container(config_path: str | None = None) -> ApplicationContainer:
         ollama_runtime_service=ollama_runtime_service,
         report_service=report_service,
         health_service=health_service,
+        integrity_service=integrity_service,
         usb_monitor=usb_monitor,
         demo_data_service=demo_data_service,
     )

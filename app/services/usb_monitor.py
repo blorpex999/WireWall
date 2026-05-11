@@ -115,7 +115,9 @@ class UsbMonitorService:
         for device in devices:
             canonical = self._canonicalize_device(device, set(new_snapshot))
             new_snapshot[canonical.device_key] = canonical
-        previous_snapshot = self._current_snapshot
+        previous_snapshot = dict(self._current_snapshot)
+        for stored_device in self.device_repo.list_all(status="connected", demo_mode=self.demo_mode):
+            previous_snapshot.setdefault(stored_device.device_key, stored_device)
 
         for device in new_snapshot.values():
             existing = self.device_repo.get(device.device_key)

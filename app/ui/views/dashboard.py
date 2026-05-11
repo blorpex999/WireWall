@@ -117,6 +117,9 @@ class DashboardView(BaseView):
         brain_frame, brain_body = self._build_section("Moteur d'analyse continu")
         suggestions_frame, suggestions_body = self._build_section("Suggestions supervisees")
         precheck_frame, precheck_body = self._build_section("Precheck reel")
+        for body in (events_body, alerts_body, health_body):
+            table_layout = QVBoxLayout(body)
+            table_layout.setContentsMargins(0, 0, 0, 0)
 
         self._section_frames = {
             "events": events_frame,
@@ -254,6 +257,8 @@ class DashboardView(BaseView):
             self.precheck_table.tree.tag_configure(tone, foreground=severity_color(tone))
 
         self._section_wrap_labels.extend([self.brain_summary, self.precheck_intro])
+        self._section_frames["brain"].setMinimumHeight(260)
+        brain_body.setMinimumHeight(220)
         self._apply_layout("wide")
         self._update_wrap_lengths()
 
@@ -440,8 +445,6 @@ class DashboardView(BaseView):
         frame = QGroupBox(title, self.content)
         frame_layout = QVBoxLayout(frame)
         body = QWidget(frame)
-        body.setLayout(QVBoxLayout())
-        body.layout().setContentsMargins(0, 0, 0, 0)
         frame_layout.addWidget(body)
         return frame, body
 

@@ -195,6 +195,7 @@ class HistoryView(BaseView):
         if event is None:
             self._clear_selection_state()
             return
+        previous_key = self._selected_event_key
         self._selected_event_key = self._event_key(event)
         self.severity_badge.set(event.severity, event.severity)
         self.values["date"].set(format_for_ui(event.occurred_at))
@@ -212,7 +213,8 @@ class HistoryView(BaseView):
                 payload=event.payload,
             )
         )
-        self.detail_page.scroll_to_top()
+        if self._selected_event_key != previous_key:
+            self.detail_page.scroll_to_top()
 
     def _clear_selection_state(self) -> None:
         self._selected_event_key = None

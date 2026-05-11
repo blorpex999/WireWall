@@ -402,7 +402,7 @@ class WireWallMainWindow(QMainWindow):
 
     def _refresh_view(self, key: str) -> None:
         try:
-            self.views[key].refresh_data()
+            self.views[key].refresh_preserving_scroll()
         except Exception:
             LOGGER.exception("Erreur pendant le refresh de la vue %s.", key)
 

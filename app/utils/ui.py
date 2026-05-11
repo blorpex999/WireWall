@@ -27,6 +27,7 @@ CATEGORY_LABELS = {
     "hub": "Hub",
     "imaging": "Imagerie",
     "communication": "Communication",
+    "audio_video": "Audio/video",
     "vendor_specific": "Specifique",
     "unknown": "Inconnu",
 }
