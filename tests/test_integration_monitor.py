@@ -90,9 +90,22 @@ def test_monitor_connect_disconnect_pipeline(repositories) -> None:
     monitor.scan_once()
     devices = repositories["device_repo"].list_all(demo_mode=True)
     events = repositories["event_repo"].list_recent(demo_mode=True)
+    bus_events = _bus.drain()
     assert devices[0].status == "disconnected"
     assert any(event.event_type == "connected" for event in events)
     assert any(event.event_type == "disconnected" for event in events)
+    assert any(
+        item["type"] == "device_event"
+        and item["payload"].get("event_type") == "connected"
+        and item["payload"].get("title") == "Appareil connecte"
+        for item in bus_events
+    )
+    assert any(
+        item["type"] == "device_event"
+        and item["payload"].get("event_type") == "disconnected"
+        and item["payload"].get("title") == "Appareil deconnecte"
+        for item in bus_events
+    )
 
 
 def test_monitor_disconnects_stale_connected_device_on_first_scan(repositories) -> None:

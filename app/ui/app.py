@@ -53,6 +53,7 @@ class WireWallMainWindow(QMainWindow):
         self._investigation_windows: list[QWidget] = []
         self._usb_filter: WindowsDeviceNotificationFilter | None = None
         self._tray_icon: QSystemTrayIcon | None = None
+        self._notification_toasts: list[QFrame] = []
         self._repaint_scheduled = False
         self._force_repaint_running = False
         self._is_closing = False
@@ -346,8 +347,15 @@ class WireWallMainWindow(QMainWindow):
         for event in self.container.event_bus.drain():
             event_type = event["type"]
             if event_type == "device_event":
+                payload = event["payload"]
                 self.controller.request_brain_refresh()
                 refresh_views.update({"dashboard", "devices", "history", "alerts"})
+                if payload.get("event_type") in {"connected", "disconnected"}:
+                    self._notify_user(
+                        payload.get("title", "Evenement appareil"),
+                        payload.get("message", "Evenement appareil detecte."),
+                        payload.get("severity", "INFO"),
+                    )
             elif event_type in {"snapshot_updated", "ai_analysis"}:
                 refresh_views.update({"dashboard", "devices", "history", "alerts"})
             elif event_type == "ai_analysis_completed":
@@ -368,23 +376,25 @@ class WireWallMainWindow(QMainWindow):
                 self.controller.request_brain_refresh()
                 self.set_status(payload.get("message", "Nouvelle alerte."), payload.get("severity", "WARNING"))
                 refresh_views.update({"dashboard", "alerts"})
-                if (
-                    self.controller.settings.desktop_notifications_enabled
-                    and payload.get("severity") in {"HIGH", "CRITICAL"}
-                ):
-                    self._show_notification_toast(
-                        payload.get("title", "Alerte WireWall"),
-                        payload.get("message", "Nouvelle alerte."),
-                        payload.get("severity", "WARNING"),
-                    )
+                self._notify_user(
+                    payload.get("title", "Alerte WireWall"),
+                    payload.get("message", "Nouvelle alerte."),
+                    payload.get("severity", "WARNING"),
+                )
             elif event_type == "monitor_error":
-                self.set_status(event["payload"].get("message", "Erreur de monitoring."), "ERROR")
+                message = event["payload"].get("message", "Erreur de monitoring.")
+                self.set_status(message, "ERROR")
+                self._notify_user("Erreur de monitoring", message, "ERROR")
                 refresh_views.add("dashboard")
             elif event_type == "monitor_warning":
-                self.set_status(event["payload"].get("message", "Degradation du monitoring USB."), "WARNING")
+                message = event["payload"].get("message", "Degradation du monitoring USB.")
+                self.set_status(message, "WARNING")
+                self._notify_user("Attention WireWall", message, "WARNING")
                 refresh_views.add("dashboard")
             elif event_type == "background_task_error":
-                self.set_status(event["payload"].get("message", "Erreur de tache de fond."), "ERROR")
+                message = event["payload"].get("message", "Erreur de tache de fond.")
+                self.set_status(message, "ERROR")
+                self._notify_user("Erreur de tache de fond", message, "ERROR")
                 task_name = event["payload"].get("task")
                 if task_name == "ai_analysis":
                     refresh_views.add("ai_analysis")
@@ -439,6 +449,7 @@ class WireWallMainWindow(QMainWindow):
 
     def _handle_resize_settle(self) -> None:
         self._notify_view_resize()
+        self._position_notification_toasts()
         self.request_repaint()
 
     def _notify_view_resize(self) -> None:
@@ -475,14 +486,96 @@ class WireWallMainWindow(QMainWindow):
                 return label
         return key
 
+    def _notify_user(self, title: str, message: str, severity: str) -> None:
+        self._show_in_app_toast(title, message, severity)
+        if self.controller.settings.desktop_notifications_enabled:
+            self._show_notification_toast(title, message, severity)
+
     def _show_notification_toast(self, title: str, message: str, severity: str) -> None:
         if self._tray_icon is None:
             return
         icon_type = {
+            "WARNING": QSystemTrayIcon.MessageIcon.Warning,
+            "ERROR": QSystemTrayIcon.MessageIcon.Critical,
             "HIGH": QSystemTrayIcon.MessageIcon.Warning,
             "CRITICAL": QSystemTrayIcon.MessageIcon.Critical,
         }.get(severity, QSystemTrayIcon.MessageIcon.Information)
         self._tray_icon.showMessage(title, message, icon_type, 4000)
+
+    def _show_in_app_toast(self, title: str, message: str, severity: str) -> None:
+        parent = self.centralWidget()
+        if parent is None:
+            return
+        toast = QFrame(parent)
+        toast.setObjectName("notification_toast")
+        toast.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        toast.setFixedWidth(390)
+        tone = {
+            "OK": ("#123b2a", "#2ee59d"),
+            "LOW": ("#142331", "#7fb4ff"),
+            "INFO": ("#142331", "#7fb4ff"),
+            "MEDIUM": ("#3a2f10", "#ffd166"),
+            "WARNING": ("#3a2f10", "#ffd166"),
+            "HIGH": ("#3a1d12", "#ff9f66"),
+            "ERROR": ("#3b1420", "#ff5f7a"),
+            "CRITICAL": ("#3b1420", "#ff5f7a"),
+        }.get(str(severity).upper(), ("#142331", "#7fb4ff"))
+        toast.setStyleSheet(
+            f"""
+            QFrame#notification_toast {{
+                background-color: {tone[0]};
+                border: 1px solid {tone[1]};
+                border-radius: 8px;
+            }}
+            QLabel#toast_title {{
+                color: #f8fafc;
+                font-weight: 700;
+                font-size: 10pt;
+            }}
+            QLabel#toast_message {{
+                color: #d7e3ea;
+                font-size: 9pt;
+            }}
+            """
+        )
+        layout = QVBoxLayout(toast)
+        layout.setContentsMargins(14, 12, 14, 12)
+        layout.setSpacing(6)
+        title_label = QLabel(title, toast)
+        title_label.setObjectName("toast_title")
+        title_label.setWordWrap(True)
+        message_label = QLabel(message, toast)
+        message_label.setObjectName("toast_message")
+        message_label.setWordWrap(True)
+        layout.addWidget(title_label)
+        layout.addWidget(message_label)
+        toast.adjustSize()
+        toast.setMinimumHeight(max(72, toast.sizeHint().height()))
+        toast.show()
+        toast.raise_()
+        self._notification_toasts.append(toast)
+        self._position_notification_toasts()
+        QTimer.singleShot(5200, lambda current=toast: self._dismiss_in_app_toast(current))
+
+    def _dismiss_in_app_toast(self, toast: QFrame) -> None:
+        if toast in self._notification_toasts:
+            self._notification_toasts.remove(toast)
+        toast.deleteLater()
+        self._position_notification_toasts()
+
+    def _position_notification_toasts(self) -> None:
+        parent = self.centralWidget()
+        if parent is None:
+            return
+        margin = 18
+        y = margin
+        for toast in list(self._notification_toasts):
+            if toast.parent() is None:
+                self._notification_toasts.remove(toast)
+                continue
+            x = max(margin, parent.width() - toast.width() - margin)
+            toast.move(x, y)
+            y += toast.height() + 10
 
     def closeEvent(self, event: QCloseEvent) -> None:  # noqa: N802
         if self._is_closing:
@@ -501,6 +594,10 @@ class WireWallMainWindow(QMainWindow):
 
         if self._tray_icon is not None:
             self._tray_icon.hide()
+
+        for toast in list(self._notification_toasts):
+            toast.deleteLater()
+        self._notification_toasts.clear()
 
         for window in list(self._investigation_windows):
             window.close()

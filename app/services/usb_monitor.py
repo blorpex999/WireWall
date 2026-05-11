@@ -319,7 +319,21 @@ class UsbMonitorService:
             demo_mode=self.demo_mode,
         )
         event_id = self.event_repo.add(event)
-        self.event_bus.publish("device_event", {"event_id": event_id, "device_key": device.device_key})
+        self.event_bus.publish(
+            "device_event",
+            {
+                "event_id": event_id,
+                "device_key": device.device_key,
+                "event_type": event_type,
+                "title": "Appareil connecte" if event_type == "connected" else "Appareil deconnecte",
+                "message": summary,
+                "severity": level,
+                "score": score,
+                "device_name": device.display_name,
+                "vid_pid": device.vid_pid,
+                "category": device.category,
+            },
+        )
         return event_id
 
     def _create_system_event(
@@ -351,7 +365,18 @@ class UsbMonitorService:
                 demo_mode=self.demo_mode,
             )
         )
-        self.event_bus.publish("device_event", {"event_id": event_id, "device_key": None})
+        self.event_bus.publish(
+            "device_event",
+            {
+                "event_id": event_id,
+                "device_key": None,
+                "event_type": event_type,
+                "title": "Information WireWall",
+                "message": summary,
+                "severity": severity,
+                "score": score,
+            },
+        )
         return event_id
 
     def _is_generic_vendor(self, value: str | None) -> bool:
