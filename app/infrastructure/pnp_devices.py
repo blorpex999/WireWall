@@ -92,7 +92,7 @@ class PnpDeviceManager:
         changed = []
         failed = {}
         pnputil_action = "/enable-device" if enable else "/disable-device"
-        pnputil_extra = ["/reboot"] if enable else ["/force", "/reboot"]
+        pnputil_extra = [] if enable else ["/force"]
         for instance_id in ids:
             result = self._run_pnputil([pnputil_action, instance_id, *pnputil_extra], timeout=45)
             if result.success:
@@ -131,7 +131,7 @@ class PnpDeviceManager:
         changed = []
         failed = {}
         for device_id in device_ids:
-            result = self._run_pnputil(["/disable-device", "/deviceid", device_id, "/force", "/reboot"], timeout=60)
+            result = self._run_pnputil(["/disable-device", "/deviceid", device_id, "/force"], timeout=60)
             if result.success:
                 changed.append(device_id)
             else:

@@ -29,7 +29,7 @@
 - Il desactive aussi les peripheriques USB deja presents via `pnputil`/`Disable-PnpDevice` (`USB`, `USBSTOR`, `HID\VID...`) pour rendre l'action visible sans attendre un redemarrage quand Windows l'autorise.
 - Il peut bloquer souris, clavier, hubs, stockage, adaptateurs et certains peripheriques internes relies en USB.
 - WireWall sauvegarde les valeurs de demarrage originales, les policies preexistantes et les IDs PnP modifies avant blocage, puis propose une restauration.
-- `gpupdate` est execute pendant l'action pour privilegier la fiabilite; un redemarrage peut encore etre necessaire pour appliquer ou annuler pleinement l'etat sur certains pilotes.
+- `gpupdate` est execute pendant l'action pour privilegier la fiabilite; WireWall ne declenche jamais de redemarrage automatique, meme si certains pilotes peuvent demander un redemarrage manuel pour appliquer ou annuler pleinement l'etat.
 - Cette option reste dangereuse sur un poste sans clavier/touchpad non USB ou sans acces distant.
 
 ## Ollama
