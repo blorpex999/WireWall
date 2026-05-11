@@ -15,6 +15,7 @@ USBSTOR_REG_PATH = r"SYSTEM\CurrentControlSet\Services\USBSTOR"
 SERVICES_REG_ROOT = r"SYSTEM\CurrentControlSet\Services"
 WIREWALL_REG_PATH = r"SOFTWARE\WireWall"
 USB_LOCKDOWN_BACKUP_VALUE = "UsbPortLockdownServiceStarts"
+USB_LOCKDOWN_PNP_BACKUP_VALUE = "UsbPortLockdownPnpInstanceIds"
 
 
 @dataclass(slots=True)
@@ -101,6 +102,35 @@ class RegistryManager:
             return OperationResult(False, "permission_denied", "Lecture de la sauvegarde WireWall refusee.")
         except (OSError, ValueError, TypeError) as exc:
             return OperationResult(False, "error", f"Sauvegarde WireWall illisible: {exc}")
+
+    def save_usb_lockdown_pnp_backup(self, instance_ids: list[str]) -> OperationResult:
+        if winreg is None:
+            return OperationResult(False, "unsupported", "Le registre Windows n'est pas disponible.")
+        values = [str(instance_id) for instance_id in instance_ids if str(instance_id).strip()]
+        try:
+            with winreg.CreateKeyEx(winreg.HKEY_LOCAL_MACHINE, WIREWALL_REG_PATH, 0, winreg.KEY_SET_VALUE) as key:
+                winreg.SetValueEx(key, USB_LOCKDOWN_PNP_BACKUP_VALUE, 0, winreg.REG_SZ, json.dumps(values))
+            return OperationResult(True, "saved", "Sauvegarde WireWall des peripheriques USB PnP enregistree.", {"instance_ids": values})
+        except PermissionError:
+            return OperationResult(False, "permission_denied", "Privileges administrateur requis pour sauvegarder les peripheriques USB.")
+        except OSError as exc:
+            return OperationResult(False, "error", f"Erreur sauvegarde PnP WireWall: {exc}")
+
+    def load_usb_lockdown_pnp_backup(self) -> OperationResult:
+        if winreg is None:
+            return OperationResult(False, "unsupported", "Le registre Windows n'est pas disponible.")
+        try:
+            with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, WIREWALL_REG_PATH, 0, winreg.KEY_READ) as key:
+                value, _ = winreg.QueryValueEx(key, USB_LOCKDOWN_PNP_BACKUP_VALUE)
+            parsed = json.loads(str(value))
+            instance_ids = [str(instance_id) for instance_id in parsed if str(instance_id).strip()]
+            return OperationResult(True, "loaded", "Sauvegarde WireWall des peripheriques USB PnP chargee.", {"instance_ids": instance_ids})
+        except FileNotFoundError:
+            return OperationResult(False, "not_found", "Aucune sauvegarde WireWall des peripheriques USB PnP.")
+        except PermissionError:
+            return OperationResult(False, "permission_denied", "Lecture de la sauvegarde WireWall PnP refusee.")
+        except (OSError, ValueError, TypeError) as exc:
+            return OperationResult(False, "error", f"Sauvegarde WireWall PnP illisible: {exc}")
 
     def set_usbstor_start(self, value: int) -> OperationResult:
         if winreg is None:

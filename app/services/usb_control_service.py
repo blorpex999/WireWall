@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from app.infrastructure.pnp_devices import PnpDeviceManager
 from app.infrastructure.registry import RegistryManager
 from app.models.entities import OperationResult
 from app.utils.admin import is_admin
@@ -13,8 +14,9 @@ USB_LOCKDOWN_SERVICES = {
 
 
 class UsbControlService:
-    def __init__(self, registry_manager: RegistryManager) -> None:
+    def __init__(self, registry_manager: RegistryManager, pnp_device_manager: PnpDeviceManager | None = None) -> None:
         self.registry_manager = registry_manager
+        self.pnp_device_manager = pnp_device_manager or PnpDeviceManager()
 
     def get_status(self) -> OperationResult:
         status = self.registry_manager.get_usbstor_start()
@@ -90,8 +92,8 @@ class UsbControlService:
                 "backup_available": backup.success,
                 "backup": backup.details.get("backup", {}) if backup.success else {},
                 "note": (
-                    "Ce controle agit sur les services Windows de controle/hub USB. "
-                    "Il peut couper souris, clavier, hubs, disques et autres peripheriques USB, souvent apres redemarrage."
+                    "Ce controle agit sur les services Windows de controle/hub USB et desactive les peripheriques PnP presents. "
+                    "Il peut couper souris, clavier, hubs, disques et autres peripheriques USB."
                 ),
             },
         )
@@ -118,6 +120,13 @@ class UsbControlService:
         if not backup_result.success:
             return backup_result
 
+        pnp_candidates = self.pnp_device_manager.list_lockdown_candidates()
+        pnp_devices = pnp_candidates.details.get("devices", []) if pnp_candidates.success else []
+        pnp_instance_ids = [str(device["instance_id"]) for device in pnp_devices if device.get("instance_id")]
+        pnp_backup = self.registry_manager.save_usb_lockdown_pnp_backup(pnp_instance_ids)
+        if not pnp_backup.success:
+            return pnp_backup
+
         results = {}
         failures = {}
         for service_name in current:
@@ -130,18 +139,35 @@ class UsbControlService:
                 False,
                 "partial",
                 "Verrouillage total USB partiellement applique.",
-                {"results": results, "failures": failures, "backup": current, "missing": missing},
+                {"results": results, "failures": failures, "backup": current, "missing": missing, "pnp_candidates": pnp_devices},
+            )
+        pnp_disable = self.pnp_device_manager.disable_devices(pnp_instance_ids)
+        pnp_details = pnp_disable.details if pnp_disable.details else {}
+        if pnp_candidates.success and not pnp_disable.success:
+            return OperationResult(
+                False,
+                "partial",
+                "Services USB bloques, mais certains peripheriques deja branches n'ont pas pu etre desactives.",
+                {
+                    "results": results,
+                    "backup": current,
+                    "missing": missing,
+                    "pnp_candidates": pnp_devices,
+                    "pnp_result": pnp_details,
+                },
             )
         return OperationResult(
             True,
             "blocked",
-            "Verrouillage total USB applique. Un redemarrage peut etre necessaire.",
+            "Verrouillage total USB applique: services bloques et peripheriques presents desactives.",
             {
                 "action": "block_all_usb",
                 "results": results,
                 "backup": current,
                 "missing": missing,
-                "warning": "Les souris, claviers et hubs USB peuvent cesser de fonctionner.",
+                "pnp_candidates": pnp_devices,
+                "pnp_result": pnp_details,
+                "warning": "Les souris, claviers et hubs USB peuvent cesser de fonctionner immediatement.",
             },
         )
 
@@ -162,18 +188,45 @@ class UsbControlService:
             results[service_name] = result.status
             if not result.success:
                 failures[service_name] = result.message
+        pnp_backup = self.registry_manager.load_usb_lockdown_pnp_backup()
+        pnp_instance_ids = pnp_backup.details.get("instance_ids", []) if pnp_backup.success else []
+        pnp_restore = self.pnp_device_manager.enable_devices(pnp_instance_ids)
         if failures:
             return OperationResult(
                 False,
                 "partial",
                 "Restauration USB partiellement appliquee.",
-                {"results": results, "failures": failures, "backup_used": backup.success},
+                {
+                    "results": results,
+                    "failures": failures,
+                    "backup_used": backup.success,
+                    "pnp_backup_used": pnp_backup.success,
+                    "pnp_result": pnp_restore.details,
+                },
+            )
+        if pnp_backup.success and not pnp_restore.success:
+            return OperationResult(
+                False,
+                "partial",
+                "Services USB restaures, mais certains peripheriques PnP n'ont pas pu etre reactives.",
+                {
+                    "results": results,
+                    "backup_used": backup.success,
+                    "pnp_backup_used": True,
+                    "pnp_result": pnp_restore.details,
+                },
             )
         return OperationResult(
             True,
             "enabled",
-            "Ports USB restaures. Un redemarrage peut etre necessaire.",
-            {"action": "restore_all_usb", "results": results, "backup_used": backup.success},
+            "Ports USB restaures et peripheriques PnP reactives. Un redemarrage peut rester necessaire.",
+            {
+                "action": "restore_all_usb",
+                "results": results,
+                "backup_used": backup.success,
+                "pnp_backup_used": pnp_backup.success,
+                "pnp_result": pnp_restore.details,
+            },
         )
 
     def diagnostics(self) -> dict[str, object]:

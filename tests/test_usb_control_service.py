@@ -10,6 +10,7 @@ class FakeRegistry:
         self.status = status
         self.services = {"USBXHCI": 3, "USBHUB3": 3, "usbhub": 3, "UCX01000": 3}
         self.backup = {}
+        self.pnp_backup = []
 
     def get_usbstor_start(self):
         return OperationResult(True, self.status, "ok", {"start_value": 3 if self.status == "enabled" else 4})
@@ -38,6 +39,36 @@ class FakeRegistry:
             return OperationResult(False, "not_found", "missing")
         return OperationResult(True, "loaded", "loaded", {"backup": self.backup})
 
+    def save_usb_lockdown_pnp_backup(self, instance_ids: list[str]):
+        self.pnp_backup = list(instance_ids)
+        return OperationResult(True, "saved", "saved", {"instance_ids": self.pnp_backup})
+
+    def load_usb_lockdown_pnp_backup(self):
+        if not self.pnp_backup:
+            return OperationResult(False, "not_found", "missing")
+        return OperationResult(True, "loaded", "loaded", {"instance_ids": self.pnp_backup})
+
+
+class FakePnpDeviceManager:
+    def __init__(self) -> None:
+        self.devices = [
+            {"instance_id": r"USBSTOR\DISK&VEN_TEST\123", "name": "Disque USB", "class": "DiskDrive", "status": "OK"},
+            {"instance_id": r"HID\VID_046D&PID_C077\456", "name": "Souris USB", "class": "HIDClass", "status": "OK"},
+        ]
+        self.disabled = []
+        self.enabled = []
+
+    def list_lockdown_candidates(self):
+        return OperationResult(True, "ok", "ok", {"devices": self.devices})
+
+    def disable_devices(self, instance_ids: list[str]):
+        self.disabled = list(instance_ids)
+        return OperationResult(True, "disabled", "disabled", {"changed": self.disabled, "failed": {}})
+
+    def enable_devices(self, instance_ids: list[str]):
+        self.enabled = list(instance_ids)
+        return OperationResult(True, "enabled", "enabled", {"changed": self.enabled, "failed": {}})
+
 
 def test_usb_control_requires_admin(monkeypatch) -> None:
     monkeypatch.setattr(control_module, "is_admin", lambda: False)
@@ -59,15 +90,18 @@ def test_usb_control_full_lockdown_saves_and_restores_services(monkeypatch) -> N
     monkeypatch.setattr(control_module, "is_admin", lambda: True)
     registry = FakeRegistry()
     registry.services["USBHUB3"] = 2
-    service = UsbControlService(registry)
+    pnp = FakePnpDeviceManager()
+    service = UsbControlService(registry, pnp)
 
     block = service.block_all_usb_ports()
     assert block.success is True
     assert block.status == "blocked"
     assert all(value == 4 for value in registry.services.values())
+    assert pnp.disabled == [r"USBSTOR\DISK&VEN_TEST\123", r"HID\VID_046D&PID_C077\456"]
 
     restore = service.restore_all_usb_ports()
     assert restore.success is True
     assert restore.status == "enabled"
     assert registry.services["USBXHCI"] == 3
     assert registry.services["USBHUB3"] == 2
+    assert pnp.enabled == [r"USBSTOR\DISK&VEN_TEST\123", r"HID\VID_046D&PID_C077\456"]
