@@ -89,8 +89,57 @@ class PnpDeviceManager:
         ids = [str(instance_id) for instance_id in instance_ids if str(instance_id).strip()]
         if not ids:
             return OperationResult(True, "empty", "Aucun peripherique PnP a modifier.", {"changed": [], "failed": {}})
+        changed = []
+        failed = {}
+        pnputil_action = "/enable-device" if enable else "/disable-device"
+        for instance_id in ids:
+            result = self._run_pnputil([pnputil_action, instance_id], timeout=45)
+            if result.success:
+                changed.append(instance_id)
+            else:
+                failed[instance_id] = result.message
+        if failed:
+            fallback = self._toggle_devices_with_powershell(list(failed), enable=enable)
+            fallback_changed = fallback.details.get("changed", []) if fallback.details else []
+            if isinstance(fallback_changed, str):
+                fallback_changed = [fallback_changed]
+            for instance_id in fallback_changed:
+                if instance_id not in changed:
+                    changed.append(instance_id)
+                failed.pop(instance_id, None)
+            fallback_failed = fallback.details.get("failed", {}) if fallback.details else {}
+            if isinstance(fallback_failed, dict):
+                failed.update({str(key): str(value) for key, value in fallback_failed.items()})
+        if failed:
+            return OperationResult(
+                False,
+                "partial",
+                "Certains peripheriques USB PnP n'ont pas pu etre modifies.",
+                {"changed": changed, "failed": failed},
+            )
+        status = "enabled" if enable else "disabled"
+        message = "Peripheriques USB PnP restaures." if enable else "Peripheriques USB PnP desactives."
+        return OperationResult(True, status, message, {"changed": changed, "failed": {}})
+
+    def apply_policy_refresh(self) -> OperationResult:
+        return self._run_process(["gpupdate.exe", "/target:computer", "/force"], timeout=90)
+
+    def disable_usb_device_ids(self) -> OperationResult:
+        device_ids = ["USB\\Class_03", "USB\\Class_08", "USB\\Class_09", "USB\\Class_E0", "USB\\Class_FF"]
+        changed = []
+        failed = {}
+        for device_id in device_ids:
+            result = self._run_pnputil(["/disable-device", "/deviceid", device_id], timeout=60)
+            if result.success:
+                changed.append(device_id)
+            else:
+                failed[device_id] = result.message
+        status = "disabled" if not failed else "partial"
+        return OperationResult(not failed, status, "Classes USB PnP traitees.", {"changed": changed, "failed": failed})
+
+    def _toggle_devices_with_powershell(self, instance_ids: list[str], *, enable: bool) -> OperationResult:
         action = "Enable-PnpDevice" if enable else "Disable-PnpDevice"
-        payload = json.dumps(ids)
+        payload = json.dumps(instance_ids)
         script = rf"""
 $ErrorActionPreference = 'Continue'
 $ids = ConvertFrom-Json $args[0]
@@ -106,7 +155,7 @@ foreach ($id in $ids) {{
 }}
 [PSCustomObject]@{{ changed = $changed; failed = $failed }} | ConvertTo-Json -Compress
 """
-        result = self._run_powershell(script, [payload], timeout=max(90, len(ids) * 8))
+        result = self._run_powershell(script, [payload], timeout=max(90, len(instance_ids) * 8))
         if not result.success:
             return result
         raw = str(result.details.get("stdout") or "").strip()
@@ -118,16 +167,29 @@ foreach ($id in $ids) {{
         if isinstance(changed, str):
             changed = [changed]
         failed = parsed.get("failed") or {}
-        if failed:
-            return OperationResult(
-                False,
-                "partial",
-                "Certains peripheriques USB PnP n'ont pas pu etre modifies.",
-                {"changed": changed, "failed": failed},
+        return OperationResult(not failed, "ok" if not failed else "partial", "PowerShell PnP termine.", {"changed": changed, "failed": failed})
+
+    def _run_pnputil(self, args: list[str], timeout: int = 60) -> OperationResult:
+        return self._run_process(["pnputil.exe", *args], timeout=timeout)
+
+    def _run_process(self, command: list[str], timeout: int = 60) -> OperationResult:
+        creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+        try:
+            completed = subprocess.run(
+                command,
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+                creationflags=creationflags,
             )
-        status = "enabled" if enable else "disabled"
-        message = "Peripheriques USB PnP restaures." if enable else "Peripheriques USB PnP desactives."
-        return OperationResult(True, status, message, {"changed": changed, "failed": {}})
+        except FileNotFoundError:
+            return OperationResult(False, "unsupported", f"{command[0]} est introuvable sur ce poste.")
+        except subprocess.TimeoutExpired:
+            return OperationResult(False, "timeout", f"Commande trop longue: {command[0]}.")
+        output = "\n".join(part.strip() for part in (completed.stdout, completed.stderr) if part and part.strip())
+        if completed.returncode != 0:
+            return OperationResult(False, "error", output or f"{command[0]} a echoue.", {"returncode": completed.returncode})
+        return OperationResult(True, "ok", output or f"{command[0]} termine.", {"returncode": completed.returncode, "output": output})
 
     @staticmethod
     def _disable_priority(instance_id: str) -> int:

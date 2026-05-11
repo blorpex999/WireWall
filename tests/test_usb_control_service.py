@@ -48,6 +48,15 @@ class FakeRegistry:
             return OperationResult(False, "not_found", "missing")
         return OperationResult(True, "loaded", "loaded", {"instance_ids": self.pnp_backup})
 
+    def apply_usb_lockdown_policies(self, class_guids: list[str]):
+        return OperationResult(True, "applied", "applied", {"classes": class_guids})
+
+    def restore_usb_lockdown_policies(self):
+        return OperationResult(True, "restored", "restored", {"backup_used": True})
+
+    def load_usb_lockdown_policy_backup(self):
+        return OperationResult(False, "not_found", "missing")
+
 
 class FakePnpDeviceManager:
     def __init__(self) -> None:
@@ -68,6 +77,12 @@ class FakePnpDeviceManager:
     def enable_devices(self, instance_ids: list[str]):
         self.enabled = list(instance_ids)
         return OperationResult(True, "enabled", "enabled", {"changed": self.enabled, "failed": {}})
+
+    def apply_policy_refresh(self):
+        return OperationResult(True, "ok", "ok", {"output": "ok"})
+
+    def disable_usb_device_ids(self):
+        return OperationResult(True, "disabled", "disabled", {"changed": ["USB\\Class_08"], "failed": {}})
 
 
 def test_usb_control_requires_admin(monkeypatch) -> None:

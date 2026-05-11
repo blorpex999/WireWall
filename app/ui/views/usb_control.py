@@ -65,7 +65,7 @@ class USBControlView(BaseView):
         lockdown = QGroupBox("Verrouillage total des ports USB", self)
         lockdown_layout = QVBoxLayout(lockdown)
         self.lockdown_note = QLabel(
-            "Option avancee: bloque les services USB et desactive les peripheriques USB deja branches via Windows PnP. "
+            "Option avancee: applique les policies Windows USB, bloque les services USB et desactive les peripheriques deja branches. "
             "Prevoir un clavier/touchpad non USB ou un acces distant avant activation.",
             lockdown,
         )
@@ -148,7 +148,8 @@ class USBControlView(BaseView):
             "Ce que USBSTOR ne bloque pas :\n"
             "- Les souris, claviers, receivers HID, hubs ou la plupart des peripheriques non stockage.\n\n"
             "Ce que le verrouillage total peut bloquer :\n"
-            "- Les controleurs/hubs USB Windows et les peripheriques deja presents via PnP: souris, clavier, stockage et adaptateurs.\n\n"
+            "- Les policies Windows Device Installation, les controleurs/hubs USB et les peripheriques deja presents via PnP.\n"
+            "- Le stockage amovible via Deny_All, donc disque externe ou cle USB doivent devenir illisibles.\n\n"
             "Pourquoi admin est requis :\n"
             "- WireWall doit modifier une cle registre Windows protegee puis relire le resultat.\n\n"
             "Pourquoi une reinsertion peut etre necessaire :\n"
@@ -214,8 +215,9 @@ class USBControlView(BaseView):
             return
         message = (
             "Bloquer TOUS les ports USB Windows ?\n\n"
-            "Cette action bloque les services USB et desactive aussi les peripheriques deja branches via Windows PnP.\n"
+            "Cette action applique les policies Windows officielles, bloque les services USB et desactive aussi les peripheriques deja branches.\n"
             "Elle peut couper souris, clavier, hubs, disque USB, adaptateurs et certains appareils internes immediatement.\n"
+            "Un redemarrage peut etre necessaire pour que Windows applique le blocage partout.\n"
             "La restauration peut etre difficile sans clavier/touchpad non USB ou acces distant.\n\n"
             "Continuer seulement si tu as un moyen de reprendre la main."
         )

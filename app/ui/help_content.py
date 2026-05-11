@@ -32,9 +32,9 @@ SCREEN_HELP: dict[str, dict[str, object]] = {
         "button": "Comprendre le controle USB",
         "sections": [
             ("Ce que montre l'ecran", "Etat USBSTOR, verrouillage total USB, niveau de droits et capacite reelle d'agir sur Windows."),
-            ("Observe reellement", "WireWall lit/ecrit USBSTOR, des services USB Windows, et desactive les peripheriques USB presents via PnP."),
+            ("Observe reellement", "WireWall applique les policies Windows Device Installation/Removable Storage, lit/ecrit USBSTOR et desactive les peripheriques presents."),
             ("Deduit ou calcule", "La capacite d'action depend du mode reel/demo, des droits admin et du retour registre."),
-            ("A dire en soutenance", "USBSTOR bloque le stockage; le verrouillage total agit plus bas et peut aussi couper souris/clavier USB."),
+            ("A dire en soutenance", "Le blocage renforce combine policies Microsoft, USBSTOR, services USB et desactivation PnP; certains effets peuvent demander redemarrage."),
         ],
     },
     "ai_analysis": {
@@ -68,7 +68,7 @@ GLOSSARY: list[tuple[str, str]] = [
     ("PyUSB / libusb", "Couche de lecture USB en espace utilisateur. Ce n'est pas un driver noyau Windows."),
     ("Snapshot utilisateur", "Photo de l'etat USB a un instant T, comparee ensuite pour detecter les changements."),
     ("USBSTOR", "Service Windows qui controle le stockage USB. Il ne bloque pas les claviers, souris ou hubs."),
-    ("Verrouillage total USB", "Action admin avancee sur les services controleur/hub USB Windows et les peripheriques PnP deja presents."),
+    ("Verrouillage total USB", "Action admin avancee qui combine policies Microsoft, services controleur/hub USB et peripheriques PnP deja presents."),
     ("Whitelist / Blacklist", "Listes de confiance ou de refus basees sur VID:PID ou numero de serie."),
     ("Baseline", "Memoire locale d'usage: nouveau, rare, connu ou en deviation par rapport aux habitudes observees."),
     ("Incident", "Traitement analyste d'une alerte: statut, decision, commentaire et resolution."),

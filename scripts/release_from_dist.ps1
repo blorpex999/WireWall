@@ -1,4 +1,5 @@
 param(
+    [string]$SourceDist,
     [switch]$SkipInstaller
 )
 
@@ -6,7 +7,7 @@ $ErrorActionPreference = "Stop"
 
 $root = Resolve-Path (Join-Path $PSScriptRoot "..")
 $version = (Get-Content (Join-Path $root "VERSION") -Encoding UTF8).Trim()
-$distDir = Join-Path $root "dist\WireWall"
+$distDir = if ($SourceDist) { (Resolve-Path $SourceDist).Path } else { Join-Path $root "dist\WireWall" }
 $releaseDir = Join-Path $root "release"
 $portableName = "WireWall-$version-win64-portable"
 $portableStage = Join-Path $releaseDir $portableName

@@ -12,6 +12,17 @@ USB_LOCKDOWN_SERVICES = {
     "UCX01000": 3,
 }
 
+USB_LOCKDOWN_CLASS_GUIDS = [
+    "{36fc9e60-c465-11cf-8056-444553540000}",  # USB host controllers and hubs
+    "{88bae032-5a81-49f0-bc3d-a4ff138216d6}",  # USBDevice
+    "{745a17a0-74d3-11d0-b6fe-00a0c90f57da}",  # HIDClass
+    "{4d36e96b-e325-11ce-bfc1-08002be10318}",  # Keyboard
+    "{4d36e96f-e325-11ce-bfc1-08002be10318}",  # Mouse
+    "{4d36e967-e325-11ce-bfc1-08002be10318}",  # DiskDrive
+    "{4d36e97b-e325-11ce-bfc1-08002be10318}",  # SCSIAdapter / UASP storage
+    "{eec5ad98-8080-425f-922a-dabf3de3f69a}",  # WPD portable devices
+]
+
 
 class UsbControlService:
     def __init__(self, registry_manager: RegistryManager, pnp_device_manager: PnpDeviceManager | None = None) -> None:
@@ -80,6 +91,7 @@ class UsbControlService:
             status = "enabled"
             message = "Ports USB systeme autorises."
         backup = self.registry_manager.load_usb_lockdown_backup()
+        policy_backup = self.registry_manager.load_usb_lockdown_policy_backup()
         return OperationResult(
             True,
             status,
@@ -91,9 +103,10 @@ class UsbControlService:
                 "errors": errors,
                 "backup_available": backup.success,
                 "backup": backup.details.get("backup", {}) if backup.success else {},
+                "policy_backup_available": policy_backup.success,
                 "note": (
-                    "Ce controle agit sur les services Windows de controle/hub USB et desactive les peripheriques PnP presents. "
-                    "Il peut couper souris, clavier, hubs, disques et autres peripheriques USB."
+                    "Ce controle applique les policies Windows officielles, bloque les services USB et desactive les peripheriques PnP presents. "
+                    "Il peut couper souris, clavier, hubs, disques et autres peripheriques USB; un redemarrage peut renforcer l'effet."
                 ),
             },
         )
@@ -126,6 +139,10 @@ class UsbControlService:
         pnp_backup = self.registry_manager.save_usb_lockdown_pnp_backup(pnp_instance_ids)
         if not pnp_backup.success:
             return pnp_backup
+        policy_result = self.registry_manager.apply_usb_lockdown_policies(USB_LOCKDOWN_CLASS_GUIDS)
+        if not policy_result.success:
+            return policy_result
+        policy_refresh = self.pnp_device_manager.apply_policy_refresh()
 
         results = {}
         failures = {}
@@ -141,17 +158,21 @@ class UsbControlService:
                 "Verrouillage total USB partiellement applique.",
                 {"results": results, "failures": failures, "backup": current, "missing": missing, "pnp_candidates": pnp_devices},
             )
+        class_disable = self.pnp_device_manager.disable_usb_device_ids()
         pnp_disable = self.pnp_device_manager.disable_devices(pnp_instance_ids)
         pnp_details = pnp_disable.details if pnp_disable.details else {}
         if pnp_candidates.success and not pnp_disable.success:
             return OperationResult(
                 False,
                 "partial",
-                "Services USB bloques, mais certains peripheriques deja branches n'ont pas pu etre desactives.",
+                "Policies/services USB appliques, mais certains peripheriques deja branches n'ont pas pu etre desactives.",
                 {
                     "results": results,
                     "backup": current,
                     "missing": missing,
+                    "policy_result": policy_result.details,
+                    "policy_refresh": policy_refresh.details,
+                    "class_disable": class_disable.details,
                     "pnp_candidates": pnp_devices,
                     "pnp_result": pnp_details,
                 },
@@ -159,12 +180,15 @@ class UsbControlService:
         return OperationResult(
             True,
             "blocked",
-            "Verrouillage total USB applique: services bloques et peripheriques presents desactives.",
+            "Verrouillage USB renforce applique: policies Windows, services et peripheriques presents traites.",
             {
                 "action": "block_all_usb",
                 "results": results,
                 "backup": current,
                 "missing": missing,
+                "policy_result": policy_result.details,
+                "policy_refresh": policy_refresh.details,
+                "class_disable": class_disable.details,
                 "pnp_candidates": pnp_devices,
                 "pnp_result": pnp_details,
                 "warning": "Les souris, claviers et hubs USB peuvent cesser de fonctionner immediatement.",
@@ -181,6 +205,10 @@ class UsbControlService:
             )
         backup = self.registry_manager.load_usb_lockdown_backup()
         target_values = backup.details.get("backup", {}) if backup.success else dict(USB_LOCKDOWN_SERVICES)
+        if target_values and all(int(value) == 4 for value in target_values.values()):
+            target_values = dict(USB_LOCKDOWN_SERVICES)
+        policy_restore = self.registry_manager.restore_usb_lockdown_policies()
+        policy_refresh = self.pnp_device_manager.apply_policy_refresh()
         results = {}
         failures = {}
         for service_name, start_value in target_values.items():
@@ -200,6 +228,8 @@ class UsbControlService:
                     "results": results,
                     "failures": failures,
                     "backup_used": backup.success,
+                    "policy_restore": policy_restore.details,
+                    "policy_refresh": policy_refresh.details,
                     "pnp_backup_used": pnp_backup.success,
                     "pnp_result": pnp_restore.details,
                 },
@@ -212,6 +242,8 @@ class UsbControlService:
                 {
                     "results": results,
                     "backup_used": backup.success,
+                    "policy_restore": policy_restore.details,
+                    "policy_refresh": policy_refresh.details,
                     "pnp_backup_used": True,
                     "pnp_result": pnp_restore.details,
                 },
@@ -224,6 +256,8 @@ class UsbControlService:
                 "action": "restore_all_usb",
                 "results": results,
                 "backup_used": backup.success,
+                "policy_restore": policy_restore.details,
+                "policy_refresh": policy_refresh.details,
                 "pnp_backup_used": pnp_backup.success,
                 "pnp_result": pnp_restore.details,
             },
